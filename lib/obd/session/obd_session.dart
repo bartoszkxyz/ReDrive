@@ -1,5 +1,6 @@
 import 'package:redrive/obd/elm/elm_response.dart';
 import 'package:redrive/obd/pid/decoders/supported_pids_decoder.dart';
+import 'package:redrive/services/logging/log_service.dart';
 
 import '../elm/elm_client.dart';
 
@@ -12,11 +13,15 @@ enum ObdSessionState { disconnected, initializing, ready, error }
 /// returns supportedEcuPids to registry.
 class ObdSession {
   final ElmClient _elmClient;
+  final String protocolCommand;
 
   ObdSessionState _state = ObdSessionState.disconnected;
   Object? _lastError;
 
-  ObdSession({required ElmClient elmClient}) : _elmClient = elmClient;
+  ObdSession({
+    required ElmClient elmClient,
+    this.protocolCommand = 'ATSP0',
+  }) : _elmClient = elmClient;
 
   ObdSessionState get state => _state;
   Object? get lastError => _lastError;
@@ -24,36 +29,89 @@ class ObdSession {
   Future<Set<int>> initialize() async {
     _state = ObdSessionState.initializing;
     _lastError = null;
+    LogService.i("Starting OBD initialization sequence (protocol: $protocolCommand)...", tag: 'OBD');
 
     try {
-      await _executeAndExpect('ATZ', ElmResponseType.adapterInfo);
+      final zResp = await _executeAndExpect(
+        'ATZ',
+        ElmResponseType.adapterInfo,
+        timeout: const Duration(seconds: 4),
+        allowOkForAdapterInfo: true,
+      );
+      LogService.i("Adapter identified: ${zResp.raw.trim()}", tag: 'OBD');
+
       await _executeAndExpect('ATE0', ElmResponseType.ok);
       await _executeAndExpect('ATL0', ElmResponseType.ok);
-      await _executeAndExpect('ATSP0', ElmResponseType.ok);
-      final supportedPidsResponse = await _executeAndExpect(
+      await _executeAndExpect(protocolCommand, ElmResponseType.ok);
+      LogService.i("ELM adapter configured with $protocolCommand", tag: 'OBD');
+
+      final supportedPids = <int>{};
+      // On K-Line/KWP2000 vehicles like Suzuki Swift, automatic protocol search
+      // on 0100 takes 5-10s across protocols. Give it up to 15s to discover the ECU.
+      LogService.i("Querying ECU PID 0100 (ECU handshake & protocol search)...", tag: 'OBD');
+      final p00Response = await _executeAndExpect(
         '0100',
         ElmResponseType.data,
+        timeout: const Duration(seconds: 15),
       );
+      supportedPids.addAll(decodeSupportedPids(p00Response, basePid: 0x00));
+      LogService.i("ECU responded: discovered ${supportedPids.length} standard PIDs in range 01-20", tag: 'OBD');
 
-      final supportedPids = decodeSupportedPids(supportedPidsResponse);
+      // Standard multi-range PID discovery (SAE J1979)
+      if (supportedPids.contains(0x20)) {
+        try {
+          final p20Response = await _elmClient.execute('0120');
+          if (p20Response.type == ElmResponseType.data) {
+            final pids20 = decodeSupportedPids(p20Response, basePid: 0x20);
+            supportedPids.addAll(pids20);
+            LogService.i("Discovered ${pids20.length} additional PIDs in range 21-40", tag: 'OBD');
+          }
+        } catch (_) {
+          // Fallback gracefully if ECU does not respond to 0120
+        }
+      }
+
+      if (supportedPids.contains(0x40)) {
+        try {
+          final p40Response = await _elmClient.execute('0140');
+          if (p40Response.type == ElmResponseType.data) {
+            final pids40 = decodeSupportedPids(p40Response, basePid: 0x40);
+            supportedPids.addAll(pids40);
+            LogService.i("Discovered ${pids40.length} additional PIDs in range 41-60", tag: 'OBD');
+          }
+        } catch (_) {
+          // Fallback gracefully if ECU does not respond to 0140
+        }
+      }
 
       _state = ObdSessionState.ready;
+      LogService.i("✅ OBD session ready. Total supported ECU PIDs: ${supportedPids.length}", tag: 'OBD');
       return supportedPids;
     } catch (e) {
       _lastError = e;
       _state = ObdSessionState.error;
+      LogService.e("❌ OBD session initialization failed: $e", tag: 'OBD', error: e);
       rethrow;
     }
   }
 
   Future<ElmResponse> _executeAndExpect(
     String command,
-    ElmResponseType expectedType,
-  ) async {
-    final response = await _elmClient.execute(command);
+    ElmResponseType expectedType, {
+    Duration timeout = const Duration(seconds: 2),
+    bool allowOkForAdapterInfo = false,
+  }) async {
+    final response = await _elmClient.execute(command, timeout: timeout);
 
-    if (response.type != expectedType) {
-      throw StateError('$command expected $expectedType, got ${response.type}');
+    final isExpected = response.type == expectedType ||
+        (allowOkForAdapterInfo &&
+            expectedType == ElmResponseType.adapterInfo &&
+            response.type == ElmResponseType.ok);
+
+    if (!isExpected) {
+      final msg = '$command expected $expectedType, got ${response.type} (${response.raw.trim()})';
+      LogService.w("OBD command mismatch: $msg", tag: 'OBD');
+      throw StateError(msg);
     }
 
     return response;

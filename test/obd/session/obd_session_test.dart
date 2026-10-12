@@ -50,6 +50,48 @@ void main() {
     expect(session.lastError, isNull);
   });
 
+  test('initializes session with Suzuki Swift K-Line handshake (SEARCHING and BUS INIT: OK)', () async {
+    final connection = FakeObdConnection();
+    final client = ElmClient(connection: connection);
+    final session = ObdSession(
+      elmClient: client,
+      protocolCommand: 'ATSP5',
+    );
+
+    addTearDown(() async {
+      await client.dispose();
+      await connection.dispose();
+    });
+
+    final initialization = session.initialize();
+
+    expect(connection.sentCommands, ['ATZ\r']);
+    connection.emit('ELM327 v2.3\r>');
+    await pumpEventQueue();
+    expect(connection.sentCommands, ['ATZ\r', 'ATE0\r']);
+    connection.emit('OK\r>');
+    await pumpEventQueue();
+    expect(connection.sentCommands, ['ATZ\r', 'ATE0\r', 'ATL0\r']);
+    connection.emit('OK\r>');
+    await pumpEventQueue();
+    expect(connection.sentCommands, ['ATZ\r', 'ATE0\r', 'ATL0\r', 'ATSP5\r']);
+    connection.emit('OK\r>');
+    await pumpEventQueue();
+    expect(connection.sentCommands, [
+      'ATZ\r',
+      'ATE0\r',
+      'ATL0\r',
+      'ATSP5\r',
+      '0100\r',
+    ]);
+
+    connection.emit('SEARCHING...\r\nBUS INIT: OK\r\n41 00 08 18 00 00\r>');
+    final supportedPids = await initialization;
+
+    expect(supportedPids, {5, 12, 13});
+    expect(session.state, ObdSessionState.ready);
+  });
+
   test('moves to error when supported PID response is malformed', () async {
     final connection = FakeObdConnection();
     final client = ElmClient(connection: connection);

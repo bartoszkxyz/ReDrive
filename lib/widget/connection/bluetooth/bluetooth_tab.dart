@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:redrive/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -5,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:redrive/services/bluetooth/models/bluetooth_status.dart';
 import 'package:redrive/services/bluetooth/models/bluetooth_obd_device.dart';
 import 'package:redrive/providers/bluetooth_provider.dart';
+import 'package:redrive/providers/obd_provider.dart';
 
 class BluetoothTab extends StatefulWidget {
   const BluetoothTab({super.key});
@@ -26,13 +28,13 @@ class _BluetoothTabState extends State<BluetoothTab> {
       if (!provider.isScanning && !provider.isConnected) {
         Future.delayed(const Duration(milliseconds: 50), () {
           if (!mounted) return;
-          _handleScan(context);
+          _handleScan();
         });
       }
     });
   }
 
-  Future<void> _handleScan(BuildContext context) async {
+  Future<void> _handleScan() async {
     final result = await context.read<BluetoothProvider>().startScan();
     if (!mounted) return;
 
@@ -97,12 +99,78 @@ class _BluetoothTabState extends State<BluetoothTab> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        BluetoothScanStatusCard(onRefresh: () => _handleScan(context)),
-        SizedBox(height: 20),
+        BluetoothScanStatusCard(onRefresh: () => _handleScan()),
+        const SizedBox(height: 12),
+        const ProtocolSelectorCard(),
+        const SizedBox(height: 12),
         Expanded(
-          child: BluetoothDevicePanel(onScan: () => _handleScan(context)),
+          child: BluetoothDevicePanel(onScan: () => _handleScan()),
         ),
       ],
+    );
+  }
+}
+
+class ProtocolSelectorCard extends StatelessWidget {
+  const ProtocolSelectorCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final obdProvider = context.watch<ObdProvider>();
+    final currentProtocol = obdProvider.preferredProtocol;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B1B1E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.tune, color: Color(0xFFC4FF47), size: 20),
+          const SizedBox(width: 12),
+          Text(
+            "${l.protocol}:",
+            style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: currentProtocol,
+                dropdownColor: const Color(0xFF222226),
+                isExpanded: true,
+                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                items: [
+                  DropdownMenuItem(
+                    value: 'ATSP0',
+                    child: Text('${l.autoDetect} (ATSP0)'),
+                  ),
+                  const DropdownMenuItem(
+                    value: 'ATSP5',
+                    child: Text('Suzuki Swift M15A (ATSP5 KWP)'),
+                  ),
+                  const DropdownMenuItem(
+                    value: 'ATSP6',
+                    child: Text('CAN 11-bit 500k (ATSP6)'),
+                  ),
+                  const DropdownMenuItem(
+                    value: 'ATSP3',
+                    child: Text('ISO 9141-2 (ATSP3)'),
+                  ),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    obdProvider.setPreferredProtocol(val);
+                  }
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -575,10 +643,13 @@ Future<void> _connectToAdapter(
     Navigator.of(context).pop();
   }
 
-  if (!success && context.mounted) {
+  if (success && context.mounted) {
+    final obdProvider = context.read<ObdProvider>();
+    unawaited(obdProvider.startRealMode());
+  } else if (!success && context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text("Ошибка: '${device.name}' не отвечает"),
+        content: Text(l.adapterNotResponding(device.name)),
         backgroundColor: Theme.of(context).colorScheme.error,
       ),
     );

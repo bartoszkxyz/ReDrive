@@ -1,1 +1,23 @@
-enum PidKey { engineRpm, vehicleSpeed, coolantTemperature, adapterVoltage }
+enum PidKey {
+  engineRpm,
+  vehicleSpeed,
+  coolantTemperature,
+  adapterVoltage,
+  engineLoad,
+  throttlePosition,
+  mafAirFlowRate,
+  engineFuelRate,
+  // Expanded standard sensors for full scan
+  intakeAirTemperature,
+  intakeManifoldPressure,
+  timingAdvance,
+  shortTermFuelTrim1,
+  longTermFuelTrim1,
+  fuelPressure,
+  fuelTankLevel,
+  barometricPressure,
+  controlModuleVoltage,
+  ambientAirTemperature,
+  engineOilTemperature,
+  runTimeSinceStart,
+}

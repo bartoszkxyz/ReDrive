@@ -28,6 +28,27 @@ void main() {
       expect(result, {32});
     });
 
+    test('decodes multi-range PIDs with basePid offset', () {
+      // Range 0x21 to 0x40 (basePid = 0x20)
+      final response20 = ElmResponse(
+        raw: '41 20 00 00 00 01',
+        type: ElmResponseType.data,
+        lines: ['41 20 00 00 00 01'],
+      );
+      final result20 = decodeSupportedPids(response20, basePid: 0x20);
+      expect(result20, {64}); // 0x40
+
+      // Range 0x41 to 0x60 (basePid = 0x40)
+      // Bit for PID 0x5E (94): 94 - 64 = 30 -> bit 2 of last byte -> 0x04
+      final response40 = ElmResponse(
+        raw: '41 40 00 00 00 04',
+        type: ElmResponseType.data,
+        lines: ['41 40 00 00 00 04'],
+      );
+      final result40 = decodeSupportedPids(response40, basePid: 0x40);
+      expect(result40, {0x5E});
+    });
+
     test('returns empty set when no PIDs are supported', () {
       final response = ElmResponse(
         raw: '41 00 00 00 00 00',
@@ -53,7 +74,7 @@ void main() {
       );
     });
 
-    test('throws when response is not for PID 00', () {
+    test('throws when response is not for expected base PID', () {
       final response = ElmResponse(
         raw: '41 0C 08 18 00 00',
         type: ElmResponseType.data,

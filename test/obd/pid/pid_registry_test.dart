@@ -33,16 +33,60 @@ void main() {
     expect(definition?.source, PidSource.adapter);
   });
 
+  test('finds engine load definition', () {
+    final registry = PidRegistry();
+    final definition = registry.find(PidKey.engineLoad);
+
+    expect(definition?.command, '0104');
+    expect(definition?.pid, 0x04);
+  });
+
+  test('finds throttle position definition', () {
+    final registry = PidRegistry();
+    final definition = registry.find(PidKey.throttlePosition);
+
+    expect(definition?.command, '0111');
+    expect(definition?.pid, 0x11);
+  });
+
+  test('finds MAF air flow rate definition', () {
+    final registry = PidRegistry();
+    final definition = registry.find(PidKey.mafAirFlowRate);
+
+    expect(definition?.command, '0110');
+    expect(definition?.pid, 0x10);
+  });
+
+  test('finds engine fuel rate definition', () {
+    final registry = PidRegistry();
+    final definition = registry.find(PidKey.engineFuelRate);
+
+    expect(definition?.command, '015E');
+    expect(definition?.pid, 0x5E);
+  });
+
   group('PidRegistry.findSupportedEcuKeys', () {
-    test('returns matching ECU PID keys', () {
+    test('returns matching ECU PID keys including load, MAF, and fuel rate', () {
       final registry = PidRegistry();
 
-      final result = registry.findSupportedEcuKeys({0x05, 0x0C, 0x0D});
+      final result = registry.findSupportedEcuKeys({
+        0x04,
+        0x05,
+        0x0C,
+        0x0D,
+        0x10,
+        0x11,
+        0x5E,
+      });
 
       expect(result, {
+        PidKey.engineLoad,
         PidKey.coolantTemperature,
         PidKey.engineRpm,
         PidKey.vehicleSpeed,
+        PidKey.mafAirFlowRate,
+        PidKey.throttlePosition,
+        PidKey.engineFuelRate,
       });
     });
 

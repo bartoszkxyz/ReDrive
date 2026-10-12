@@ -10,6 +10,8 @@ import '../obd/connection/obd_connection.dart';
 import '../obd/pid/pid_registry.dart';
 import '../obd/source/live_obd_source.dart';
 import '../obd/source/obd_source_state.dart';
+import '../obd/elm/elm_response.dart';
+import '../services/settings/app_preferences.dart';
 
 enum ObdMode { idle, demo, real }
 
@@ -22,12 +24,25 @@ enum ObdRecoveryStage { none, session, transport }
 ///
 /// Low-level OBD communication is delegated to [LiveObdSource].
 class ObdProvider extends ChangeNotifier {
+  static const Set<PidKey> defaultSessionKeys = {
+    PidKey.vehicleSpeed,
+    PidKey.engineRpm,
+    PidKey.coolantTemperature,
+    PidKey.adapterVoltage,
+    PidKey.engineLoad,
+    PidKey.throttlePosition,
+    PidKey.mafAirFlowRate,
+    PidKey.engineFuelRate,
+  };
+
   ObdConnection? _connection;
   LiveObdSource? _liveSource;
   final PidRegistry _registry;
   DemoDataGenerator? _demoGenerator;
 
-  ObdProvider({PidRegistry? registry}) : _registry = registry ?? PidRegistry();
+  ObdProvider({PidRegistry? registry}) : _registry = registry ?? PidRegistry() {
+    _watchlists[WatchSource.session] = defaultSessionKeys;
+  }
 
   StreamSubscription<({PidKey key, num value})>? _updatesSubscription;
   StreamSubscription<ObdSourceState>? _stateSubscription;
@@ -36,6 +51,9 @@ class ObdProvider extends ChangeNotifier {
 
   final _errorsController = StreamController<Object>.broadcast();
   Stream<Object> get errors => _errorsController.stream;
+
+  final _dataController = StreamController<ObdData>.broadcast();
+  Stream<ObdData> get dataStream => _dataController.stream;
 
   final Map<WatchSource, Set<PidKey>> _watchlists = {};
 
@@ -80,11 +98,15 @@ class ObdProvider extends ChangeNotifier {
 
     _connectionStateSubscription = connection.connectionState.listen((
       isConnected,
-    ) {
+    ) async {
       if (!isConnected) {
         unawaited(_handleTransportDisconnected());
       } else {
         notifyListeners();
+        final autoConnect = await AppPreferences.isAutoConnectEnabled();
+        if (autoConnect && _mode == ObdMode.idle && !isReconnecting) {
+          unawaited(startRealMode());
+        }
       }
     });
 
@@ -122,6 +144,30 @@ class ObdProvider extends ChangeNotifier {
     _demoGenerator = DemoDataGenerator();
     _demoGenerator!.start((ObdData newDemoData) {
       _data = newDemoData;
+      _latestPidValues[PidKey.vehicleSpeed] = newDemoData.speed;
+      _latestPidValues[PidKey.engineRpm] = newDemoData.rpm;
+      _latestPidValues[PidKey.coolantTemperature] = newDemoData.coolantTemp;
+      _latestPidValues[PidKey.adapterVoltage] = newDemoData.voltage;
+      _latestPidValues[PidKey.engineLoad] = newDemoData.engineLoad;
+      _latestPidValues[PidKey.throttlePosition] = newDemoData.throttlePosition;
+      _latestPidValues[PidKey.mafAirFlowRate] = newDemoData.maf;
+      _latestPidValues[PidKey.engineFuelRate] = newDemoData.engineFuelRate;
+      // Simulated expanded sensors for demo mode
+      _latestPidValues[PidKey.intakeAirTemperature] = 24.0 + (newDemoData.coolantTemp > 85 ? 4.0 : 0.0);
+      _latestPidValues[PidKey.intakeManifoldPressure] = 30.0 + (newDemoData.engineLoad * 0.65);
+      _latestPidValues[PidKey.timingAdvance] = 12.0 + (newDemoData.rpm / 400.0);
+      _latestPidValues[PidKey.shortTermFuelTrim1] = -1.5 + (newDemoData.speed % 4);
+      _latestPidValues[PidKey.longTermFuelTrim1] = 0.8;
+      _latestPidValues[PidKey.fuelPressure] = 380.0;
+      _latestPidValues[PidKey.fuelTankLevel] = 68.5;
+      _latestPidValues[PidKey.barometricPressure] = 101.3;
+      _latestPidValues[PidKey.controlModuleVoltage] = newDemoData.voltage - 0.2;
+      _latestPidValues[PidKey.ambientAirTemperature] = 18.0;
+      _latestPidValues[PidKey.engineOilTemperature] = newDemoData.coolantTemp + 5.0;
+      _latestPidValues[PidKey.runTimeSinceStart] = 480.0;
+      if (!_dataController.isClosed) {
+        _dataController.add(_data);
+      }
       notifyListeners();
     });
 
@@ -137,6 +183,7 @@ class ObdProvider extends ChangeNotifier {
 
     _mode = ObdMode.idle;
     _data = const ObdData();
+    _latestPidValues.clear();
 
     notifyListeners();
   }
@@ -182,10 +229,23 @@ class ObdProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  String _preferredProtocol = 'ATSP0';
+  String get preferredProtocol => _preferredProtocol;
+
+  void setPreferredProtocol(String protocol) {
+    if (_preferredProtocol == protocol) return;
+    _preferredProtocol = protocol;
+    notifyListeners();
+  }
+
   Future<void> _startLiveSource() async {
     await _stopLive();
 
-    final source = LiveObdSource(connection: _connection!, registry: _registry);
+    final source = LiveObdSource(
+      connection: _connection!,
+      registry: _registry,
+      protocolCommand: _preferredProtocol,
+    );
 
     for (final entry in _watchlists.entries) {
       source.setWatchlist(entry.key, entry.value);
@@ -283,10 +343,26 @@ class ObdProvider extends ChangeNotifier {
     setWatchlist(source, const {});
   }
 
+  Set<PidKey> get supportedKeys => _liveSource?.supportedKeys ?? const {};
+  Set<int> get rawSupportedPids => _liveSource?.rawSupportedPids ?? const {};
+
+  final Map<PidKey, num> _latestPidValues = {};
+  Map<PidKey, num> get latestPidValues => Map.unmodifiable(_latestPidValues);
+  num? getPidValue(PidKey key) => _latestPidValues[key];
+
+  Future<ElmResponse> executeCommand(String command) async {
+    if (_liveSource == null) {
+      throw StateError('Live OBD session is not active');
+    }
+    return _liveSource!.executeCommand(command);
+  }
+
   void _onUpdate(({PidKey key, num value}) update) {
     _isResuming = false;
     _transportReconnectUsed = false;
     _hadData = true;
+    _latestPidValues[update.key] = update.value;
+
     switch (update.key) {
       case PidKey.engineRpm:
         _data = _data.copyWith(rpm: update.value.toInt());
@@ -299,6 +375,25 @@ class ObdProvider extends ChangeNotifier {
 
       case PidKey.adapterVoltage:
         _data = _data.copyWith(voltage: update.value.toDouble());
+
+      case PidKey.engineLoad:
+        _data = _data.copyWith(engineLoad: update.value.toDouble());
+
+      case PidKey.throttlePosition:
+        _data = _data.copyWith(throttlePosition: update.value.toDouble());
+
+      case PidKey.mafAirFlowRate:
+        _data = _data.copyWith(maf: update.value.toDouble());
+
+      case PidKey.engineFuelRate:
+        _data = _data.copyWith(engineFuelRate: update.value.toDouble());
+
+      default:
+        break;
+    }
+
+    if (!_dataController.isClosed) {
+      _dataController.add(_data);
     }
 
     notifyListeners();
@@ -312,6 +407,7 @@ class ObdProvider extends ChangeNotifier {
     _connectionStateSubscription?.cancel();
     _reconnectingStateSubscription?.cancel();
     _errorsController.close();
+    _dataController.close();
 
     super.dispose();
   }

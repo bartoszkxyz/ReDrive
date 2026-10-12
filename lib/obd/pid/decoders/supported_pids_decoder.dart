@@ -1,6 +1,12 @@
 import '../../elm/elm_response.dart';
 
-Set<int> decodeSupportedPids(ElmResponse response) {
+/// Decodes the supported PID bitmap from Mode 01 responses.
+///
+/// Supports standard range discovery:
+/// - [basePid] = 0x00 for PIDs 0x01..0x20 (command '0100')
+/// - [basePid] = 0x20 for PIDs 0x21..0x40 (command '0120')
+/// - [basePid] = 0x40 for PIDs 0x41..0x60 (command '0140')
+Set<int> decodeSupportedPids(ElmResponse response, {int basePid = 0x00}) {
   if (response.type != ElmResponseType.data || response.lines.isEmpty) {
     throw const FormatException(
       'Supported PID response does not contain OBD data',
@@ -15,7 +21,9 @@ Set<int> decodeSupportedPids(ElmResponse response) {
     );
   }
 
-  if (bytes[0] != '41' || bytes[1] != '00') {
+  final expectedPid = basePid.toRadixString(16).padLeft(2, '0').toUpperCase();
+
+  if (bytes[0] != '41' || bytes[1].toUpperCase() != expectedPid) {
     throw FormatException(
       'Invalid supported PID response: ${response.lines.first}',
     );
@@ -38,7 +46,7 @@ Set<int> decodeSupportedPids(ElmResponse response) {
     final isSupported = ((bitmap[byteIndex] >> bitIndex) & 1) == 1;
 
     if (isSupported) {
-      final pid = position + 1;
+      final pid = basePid + position + 1;
       supported.add(pid);
     }
   }

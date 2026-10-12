@@ -1,10 +1,11 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_classic/flutter_blue_classic.dart';
 import 'package:redrive/services/bluetooth/models/bluetooth_status.dart';
 import 'package:redrive/services/bluetooth/permissions/bluetooth_permission_service.dart';
 import 'package:redrive/services/bluetooth/models/bluetooth_obd_device.dart';
+import 'package:redrive/services/settings/app_preferences.dart';
+import 'package:redrive/services/logging/log_service.dart';
 
 /// [BluetoothProvider] — центральный узел управления Classic Bluetooth (SPP).
 ///
@@ -81,6 +82,10 @@ class BluetoothProvider extends ChangeNotifier {
 
   bool _pendingScan = false;
 
+  void _log(String message, {LogLevel level = LogLevel.info, Object? error, StackTrace? stackTrace}) {
+    LogService.log(message, level: level, tag: 'Bluetooth', error: error, stackTrace: stackTrace);
+  }
+
   void _setConnected(bool state) {
     if (_isConnected == state) return;
 
@@ -100,26 +105,35 @@ class BluetoothProvider extends ChangeNotifier {
     _bluetooth.adapterStateNow.then((BluetoothAdapterState state) {
       _isHardwareOn = state == BluetoothAdapterState.on;
       notifyListeners();
+      if (_isHardwareOn) {
+        autoConnectLastDevice();
+      }
+    }).catchError((_) {
+      // Platform does not support classic bluetooth (e.g. Linux desktop preview)
     });
 
     _bluetooth.adapterState.listen((BluetoothAdapterState state) {
       _isHardwareOn = state == BluetoothAdapterState.on;
 
       if (state == BluetoothAdapterState.off) {
-        developer.log("⚠️ Bluetooth ВЫКЛЮЧЕН!", name: 'reBlue');
+        _log("⚠️ Bluetooth turned OFF", level: LogLevel.warning);
         _isToggleOn = false;
         disconnect();
         _stopScan();
         _discoveredDevices.clear();
         _deviceMap.clear();
       } else if (state == BluetoothAdapterState.on) {
-        developer.log("✅ Bluetooth ВКЛЮЧЕН!", name: 'reBlue');
+        _log("✅ Bluetooth turned ON");
         if (_pendingScan) {
           _pendingScan = false;
           startScan();
+        } else {
+          autoConnectLastDevice();
         }
       }
       notifyListeners();
+    }, onError: (_) {
+      // Ignored on non-supported platforms
     });
   }
 
@@ -142,14 +156,16 @@ class BluetoothProvider extends ChangeNotifier {
   Future<BluetoothScanResult> startScan() async {
     if (_isScanning) return BluetoothScanResult.started;
 
-    developer.log("Запрашиваем доступ к разрешениям", name: 'reBlue');
+    _log("Requesting Bluetooth permissions...");
     final permissionStatus = await requestBluetoothPermissions();
 
     if (permissionStatus == BluetoothPermissionStatus.permanentlyDenied) {
+      _log("Bluetooth permissions permanently denied", level: LogLevel.warning);
       return BluetoothScanResult.permanentlyDenied;
     }
 
     if (permissionStatus != BluetoothPermissionStatus.granted) {
+      _log("Bluetooth permissions not granted", level: LogLevel.warning);
       _isScanning = false;
       notifyListeners();
       return BluetoothScanResult.notStarted;
@@ -160,7 +176,7 @@ class BluetoothProvider extends ChangeNotifier {
       try {
         _bluetooth.turnOn();
       } catch (e) {
-        developer.log("Ошибка вызова turnOn: $e", name: 'reBlue', error: e);
+        _log("Failed to turn on Bluetooth: $e", level: LogLevel.error, error: e);
       }
       return BluetoothScanResult.notStarted;
     }
@@ -192,17 +208,13 @@ class BluetoothProvider extends ChangeNotifier {
           }
         }
       } catch (e) {
-        developer.log(
-          "Ошибка получения bonded devices",
-          name: 'reBlue',
-          error: e,
-        );
+        _log("Failed to get bonded devices: $e", level: LogLevel.warning, error: e);
       }
 
       notifyListeners();
 
       _bluetooth.startScan();
-      developer.log("Сканирование запущено", name: 'reBlue');
+      _log("Bluetooth discovery scan started");
 
       await _scanSubscription?.cancel();
       _scanSubscription = _bluetooth.scanResults.listen(
@@ -216,11 +228,7 @@ class BluetoothProvider extends ChangeNotifier {
           }
         },
         onError: (err) {
-          developer.log(
-            "Ошибка в стриме сканирования",
-            name: 'reBlue',
-            error: err,
-          );
+          _log("Error in Bluetooth scan stream", level: LogLevel.error, error: err);
           _stopScan();
         },
       );
@@ -228,12 +236,12 @@ class BluetoothProvider extends ChangeNotifier {
       _scanTimer?.cancel();
       _scanTimer = Timer(const Duration(seconds: 15), () {
         if (_isScanning) {
-          developer.log("Таймер: 15 секунд прошло, авто-стоп", name: 'reBlue');
+          _log("Scan timer: 15s elapsed, auto-stopping scan");
           _stopScan();
         }
       });
     } catch (e) {
-      developer.log("Scan error: $e", name: 'reBlue', error: e);
+      _log("Scan error: $e", level: LogLevel.error, error: e);
       _isScanning = false;
       notifyListeners();
       return BluetoothScanResult.notStarted;
@@ -250,7 +258,7 @@ class BluetoothProvider extends ChangeNotifier {
     _scanSubscription = null;
     _isScanning = false;
     notifyListeners();
-    developer.log("Сканирование остановлено", name: 'reBlue');
+    _log("Bluetooth scan stopped");
   }
 
   /// Основной метод подключения к OBD2
@@ -266,7 +274,7 @@ class BluetoothProvider extends ChangeNotifier {
     _setReconnecting(false);
 
     _isConnecting = true;
-    _connectionMessage = "Подключение к ${device.name}...";
+    _connectionMessage = "Connecting to ${device.name}...";
 
     notifyListeners();
 
@@ -274,43 +282,41 @@ class BluetoothProvider extends ChangeNotifier {
 
     await disconnect();
 
-    // проверка процесса после разрыва старого сокета
+    // Verify process after closing old socket
     if (currentId != _connectionId) return false;
 
-    final physicalDevice = _deviceMap[device.address];
-    if (physicalDevice == null) {
-      _isConnecting = false;
-      notifyListeners();
-      return false;
-    }
+    final targetAddress = device.address;
     for (int i = 1; i <= 3; i++) {
       try {
-        developer.log(
-          "Попытка подключения к ${device.name} (${device.address}) №$i",
-          name: 'reBlue',
-        );
+        _log("Connection attempt to ${device.name} ($targetAddress) #$i");
 
-        await _bluetooth.bondDevice(physicalDevice.address);
+        try {
+          await _bluetooth.bondDevice(targetAddress);
+        } catch (_) {}
 
         if (currentId != _connectionId) return false;
 
         if (i > 1) {
-          _connectionMessage = "Попытка подключения №${i - 1}";
+          _connectionMessage = "Connection attempt #${i - 1}";
         } else {
-          _connectionMessage = "Обмен данными...";
+          _connectionMessage = "Exchanging data...";
         }
         notifyListeners();
 
         final newSocket = await _bluetooth
-            .connect(physicalDevice.address)
+            .connect(targetAddress)
             .timeout(const Duration(seconds: 5));
 
         // если id изменился, закрываем новый сокет и выходим
         if (currentId != _connectionId) {
-          developer.log(
-            "Призрак соединения убит ПОСЛЕ коннекта",
-            name: 'reBlue',
-          );
+          _log("Connection canceled after connect", level: LogLevel.warning);
+          await newSocket?.finish();
+          return false;
+        }
+
+        // Brief delay for adapter UART stabilization
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (currentId != _connectionId) {
           await newSocket?.finish();
           return false;
         }
@@ -325,18 +331,18 @@ class BluetoothProvider extends ChangeNotifier {
         _discoveredDevices.removeWhere((d) => d.address == device.address);
         _discoveredDevices.insert(0, device);
 
-        developer.log("✅ УСПЕШНО подключено к ${device.name}", name: 'reBlue');
+        _log("✅ Successfully connected to ${device.name}");
+        unawaited(AppPreferences.saveLastConnectedDevice(
+          mac: device.address,
+          name: device.name,
+        ));
         if (currentId == _connectionId) {
           _isConnecting = false;
         }
         notifyListeners();
         return true;
       } catch (e) {
-        developer.log(
-          "❌ Ошибка подключения к ${device.name}: $e",
-          name: 'reBlue',
-          error: e,
-        );
+        _log("❌ Connection error to ${device.name}: $e", level: LogLevel.error, error: e);
 
         if (currentId != _connectionId) return false;
         if (i < 3) {
@@ -356,6 +362,43 @@ class BluetoothProvider extends ChangeNotifier {
     return false;
   }
 
+  /// Automatically connects to the most recently used OBD adapter on startup/ignition.
+  Future<bool> autoConnectLastDevice() async {
+    final isEnabled = await AppPreferences.isAutoConnectEnabled();
+    if (!isEnabled) return false;
+
+    final lastMac = await AppPreferences.getLastObdMac();
+    if (lastMac == null || lastMac.isEmpty) return false;
+
+    if (_isConnected || _isConnecting) return true;
+
+    final lastName = await AppPreferences.getLastObdName() ?? "OBD Adapter";
+    _log("🚗 Headunit Auto-Connecting to $lastName ($lastMac)...");
+
+    final targetDevice = BluetoothObdDevice(
+      name: lastName,
+      address: lastMac,
+      isBle: false,
+    );
+
+    // Look for device in bonded devices or scan cache
+    try {
+      final bondedList = await _bluetooth.bondedDevices;
+      if (bondedList != null) {
+        for (final b in bondedList) {
+          _deviceMap[b.address] = b;
+          if (b.address.toLowerCase() == lastMac.toLowerCase()) {
+            _deviceMap[lastMac] = b;
+          }
+        }
+      }
+    } catch (e) {
+      _log("Failed to query bonded devices during auto-connect: $e", level: LogLevel.warning, error: e);
+    }
+
+    return connectToDevice(targetDevice);
+  }
+
   /// Настраивает прослушивание входного потока данных от обд сканера
   void _setupListen() {
     _inputSubscription = _connection!.input!.listen(
@@ -364,11 +407,11 @@ class BluetoothProvider extends ChangeNotifier {
         _rxController.add(incoming);
       },
       onDone: () {
-        developer.log("Поток данных закрыт (onDone)", name: 'reBlue');
+        _log("Data stream closed (onDone)", level: LogLevel.warning);
         disconnect(isIntentional: false);
       },
       onError: (e) {
-        developer.log("Ошибка в потоке данных", name: 'reBlue', error: e);
+        _log("Data stream error: $e", level: LogLevel.error, error: e);
         disconnect(isIntentional: false);
       },
       cancelOnError: true,
@@ -380,24 +423,25 @@ class BluetoothProvider extends ChangeNotifier {
 
     try {
       // Команда превращается в байты и отправляется в сокет.
-      // '\r' в конце — это стандарт ELM327 (как нажатие Enter),
-      // без него сканер просто будет ждать и ничего не ответит.
-      _connection!.output.add(Uint8List.fromList('$command\r'.codeUnits));
-      developer.log("➡️ Отправлено: $command", name: 'reBlue');
+      // '\r' в конце — это стандарт ELM327 (как нажатие Enter).
+      // Предотвращаем дублирование \r, если команда уже содержит перевод строки.
+      final cmd = command.endsWith('\r') ? command : '$command\r';
+      _connection!.output.add(Uint8List.fromList(cmd.codeUnits));
+      _log("➡️ TX: ${cmd.trim()}", level: LogLevel.debug);
     } catch (e) {
-      developer.log("❌ Ошибка отправки команды: $e", name: 'reBlue');
+      _log("❌ Command sending error: $e", level: LogLevel.error, error: e);
     }
   }
 
-  /// Полностью закрывает соединение и освобождает ресурсы стримов
+  /// Closes connection and releases resources
   Future<void> disconnect({bool isIntentional = true}) async {
     try {
       await _inputSubscription?.cancel();
       await _connection?.finish();
       _connection = null;
-      developer.log("Соединение разорвано", name: 'reBlue');
+      _log("Bluetooth connection closed");
     } catch (e) {
-      developer.log("Ошибка при отключении: $e", name: 'reBlue', error: e);
+      _log("Error disconnecting: $e", level: LogLevel.warning, error: e);
     }
 
     if (isIntentional) {
@@ -422,10 +466,7 @@ class BluetoothProvider extends ChangeNotifier {
     _quickDrops = isQuickDrop ? _quickDrops + 1 : 0;
 
     if (_quickDrops >= _maxQuickDrops) {
-      developer.log(
-        "Соединение умирает сразу после переподключения, сдаёмся",
-        name: 'reBlue',
-      );
+      _log("Connection drops immediately after reconnecting, giving up", level: LogLevel.warning);
       await disconnect();
       return;
     }
@@ -434,30 +475,25 @@ class BluetoothProvider extends ChangeNotifier {
     final int currentId = _connectionId;
 
     _setReconnecting(true);
-    _backgroundMessage = "переподключение...";
+    _backgroundMessage = "Reconnecting...";
     notifyListeners();
 
-    final physicalDevice = _deviceMap[_connectedDevice!.address];
-    if (physicalDevice == null) {
-      _setReconnecting(false);
-      disconnect(isIntentional: true);
-      return;
-    }
+    final targetAddress = _connectedDevice!.address;
 
     for (int i = 1; i <= 3; i++) {
       try {
-        await Future.delayed(Duration(milliseconds: 4000));
+        await Future.delayed(const Duration(milliseconds: 4000));
 
         if (currentId != _connectionId) {
           _setReconnecting(false);
           notifyListeners();
           return;
         }
-        _backgroundMessage = "переподключение... №$i";
+        _backgroundMessage = "Reconnecting... #$i";
         notifyListeners();
 
         final oldSocket = await _bluetooth
-            .connect(physicalDevice.address)
+            .connect(targetAddress)
             .timeout(const Duration(seconds: 5));
 
         if (currentId != _connectionId) {
@@ -475,7 +511,7 @@ class BluetoothProvider extends ChangeNotifier {
         notifyListeners();
         return;
       } catch (e) {
-        developer.log("переподключение аварийное №$i", name: "reBlue");
+        _log("Emergency reconnect attempt #$i: $e", level: LogLevel.warning, error: e);
         if (currentId != _connectionId) {
           _setReconnecting(false);
           notifyListeners();
@@ -490,14 +526,14 @@ class BluetoothProvider extends ChangeNotifier {
     }
   }
 
-  /// Метод отмены: прерывает текущую попытку коннекта и уведомляет UI
+  /// Cancels connection attempt and notifies UI
   void cancelConnection() {
     _connectionId++;
     _isConnecting = false;
     _setReconnecting(false);
     disconnect();
     notifyListeners();
-    developer.log("Подключение отменено пользователем", name: 'reBlue');
+    _log("Connection canceled by user");
   }
 
   /// Полное выключение БЛЮТУЗА в приложении

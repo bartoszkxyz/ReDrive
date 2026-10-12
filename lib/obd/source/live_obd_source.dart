@@ -1,6 +1,7 @@
 import 'dart:async';
 import '../connection/obd_connection.dart';
 import '../elm/elm_client.dart';
+import '../elm/elm_response.dart';
 import '../pid/pid_key.dart';
 import '../pid/pid_registry.dart';
 import '../polling/polling_controller.dart';
@@ -29,14 +30,18 @@ class LiveObdSource {
   StreamSubscription<({PidKey key, num value})>? _pollingSubscription;
 
   Set<PidKey> _supportedKeys = const {};
+  Set<int> _rawSupportedPids = const {};
   final Map<WatchSource, Set<PidKey>> _pendingWatchlists = {};
 
   bool _stopRequested = false;
   int _recoveryAttempts = 0;
 
+  final String protocolCommand;
+
   LiveObdSource({
     required ObdConnection connection,
     required PidRegistry registry,
+    this.protocolCommand = 'ATSP0',
   }) : _connection = connection,
        _registry = registry;
 
@@ -44,6 +49,7 @@ class LiveObdSource {
   ObdSession? get session => _session;
   Stream<ObdSourceState> get stateStream => _stateController.stream;
   Set<PidKey> get supportedKeys => _supportedKeys;
+  Set<int> get rawSupportedPids => _rawSupportedPids;
   Stream<({PidKey key, num value})> get updates => _updatesController.stream;
   Map<PidKey, num> get latestValues =>
       _pollingController?.latestValues ?? const {};
@@ -60,6 +66,13 @@ class LiveObdSource {
 
   void clearWatchlist(WatchSource source) {
     setWatchlist(source, const {});
+  }
+
+  Future<ElmResponse> executeCommand(String command) async {
+    if (_elmClient == null) {
+      throw StateError('OBD connection is not ready');
+    }
+    return _elmClient!.execute(command);
   }
 
   void _setState(ObdSourceState newState) {
@@ -104,12 +117,16 @@ class LiveObdSource {
     final client = ElmClient(connection: _connection);
     _elmClient = client;
 
-    final session = ObdSession(elmClient: client);
+    final session = ObdSession(
+      elmClient: client,
+      protocolCommand: protocolCommand,
+    );
     _session = session;
 
     final rawSupportedPids = await session.initialize();
     if (_stopRequested) return;
 
+    _rawSupportedPids = rawSupportedPids;
     _supportedKeys = _registry.findSupportedEcuKeys(rawSupportedPids);
 
     final controller = PollingController(

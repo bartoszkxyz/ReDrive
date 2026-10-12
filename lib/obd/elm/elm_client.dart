@@ -5,6 +5,7 @@ import '../connection/obd_connection.dart';
 import 'elm_response.dart';
 import 'elm_response_parser.dart';
 import 'dart:async';
+import 'package:redrive/services/logging/log_service.dart';
 
 /// Provides command-level communication with an ELM327 adapter.
 ///
@@ -43,6 +44,7 @@ class ElmClient {
     if (!_receiveBuffer.contains(">")) return;
 
     ElmResponse response = _parser.parse(_receiveBuffer);
+    LogService.d("⬅️ ELM RX (${response.type}): ${response.raw.trim()}", tag: 'ELM327');
 
     _commandWatchdogTimer?.cancel();
     current.completer.complete(response);
@@ -97,6 +99,7 @@ class ElmClient {
 
   Future<void> _sendCommand(ElmCommand command) async {
     try {
+      LogService.d("➡️ ELM TX: ${command.command}", tag: 'ELM327');
       await _connection.send('${command.command}\r');
     } catch (error) {
       if (command != _queue.currentElmCommand) return;
@@ -106,6 +109,7 @@ class ElmClient {
   }
 
   void _failExchange(Object error) {
+    LogService.w("⚠️ ELM exchange failure: $error", tag: 'ELM327');
     _commandWatchdogTimer?.cancel();
     _isDesynchronized = true;
     _receiveBuffer = "";

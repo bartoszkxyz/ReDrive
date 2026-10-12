@@ -46,8 +46,37 @@ class ElmResponseParser {
     return line.toUpperCase().startsWith('SEARCHING');
   }
 
+  static bool _isIgnoredStatusLine(String line) {
+    final upper = line.toUpperCase().trim();
+    if (upper.startsWith('SEARCHING')) {
+      return true;
+    }
+    // Filter out successful or progress bus inits e.g. "BUS INIT: OK", "BUS INIT: ...OK", "BUS INIT: ..."
+    // BUT preserve "BUS INIT: ERROR"
+    if (upper.startsWith('BUS INIT') && !upper.contains('ERROR')) {
+      return true;
+    }
+    // Filter out progress dots like "..." or "..OK"
+    if (RegExp(r'^\.+(?:OK)?$', caseSensitive: false).hasMatch(upper)) {
+      return true;
+    }
+    return false;
+  }
+
   static bool _isAdapterInfoLine(String line) {
-    return line.toUpperCase().startsWith("ELM327");
+    final upper = line.toUpperCase().trim();
+    if (upper.isEmpty) return false;
+    return upper.contains("ELM") ||
+        upper.contains("ICAR") ||
+        upper.contains("VGATE") ||
+        upper.contains("OBD") ||
+        upper.contains("STN") ||
+        upper.contains("VIECAR") ||
+        upper.contains("KONNWEI") ||
+        upper.contains("VEEPEAK") ||
+        upper.contains("SCAN") ||
+        upper.contains("CHIP") ||
+        RegExp(r'V[0-9]+\.[0-9]+', caseSensitive: false).hasMatch(upper);
   }
 
   ElmResponse parse(String raw) {
@@ -60,7 +89,7 @@ class ElmResponseParser {
     final wasSearching = lines.any(_isSearchingLine);
 
     final responseLines = lines
-        .where((line) => !_isSearchingLine(line))
+        .where((line) => !_isIgnoredStatusLine(line))
         .toList(growable: false);
 
     if (responseLines.isNotEmpty) {
