@@ -6,8 +6,12 @@ import 'package:redrive/screens/car_screen.dart';
 import 'package:redrive/screens/connection_screen.dart';
 import 'package:redrive/widget/bottom_bar/custom_bottom_bar.dart';
 import 'package:redrive/widget/common/reconnection_banner.dart';
+import 'package:redrive/screens/dashboard_screen.dart';
 import 'home_screen.dart';
 import 'dart:async';
+
+import 'package:redrive/screens/trips_screen.dart';
+import 'package:redrive/screens/diagnostics_screen.dart';
 
 class RootScreen extends StatefulWidget {
   const RootScreen({super.key});
@@ -22,10 +26,11 @@ class _RootScreenState extends State<RootScreen> {
 
   late final List<Widget> _screens = [
     const HomeScreen(),
-    Container(color: Colors.black),
+    const DashboardScreen(),
     const ConnectionScreen(),
     const CarScreen(),
-    Container(color: Colors.black),
+    const TripsScreen(),
+    const DiagnosticsScreen(),
   ];
 
   @override

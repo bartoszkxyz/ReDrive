@@ -6,26 +6,34 @@ import 'package:redrive/services/bluetooth/connection/bluetooth_obd_connection.d
 
 import 'providers/obd_provider.dart';
 import 'providers/bluetooth_provider.dart';
+import 'providers/trip_provider.dart';
 import 'core/app_themes.dart';
 import 'screens/root_screen.dart';
 
-void main() {
+import 'package:redrive/services/background_service.dart';
+import 'package:redrive/services/obd_background_proxy.dart';
+import 'package:redrive/services/logging/log_service.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await LogService.init();
+  LogService.i('ReDrive application starting up', tag: 'App');
+  await initializeBackgroundService();
+  ObdBackgroundProxy().init();
+
+  final bluetoothProvider = BluetoothProvider();
+  final obdProvider = ObdProvider();
+  obdProvider.attachConnection(
+    BluetoothObdConnection(bluetoothProvider),
+  );
+  final tripProvider = TripProvider()..bindToObd(obdProvider);
+
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => BluetoothProvider()),
-
-        ChangeNotifierProvider(
-          create: (context) {
-            final obdProvider = ObdProvider();
-
-            obdProvider.attachConnection(
-              BluetoothObdConnection(context.read<BluetoothProvider>()),
-            );
-
-            return obdProvider;
-          },
-        ),
+        ChangeNotifierProvider.value(value: bluetoothProvider),
+        ChangeNotifierProvider.value(value: obdProvider),
+        ChangeNotifierProvider.value(value: tripProvider),
       ],
       child: const RedriveApp(),
     ),

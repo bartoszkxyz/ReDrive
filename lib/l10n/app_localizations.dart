@@ -28,8 +28,18 @@ class AppLocalizations {
   String get connection => _text('连接', '連線', 'Connection');
   String get garage => _text('车库', '車庫', 'Garage');
   String get dtc => _text('故障码', '故障碼', 'DTC');
+  String get trips => _text('行程', '行程', 'Trips');
   String get speed => _text('车速', '車速', 'Speed');
   String get rpm => _text('转速', '轉速', 'RPM');
+  String get coolantTemp => _text('水温', '水溫', 'Coolant Temp');
+  String get engineTemp => _text('发动机水温', '發動機水溫', 'Engine Temp');
+  String get readyToDrive => _text('可行驶', '可行駛', 'Ready to Drive');
+  String get warmingUp => _text('热车中', '熱車中', 'Warming Up');
+  String get activeTrip => _text('当前行程', '當前行程', 'Active Trip');
+  String get avgFuel => _text('平均油耗', '平均油耗', 'Avg Fuel');
+  String get instantFuel => _text('瞬时油耗', '瞬時油耗', 'Instant Fuel');
+  String get fuelLoad => _text('燃油负荷', '燃油負荷', 'Fuel Load');
+  String get engineLoad => _text('发动机负荷', '發動機負荷', 'Engine Load');
   String get preparing =>
       _text('准备连接...', '準備連線...', 'Preparing connection...');
   String get connectingEcu =>
@@ -108,6 +118,10 @@ class AppLocalizations {
     '連線已中斷，請重新連線',
     'Connection lost. Please connect again',
   );
+  String get protocol => _text('协议', '協議', 'Protocol');
+  String get autoDetect => _text('自动检测', '自動偵測', 'Auto Detect');
+  String adapterNotResponding(String name) =>
+      _text('错误: $name 无响应', '錯誤: $name 無回應', "Error: '$name' is not responding");
 
   static const delegate = _AppLocalizationsDelegate();
   static const supportedLocales = [

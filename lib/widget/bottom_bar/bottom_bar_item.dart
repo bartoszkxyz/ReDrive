@@ -8,11 +8,13 @@ class BottomBarItem extends StatelessWidget {
     required this.data,
     required this.isActive,
     required this.onTap,
+    this.isCompact = false,
   });
 
   final BottomBarItemData data;
   final bool isActive;
   final VoidCallback onTap;
+  final bool isCompact;
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +22,9 @@ class BottomBarItem extends StatelessWidget {
     final Color inactiveColor = Colors.grey.shade600;
 
     Color currentColor = isActive ? activeColor : inactiveColor;
+    final double iconSize = isCompact ? (isActive ? 22 : 19) : (isActive ? 27 : 23);
+    final double fontSize = isCompact ? 11 : 12;
+    final double spacing = isCompact ? 3 : 6;
 
     return Expanded(
       child: GestureDetector(
@@ -34,26 +39,30 @@ class BottomBarItem extends StatelessWidget {
               curve: Curves.easeOut,
               child: SvgPicture.asset(
                 data.iconPath,
-                width: isActive ? 27 : 23,
-                height: isActive ? 27 : 23,
+                width: iconSize,
+                height: iconSize,
                 colorFilter: ColorFilter.mode(currentColor, BlendMode.srcIn),
               ),
             ),
-            const SizedBox(height: 6),
+            SizedBox(height: spacing),
             AnimatedDefaultTextStyle(
               duration: const Duration(milliseconds: 200),
               style: TextStyle(
                 color: currentColor,
-                fontSize: 12,
+                fontSize: fontSize,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
               ),
-              child: Text(data.label),
+              child: Text(
+                data.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: isCompact ? 2 : 4),
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOut,
-              width: isActive ? 20 : 0,
+              width: isActive ? (isCompact ? 16 : 20) : 0,
               height: 2,
               decoration: BoxDecoration(
                 color: currentColor,

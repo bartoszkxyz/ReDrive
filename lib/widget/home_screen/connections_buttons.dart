@@ -3,21 +3,29 @@ import 'package:redrive/l10n/app_localizations.dart';
 
 class ConnectionButtons extends StatelessWidget {
   final VoidCallback onConnect;
-  final VoidCallback onViewDemo;
+  final VoidCallback? onViewDemo;
   final bool isConnected;
   final bool isDemoMode;
 
   const ConnectionButtons({
     super.key,
     required this.onConnect,
-    required this.onViewDemo,
+    this.onViewDemo,
     required this.isConnected,
-    required this.isDemoMode,
+    this.isDemoMode = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+
+    if (onViewDemo == null) {
+      return _AnimatedConnectButton(
+        isConnected: isConnected,
+        onPressed: onConnect,
+        colorScheme: colorScheme,
+      );
+    }
 
     return Column(
       children: [
@@ -29,7 +37,7 @@ class ConnectionButtons extends StatelessWidget {
         const SizedBox(height: 12),
         _AnimatedDemoButton(
           isDemoMode: isDemoMode,
-          onPressed: onViewDemo,
+          onPressed: onViewDemo!,
           colorScheme: colorScheme,
         ),
       ],

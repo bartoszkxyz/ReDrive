@@ -83,14 +83,18 @@ class _CardHeader extends StatelessWidget {
           colorFilter: ColorFilter.mode(colorScheme.primary, BlendMode.srcIn),
         ),
         const SizedBox(width: 8),
-        Text(
-          title.toUpperCase(),
-          textScaler: TextScaler.noScaling,
-          style: TextStyle(
-            color: colorScheme.onSurface.withValues(alpha: 0.5),
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 3,
+        Expanded(
+          child: Text(
+            title.toUpperCase(),
+            textScaler: TextScaler.noScaling,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: colorScheme.onSurface.withValues(alpha: 0.5),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 2,
+            ),
           ),
         ),
       ],
@@ -123,15 +127,19 @@ class _AnimatedValue extends StatelessWidget {
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
           builder: (context, animValue, _) {
-            return Text(
-              "${animValue.toStringAsFixed(fractionDigits)}$suffix",
-              textScaler: TextScaler.noScaling,
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontSize: 44,
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w800,
-                height: 1.1,
+            return FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                "${animValue.toStringAsFixed(fractionDigits)}$suffix",
+                textScaler: TextScaler.noScaling,
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontSize: 40,
+                  fontFamily: 'Inter',
+                  fontWeight: FontWeight.w800,
+                  height: 1.05,
+                ),
               ),
             );
           },
@@ -141,7 +149,7 @@ class _AnimatedValue extends StatelessWidget {
           textScaler: TextScaler.noScaling,
           style: TextStyle(
             color: colorScheme.onSurface.withValues(alpha: 0.4),
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -153,7 +161,6 @@ class _AnimatedValue extends StatelessWidget {
 class _SegmentedIndicator extends StatelessWidget {
   final double progress;
   final ColorScheme colorScheme;
-  static const int totalSegments = 18;
 
   const _SegmentedIndicator({
     required this.progress,
@@ -162,27 +169,35 @@ class _SegmentedIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.0, end: progress),
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
-      builder: (context, animProgress, _) {
-        final filledSegments = (animProgress * totalSegments).round();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final int segments = availableWidth < 180 ? 12 : 18;
+        final double segmentWidth = availableWidth < 180 ? 4 : 5.5;
 
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(totalSegments, (index) {
-            return Container(
-              width: 6,
-              height: 14,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(2),
-                color: index < filledSegments
-                    ? colorScheme.primary
-                    : colorScheme.onSurface.withValues(alpha: 0.1),
-              ),
+        return TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: 0.0, end: progress),
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+          builder: (context, animProgress, _) {
+            final filledSegments = (animProgress * segments).round();
+
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(segments, (index) {
+                return Container(
+                  width: segmentWidth,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(2),
+                    color: index < filledSegments
+                        ? colorScheme.primary
+                        : colorScheme.onSurface.withValues(alpha: 0.1),
+                  ),
+                );
+              }),
             );
-          }),
+          },
         );
       },
     );

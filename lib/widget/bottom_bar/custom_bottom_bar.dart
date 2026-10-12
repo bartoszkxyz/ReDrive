@@ -15,6 +15,11 @@ class CustomBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final bool isLandscape = size.width > size.height;
+    final bool isCompact = isLandscape || size.height <= 750;
+    final double barHeight = isCompact ? 64.0 : _height;
+
     final l = AppLocalizations.of(context);
     final items = [
       BottomBarItemData(
@@ -34,12 +39,16 @@ class CustomBottomBar extends StatelessWidget {
         label: l.garage,
       ),
       BottomBarItemData(
+        iconPath: 'assets/images/svg/bottomBar/trips.svg',
+        label: l.trips,
+      ),
+      BottomBarItemData(
         iconPath: 'assets/images/svg/bottomBar/dtc.svg',
         label: l.dtc,
       ),
     ];
     return SizedBox(
-      height: _height,
+      height: barHeight,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: List.generate(
@@ -48,6 +57,7 @@ class CustomBottomBar extends StatelessWidget {
             data: items[index],
             isActive: currentIndex == index,
             onTap: () => onItemSelected(index),
+            isCompact: isCompact,
           ),
         ),
       ),
