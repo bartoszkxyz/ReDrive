@@ -49,3 +49,6 @@ app.*.map.json
 /web/
 /linux/
 /macos/
+
+# Local agent settings
+.agent-data/
