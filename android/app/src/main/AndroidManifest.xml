@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Permissions for Android 12 or above -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
@@ -12,15 +13,29 @@
         <!-- legacy for Android 9 or lower -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="28" />
 
+    <!-- Foreground Service permissions -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Automotive & Headunit background start permissions -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <application
         android:label="redrive"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:resizeableActivity="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
+            android:resizeableActivity="true"
+            android:supportsPictureInPicture="true"
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
@@ -43,6 +58,58 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <service
+            android:name="id.flutter.flutter_background_service.BackgroundService"
+            android:enabled="true"
+            android:exported="true"
+            android:foregroundServiceType="connectedDevice"
+            tools:node="merge" />
+
+        <receiver
+            android:name=".HeadunitBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <!-- Standard Android Boot, Lock, Power -->
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.ACTION_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
+
+                <!-- Hardware triggers upon ignition -->
+                <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
+
+                <!-- FYT / SYU Headunits (Joying, Mekede, Teyes, etc.) -->
+                <action android:name="com.syu.action.ACC_ON" />
+                <action android:name="com.syu.action.ACC_OFF" />
+                <action android:name="com.fyt.action.ACC_ON" />
+                <action android:name="com.fyt.action.ACC_OFF" />
+                <action android:name="com.syu.boot" />
+
+                <!-- Microntek / MTC / HCT Headunits (PX5, PX6) -->
+                <action android:name="com.microntek.bootcheck" />
+                <action android:name="com.microntek.acc.on" />
+                <action android:name="com.microntek.acc.off" />
+                <action android:name="hct.bootcheck" />
+
+                <!-- Topway / Allwinner Headunits (TS10, TS18, T3, T5, T8) -->
+                <action android:name="com.android.boot.action.ACC_ON" />
+                <action android:name="com.android.boot.action.ACC_OFF" />
+                <action android:name="com.ts.main.action.ACC_ON" />
+                <action android:name="com.ts.main.action.ACC_OFF" />
+                <action android:name="com.topway.action.ACC_ON" />
+                <action android:name="com.topway.action.ACC_OFF" />
+                <action android:name="com.allwinner.boot.action.ACC_ON" />
+                <action android:name="com.allwinner.boot.action.ACC_OFF" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
