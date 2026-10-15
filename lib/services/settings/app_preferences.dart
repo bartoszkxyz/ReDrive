@@ -11,6 +11,9 @@ class AppPreferences {
   static const String _keyDisplacement = 'engine_displacement_liters';
   static const String _keyMinTripDistance = 'min_trip_distance_km';
   static const String _keyDebugLogging = 'debug_logging_enabled';
+  static const String _keyAutoLaunchOnBoot = 'auto_launch_on_boot';
+  static const String _keyLastBootAction = 'last_boot_action';
+  static const String _keyLastBootTimestamp = 'last_boot_timestamp';
 
   static SharedPreferences? _prefs;
 
@@ -102,5 +105,28 @@ class AppPreferences {
   static Future<void> setDebugLoggingEnabled(bool enabled) async {
     final prefs = await _instance;
     await prefs.setBool(_keyDebugLogging, enabled);
+  }
+
+  /// Whether ReDrive automatically launches its UI on the headunit upon ignition/boot.
+  static Future<bool> isAutoLaunchOnBootEnabled() async {
+    final prefs = await _instance;
+    return prefs.getBool(_keyAutoLaunchOnBoot) ?? true;
+  }
+
+  static Future<void> setAutoLaunchOnBootEnabled(bool enabled) async {
+    final prefs = await _instance;
+    await prefs.setBool(_keyAutoLaunchOnBoot, enabled);
+  }
+
+  /// The last automotive broadcast intent caught by HeadunitBootReceiver.
+  static Future<String?> getLastBootAction() async {
+    final prefs = await _instance;
+    return prefs.getString(_keyLastBootAction);
+  }
+
+  /// The timestamp of the last automotive broadcast intent caught by HeadunitBootReceiver.
+  static Future<String?> getLastBootTimestamp() async {
+    final prefs = await _instance;
+    return prefs.getString(_keyLastBootTimestamp);
   }
 }

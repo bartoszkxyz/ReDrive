@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:redrive/services/logging/log_service.dart';
 
 Future<void> initializeBackgroundService() async {
   if (!Platform.isAndroid && !Platform.isIOS) {
@@ -62,6 +63,8 @@ Future<bool> onIosBackground(ServiceInstance service) async {
 void onStart(ServiceInstance service) async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
+  await LogService.init();
+  LogService.i('BackgroundService started from system wake/boot', tag: 'Service');
 
   if (service is AndroidServiceInstance) {
     service.on('setAsForeground').listen((event) {

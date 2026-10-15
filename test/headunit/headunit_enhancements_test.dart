@@ -98,7 +98,12 @@ void main() {
       expect(find.text('Foreground Service'), findsOneWidget);
       expect(find.text('Partial WakeLock'), findsOneWidget);
       expect(find.text('Insecure RFCOMM'), findsOneWidget);
+      expect(find.text('Auto-Launch App on Ignition'), findsOneWidget);
+
+      await tester.scrollUntilVisible(find.text('Why standard Android permission popups fail'), 100);
       expect(find.text('Why standard Android permission popups fail'), findsOneWidget);
+
+      await tester.scrollUntilVisible(find.text('How ReDrive operates (Car Scanner paradigm)'), 100);
       expect(find.text('How ReDrive operates (Car Scanner paradigm)'), findsOneWidget);
     });
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../providers/obd_provider.dart';
+import '../../services/settings/app_preferences.dart';
 import 'obd_adapter_test_sheet.dart';
 
 void showHeadunitBackgroundSheet(BuildContext context) {
@@ -14,8 +15,39 @@ void showHeadunitBackgroundSheet(BuildContext context) {
   );
 }
 
-class HeadunitBackgroundSheet extends StatelessWidget {
+class HeadunitBackgroundSheet extends StatefulWidget {
   const HeadunitBackgroundSheet({super.key});
+
+  @override
+  State<HeadunitBackgroundSheet> createState() => _HeadunitBackgroundSheetState();
+}
+
+class _HeadunitBackgroundSheetState extends State<HeadunitBackgroundSheet> {
+  bool _autoLaunch = true;
+  String? _lastBootAction;
+  String? _lastBootTimestamp;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    final autoLaunch = await AppPreferences.isAutoLaunchOnBootEnabled();
+    final action = await AppPreferences.getLastBootAction();
+    final timestamp = await AppPreferences.getLastBootTimestamp();
+
+    if (mounted) {
+      setState(() {
+        _autoLaunch = autoLaunch;
+        _lastBootAction = action;
+        _lastBootTimestamp = timestamp;
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +100,7 @@ class HeadunitBackgroundSheet extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        'Optimized for Chinese Topway / TS18 Headunits',
+                        'Ignition lifecycle • Topway TS18, FYT, Allwinner',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
@@ -90,6 +122,95 @@ class HeadunitBackgroundSheet extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               children: [
+                // Auto-Launch Control Card
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.rocket_launch_rounded, color: theme.colorScheme.primary, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Auto-Launch App on Ignition',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          if (!_isLoading)
+                            Switch.adaptive(
+                              value: _autoLaunch,
+                              activeTrackColor: theme.colorScheme.primary,
+                              onChanged: (val) async {
+                                setState(() => _autoLaunch = val);
+                                await AppPreferences.setAutoLaunchOnBootEnabled(val);
+                              },
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'When your vehicle ignition turns on (ACC_ON or system boot), ReDrive brings its dashboard directly onto the headunit screen and connects to your OBD-II adapter immediately.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1),
+                      const SizedBox(height: 10),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            _lastBootAction != null ? Icons.check_circle_rounded : Icons.pending_rounded,
+                            size: 16,
+                            color: _lastBootAction != null ? Colors.greenAccent : Colors.amberAccent,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Last Ignition / Wake Event:',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _lastBootAction != null
+                                      ? '$_lastBootAction\n($_lastBootTimestamp)'
+                                      : 'No wake intent recorded yet (waiting for next vehicle ignition cycle)',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                    color: _lastBootAction != null ? theme.colorScheme.onSurface : Colors.amberAccent,
+                                    fontFamily: _lastBootAction != null ? 'monospace' : null,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
                 // Quick Status Badges
                 Wrap(
                   spacing: 8,
@@ -103,7 +224,7 @@ class HeadunitBackgroundSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
 
-                // Info card 1: Why no permissions dialog
+                // Info card: Why no permissions dialog
                 _buildCard(
                   theme: theme,
                   icon: Icons.info_outline_rounded,
@@ -114,6 +235,17 @@ class HeadunitBackgroundSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
+                // Info card 1: First-time launch requirement
+                _buildCard(
+                  theme: theme,
+                  icon: Icons.notifications_active_rounded,
+                  iconColor: Colors.amberAccent,
+                  title: 'First-time Launch After APK Updates',
+                  body:
+                      'Android security places all newly installed or updated APKs in a "Stopped State". You must open ReDrive manually once after updating so Android registers the ignition broadcast receivers.',
+                ),
+                const SizedBox(height: 12),
+
                 // Info card 2: Car Scanner paradigm
                 _buildCard(
                   theme: theme,
@@ -121,7 +253,7 @@ class HeadunitBackgroundSheet extends StatelessWidget {
                   iconColor: Colors.greenAccent,
                   title: 'How ReDrive operates (Car Scanner paradigm)',
                   body:
-                      'Like Car Scanner, ReDrive runs an Android Foreground Service with an active notification and a PARTIAL_WAKE_LOCK. In Android\'s Low Memory Killer (LMK) architecture, foreground services have top priority and will never be killed to free RAM for navigation or music apps, requiring no battery optimization whitelisting.',
+                      'ReDrive runs an Android Foreground Service with an ongoing notification and PARTIAL_WAKE_LOCK. In Android\'s Low Memory Killer (LMK) architecture, foreground services have top priority and will never be killed to free RAM for navigation or music apps.',
                 ),
                 const SizedBox(height: 12),
 
@@ -132,7 +264,7 @@ class HeadunitBackgroundSheet extends StatelessWidget {
                   iconColor: Colors.cyanAccent,
                   title: 'Ignition & Sleep Lifecycle',
                   body:
-                      '• Ignition ON (ACC_ON / Boot): ReDrive awakens silently in the background, waits 2.5 seconds for headunit Bluetooth settling, and retries connection up to 10 times without popping over your launcher or maps.\n• Ignition OFF (ACC_OFF / Sleep): ReDrive cleanly flushes trip metrics to SQLite disk and closes the Bluetooth RFCOMM socket to ensure 0% battery drain while parked.',
+                      '• Ignition ON (ACC_ON / Boot): ReDrive awakens automatically, launches onto the screen, and retries OBD connection up to 10 times.\n• Ignition OFF (ACC_OFF / Sleep): ReDrive cleanly flushes trip metrics to SQLite disk and closes the Bluetooth RFCOMM socket to ensure 0% battery drain while parked.',
                 ),
                 const SizedBox(height: 12),
 
@@ -143,7 +275,7 @@ class HeadunitBackgroundSheet extends StatelessWidget {
                   iconColor: Colors.purpleAccent,
                   title: 'Bluetooth Insecure RFCOMM Fallback',
                   body:
-                      'Topway TS18 headunits route Bluetooth via an external MCU chip that often freezes on standard Android secure PIN handshakes. ReDrive automatically falls back to an insecure RFCOMM socket, connecting immediately to your paired OBD-II adapter.',
+                      'Topway TS18 and Chinese headunits route Bluetooth via an external MCU chip that often freezes on standard Android secure PIN handshakes. ReDrive automatically falls back to an insecure RFCOMM socket, connecting immediately to your paired OBD-II adapter.',
                 ),
                 const SizedBox(height: 24),
               ],
