@@ -224,5 +224,47 @@ void main() {
       expect(find.text('DFCO ACTIVE'), findsOneWidget);
       expect(find.text('LOOP: CL'), findsOneWidget);
     });
+
+    testWidgets('DashboardScreen displays problem and warning badges when metrics exceed thresholds', (tester) async {
+      tester.view.physicalSize = const Size(1024, 600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      // Seed with anomalous telemetry that crosses thresholds
+      obdProvider.setDataForTesting(const ObdData(
+        speed: 0,
+        rpm: 800,
+        coolantTemp: 108, // > 104 -> OVERHEAT
+        voltage: 11.5, // < 11.8 -> LOW BATT
+        shortTermFuelTrim: 16.5, // >= 15.0 -> HIGH LEAN
+        longTermFuelTrim: -12.0, // >= 10.0 negative -> RICH TRIM
+        fuelLevelPercent: 7.0, // <= 10.0 -> RESERVE
+        estimatedRangeKm: 25.0, // <= 30.0 -> CRITICAL
+        manifoldPressure: 58.0, // >= 55.0 at idle -> LEAK?
+        relativeThrottle: 0.0,
+      ));
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<ObdProvider>.value(value: obdProvider),
+            ChangeNotifierProvider<TripProvider>.value(value: tripProvider),
+          ],
+          child: const MaterialApp(
+            home: DashboardScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify the warning / alert badges render
+      expect(find.text('OVERHEAT'), findsOneWidget);
+      expect(find.text('LOW BATT'), findsOneWidget);
+      expect(find.text('HIGH LEAN'), findsOneWidget);
+      expect(find.text('RICH TRIM'), findsOneWidget);
+      expect(find.text('RESERVE'), findsOneWidget);
+      expect(find.text('CRITICAL'), findsOneWidget);
+      expect(find.text('LEAK?'), findsOneWidget);
+    });
   });
 }

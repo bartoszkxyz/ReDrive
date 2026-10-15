@@ -9,6 +9,8 @@ class TelemetryCard extends StatelessWidget {
   final String unit;
   final String iconPath;
   final double progress;
+  final Color? statusColor;
+  final String? statusBadge;
 
   const TelemetryCard({
     super.key,
@@ -19,11 +21,15 @@ class TelemetryCard extends StatelessWidget {
     required this.unit,
     required this.iconPath,
     required this.progress,
+    this.statusColor,
+    this.statusBadge,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final effectiveAccentColor = statusColor ?? colorScheme.primary;
+    final hasStatus = statusColor != null;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -31,8 +37,10 @@ class TelemetryCard extends StatelessWidget {
         color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: colorScheme.onSurface.withValues(alpha: 0.05),
-          width: 1,
+          color: hasStatus
+              ? statusColor!.withValues(alpha: 0.7)
+              : colorScheme.onSurface.withValues(alpha: 0.05),
+          width: hasStatus ? 1.5 : 1,
         ),
       ),
       child: Column(
@@ -42,6 +50,9 @@ class TelemetryCard extends StatelessWidget {
             title: title,
             iconPath: iconPath,
             colorScheme: colorScheme,
+            accentColor: effectiveAccentColor,
+            statusBadge: statusBadge,
+            statusColor: statusColor,
           ),
           const Spacer(),
 
@@ -51,10 +62,15 @@ class TelemetryCard extends StatelessWidget {
             fractionDigits: fractionDigits,
             unit: unit,
             colorScheme: colorScheme,
+            valueColor: hasStatus ? statusColor : null,
           ),
           const Spacer(),
 
-          _SegmentedIndicator(progress: progress, colorScheme: colorScheme),
+          _SegmentedIndicator(
+            progress: progress,
+            colorScheme: colorScheme,
+            fillColor: effectiveAccentColor,
+          ),
         ],
       ),
     );
@@ -65,11 +81,17 @@ class _CardHeader extends StatelessWidget {
   final String title;
   final String iconPath;
   final ColorScheme colorScheme;
+  final Color accentColor;
+  final String? statusBadge;
+  final Color? statusColor;
 
   const _CardHeader({
     required this.title,
     required this.iconPath,
     required this.colorScheme,
+    required this.accentColor,
+    this.statusBadge,
+    this.statusColor,
   });
 
   @override
@@ -80,7 +102,7 @@ class _CardHeader extends StatelessWidget {
           iconPath,
           width: 16,
           height: 16,
-          colorFilter: ColorFilter.mode(colorScheme.primary, BlendMode.srcIn),
+          colorFilter: ColorFilter.mode(accentColor, BlendMode.srcIn),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -97,6 +119,28 @@ class _CardHeader extends StatelessWidget {
             ),
           ),
         ),
+        if (statusBadge != null && statusColor != null) ...[
+          const SizedBox(width: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: statusColor!.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: statusColor!, width: 1),
+            ),
+            child: Text(
+              statusBadge!.toUpperCase(),
+              textScaler: TextScaler.noScaling,
+              style: TextStyle(
+                color: statusColor,
+                fontSize: 9,
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -108,6 +152,7 @@ class _AnimatedValue extends StatelessWidget {
   final int fractionDigits;
   final String unit;
   final ColorScheme colorScheme;
+  final Color? valueColor;
 
   const _AnimatedValue({
     required this.value,
@@ -115,6 +160,7 @@ class _AnimatedValue extends StatelessWidget {
     required this.fractionDigits,
     required this.unit,
     required this.colorScheme,
+    this.valueColor,
   });
 
   @override
@@ -134,7 +180,7 @@ class _AnimatedValue extends StatelessWidget {
                 "${animValue.toStringAsFixed(fractionDigits)}$suffix",
                 textScaler: TextScaler.noScaling,
                 style: TextStyle(
-                  color: colorScheme.onSurface,
+                  color: valueColor ?? colorScheme.onSurface,
                   fontSize: 40,
                   fontFamily: 'Inter',
                   fontWeight: FontWeight.w800,
@@ -161,14 +207,18 @@ class _AnimatedValue extends StatelessWidget {
 class _SegmentedIndicator extends StatelessWidget {
   final double progress;
   final ColorScheme colorScheme;
+  final Color? fillColor;
 
   const _SegmentedIndicator({
     required this.progress,
     required this.colorScheme,
+    this.fillColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final activeColor = fillColor ?? colorScheme.primary;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final availableWidth = constraints.maxWidth;
@@ -191,7 +241,7 @@ class _SegmentedIndicator extends StatelessWidget {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(2),
                     color: index < filledSegments
-                        ? colorScheme.primary
+                        ? activeColor
                         : colorScheme.onSurface.withValues(alpha: 0.1),
                   ),
                 );

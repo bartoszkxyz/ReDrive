@@ -163,6 +163,97 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isWide = size.width >= 850;
     final double cardHeight = isWide ? 160.0 : 190.0;
 
+    // --- Threshold Problem & Warning Evaluations ---
+
+    // Coolant Temperature
+    Color? coolantStatusColor;
+    String? coolantStatusBadge;
+    if (obdData.coolantTemp > 104) {
+      coolantStatusColor = const Color(0xFFEF4444); // Red Overheating
+      coolantStatusBadge = 'OVERHEAT';
+    } else if (obdData.coolantTemp >= 99) {
+      coolantStatusColor = const Color(0xFFF59E0B); // Amber Elevated
+      coolantStatusBadge = 'ELEVATED';
+    } else if (obdData.coolantTemp > 0 && obdData.coolantTemp < 65) {
+      coolantStatusColor = const Color(0xFF38BDF8); // Sky Blue Warmup
+      coolantStatusBadge = 'WARMUP';
+    }
+
+    // Battery / Adapter Voltage
+    Color? voltageStatusColor;
+    String? voltageStatusBadge;
+    if (obdData.voltage > 0) {
+      if (obdData.voltage < 11.8 || obdData.voltage >= 15.4) {
+        voltageStatusColor = const Color(0xFFEF4444); // Red Problem
+        voltageStatusBadge = obdData.voltage < 11.8 ? 'LOW BATT' : 'OVERVOLT';
+      } else if (obdData.voltage < 12.8 || obdData.voltage >= 15.0) {
+        voltageStatusColor = const Color(0xFFF59E0B); // Amber Warning
+        voltageStatusBadge = obdData.voltage < 12.8 ? 'LOW VOLT' : 'HIGH VOLT';
+      }
+    }
+
+    // Manifold Absolute Pressure (Vacuum leak detection at idle)
+    Color? mapStatusColor;
+    String? mapStatusBadge;
+    if (obdData.speed == 0 && obdData.rpm > 500 && obdData.relativeThrottle <= 1.5) {
+      if (obdData.manifoldPressure >= 55.0) {
+        mapStatusColor = const Color(0xFFEF4444); // Red High Idle Pressure / Leak
+        mapStatusBadge = 'LEAK?';
+      } else if (obdData.manifoldPressure >= 46.0) {
+        mapStatusColor = const Color(0xFFF59E0B); // Amber Low Vacuum
+        mapStatusBadge = 'LOW VAC';
+      }
+    }
+
+    // Fuel Tank & Range
+    Color? fuelTankStatusColor;
+    String? fuelTankStatusBadge;
+    if (obdData.fuelLevelPercent > 0) {
+      if (obdData.fuelLevelPercent <= 10.0) {
+        fuelTankStatusColor = const Color(0xFFEF4444); // Red Critical Reserve
+        fuelTankStatusBadge = 'RESERVE';
+      } else if (obdData.fuelLevelPercent <= 18.0) {
+        fuelTankStatusColor = const Color(0xFFF59E0B); // Amber Low Fuel
+        fuelTankStatusBadge = 'LOW FUEL';
+      }
+    }
+
+    Color? rangeStatusColor;
+    String? rangeStatusBadge;
+    if (obdData.estimatedRangeKm > 0) {
+      if (obdData.estimatedRangeKm <= 30.0) {
+        rangeStatusColor = const Color(0xFFEF4444);
+        rangeStatusBadge = 'CRITICAL';
+      } else if (obdData.estimatedRangeKm <= 60.0) {
+        rangeStatusColor = const Color(0xFFF59E0B);
+        rangeStatusBadge = 'LOW';
+      }
+    }
+
+    // Short-Term Fuel Trim (STFT)
+    Color? stftStatusColor;
+    String? stftStatusBadge;
+    final stftVal = obdData.shortTermFuelTrim;
+    if (stftVal.abs() >= 15.0) {
+      stftStatusColor = const Color(0xFFEF4444); // Red Imminent DTC threshold
+      stftStatusBadge = stftVal > 0 ? 'HIGH LEAN' : 'HIGH RICH';
+    } else if (stftVal.abs() >= 10.0) {
+      stftStatusColor = const Color(0xFFF59E0B); // Amber Warning
+      stftStatusBadge = stftVal > 0 ? 'LEAN' : 'RICH';
+    }
+
+    // Long-Term Fuel Trim (LTFT)
+    Color? ltftStatusColor;
+    String? ltftStatusBadge;
+    final ltftVal = obdData.longTermFuelTrim;
+    if (ltftVal.abs() >= 15.0) {
+      ltftStatusColor = const Color(0xFFEF4444); // Red Imminent P0171/P0172
+      ltftStatusBadge = ltftVal > 0 ? 'CHECK LEAN' : 'CHECK RICH';
+    } else if (ltftVal.abs() >= 10.0) {
+      ltftStatusColor = const Color(0xFFF59E0B); // Amber Warning
+      ltftStatusBadge = ltftVal > 0 ? 'LEAN TRIM' : 'RICH TRIM';
+    }
+
     // --- Section 1: Core Drive Telemetry ---
     final speedCard = TelemetryCard(
       title: 'SPEED',
@@ -190,6 +281,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       unit: '°C',
       iconPath: 'assets/images/svg/dashboard/temp.svg',
       progress: ((obdData.coolantTemp + 40) / 160).clamp(0.0, 1.0),
+      statusColor: coolantStatusColor,
+      statusBadge: coolantStatusBadge,
     );
     final voltageCard = TelemetryCard(
       title: 'VOLTAGE',
@@ -199,6 +292,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       unit: 'V',
       iconPath: 'assets/images/svg/dashboard/settings.svg',
       progress: ((obdData.voltage - 10) / 6).clamp(0.0, 1.0),
+      statusColor: voltageStatusColor,
+      statusBadge: voltageStatusBadge,
     );
 
     // --- Section 2: Power & Driving Dynamics ---
@@ -257,6 +352,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       unit: 'kPa',
       iconPath: 'assets/images/svg/dashboard/engine.svg',
       progress: (obdData.manifoldPressure / 120.0).clamp(0.0, 1.0),
+      statusColor: mapStatusColor,
+      statusBadge: mapStatusBadge,
     );
     final timingCard = TelemetryCard(
       title: 'IGN TIMING',
@@ -288,6 +385,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           : '%',
       iconPath: 'assets/images/svg/dashboard/fuel.svg',
       progress: (obdData.fuelLevelPercent / 100.0).clamp(0.0, 1.0),
+      statusColor: fuelTankStatusColor,
+      statusBadge: fuelTankStatusBadge,
     );
     final rangeCard = TelemetryCard(
       title: 'EST RANGE (DTE)',
@@ -297,6 +396,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       unit: 'km',
       iconPath: 'assets/images/svg/bottomBar/dtc.svg',
       progress: (obdData.estimatedRangeKm / 600.0).clamp(0.0, 1.0),
+      statusColor: rangeStatusColor,
+      statusBadge: rangeStatusBadge,
     );
     final stftCard = TelemetryCard(
       title: 'SHORT TRIM (STFT)',
@@ -306,6 +407,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       unit: '%',
       iconPath: 'assets/images/svg/dashboard/fuel.svg',
       progress: ((obdData.shortTermFuelTrim + 25) / 50.0).clamp(0.0, 1.0),
+      statusColor: stftStatusColor,
+      statusBadge: stftStatusBadge,
     );
     final ltftCard = TelemetryCard(
       title: 'LONG TRIM (LTFT)',
@@ -315,6 +418,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       unit: '%',
       iconPath: 'assets/images/svg/dashboard/fuel.svg',
       progress: ((obdData.longTermFuelTrim + 25) / 50.0).clamp(0.0, 1.0),
+      statusColor: ltftStatusColor,
+      statusBadge: ltftStatusBadge,
     );
 
     // --- Section 5: Trip & Efficiency ---
