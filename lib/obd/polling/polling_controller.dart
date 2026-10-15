@@ -7,6 +7,16 @@ import '../pid/pid_registry.dart';
 
 enum WatchSource { visibleScreen, backgroundMonitoring, logging, session }
 
+/// Priority tier determining polling frequency over the OBD-II serial bus.
+enum PidPriorityTier {
+  /// Fast tier: polled on every loop (RPM, Speed, Throttle, MAF).
+  high,
+  /// Normal tier: polled every 2nd loop (Load, STFT, MAP, Timing, Fuel Rate, Loop Status).
+  normal,
+  /// Slow tier: polled every 8th loop (Coolant, IAT, Fuel Tank, LTFT, Voltage, Temp sensors).
+  low,
+}
+
 /// Controls periodic polling of requested OBD-II PIDs.
 ///
 /// Combines watchlists from multiple consumers such as
@@ -19,6 +29,7 @@ class PollingController {
 
   final Map<WatchSource, Set<PidKey>> _watchlists = {};
   final Map<PidKey, num> _latestValues = {};
+  int _cycleCount = 0;
 
   final _updatesController =
       StreamController<({PidKey key, num value})>.broadcast();
@@ -36,6 +47,38 @@ class PollingController {
   bool get isPolling => _isPolling;
   Map<PidKey, num> get latestValues => Map.unmodifiable(_latestValues);
   Stream<({PidKey key, num value})> get updates => _updatesController.stream;
+  int get cycleCount => _cycleCount;
+
+  static PidPriorityTier priorityFor(PidKey key) {
+    switch (key) {
+      case PidKey.engineRpm:
+      case PidKey.vehicleSpeed:
+      case PidKey.throttlePosition:
+      case PidKey.mafAirFlowRate:
+        return PidPriorityTier.high;
+
+      case PidKey.engineLoad:
+      case PidKey.shortTermFuelTrim1:
+      case PidKey.timingAdvance:
+      case PidKey.intakeManifoldPressure:
+      case PidKey.engineFuelRate:
+      case PidKey.fuelSystemStatus:
+        return PidPriorityTier.normal;
+
+      case PidKey.coolantTemperature:
+      case PidKey.intakeAirTemperature:
+      case PidKey.adapterVoltage:
+      case PidKey.fuelTankLevel:
+      case PidKey.longTermFuelTrim1:
+      case PidKey.fuelPressure:
+      case PidKey.barometricPressure:
+      case PidKey.controlModuleVoltage:
+      case PidKey.ambientAirTemperature:
+      case PidKey.engineOilTemperature:
+      case PidKey.runTimeSinceStart:
+        return PidPriorityTier.low;
+    }
+  }
 
   void setWatchlist(WatchSource source, Set<PidKey> keys) {
     if (keys.isEmpty) {
@@ -65,6 +108,23 @@ class PollingController {
     return effective;
   }
 
+  /// Determines which keys to poll this cycle based on tiered priority.
+  /// Uninitialized keys are always included to ensure fast initial discovery.
+  List<PidKey> computeScheduledKeys(Set<PidKey> effectiveKeys) {
+    return effectiveKeys.where((key) {
+      if (!_latestValues.containsKey(key)) return true;
+      final tier = priorityFor(key);
+      switch (tier) {
+        case PidPriorityTier.high:
+          return true;
+        case PidPriorityTier.normal:
+          return _cycleCount % 2 == 0;
+        case PidPriorityTier.low:
+          return _cycleCount % 8 == 0;
+      }
+    }).toList();
+  }
+
   void start() {
     if (!_isPolling) {
       _isPolling = true;
@@ -79,13 +139,16 @@ class PollingController {
 
   Future<void> _runPollingLoop() async {
     while (_isPolling) {
-      final keys = computeEffectiveKeys();
+      final effective = computeEffectiveKeys();
 
-      if (keys.isEmpty) {
+      if (effective.isEmpty) {
         await Future.delayed(const Duration(milliseconds: 100));
 
         continue;
       }
+
+      _cycleCount++;
+      final keys = computeScheduledKeys(effective);
 
       for (final key in keys) {
         if (!_isPolling) break;

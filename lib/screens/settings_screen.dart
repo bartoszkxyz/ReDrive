@@ -400,6 +400,16 @@ class _SettingsSheetState extends State<SettingsSheet> {
                         ),
                         const SizedBox(height: 10),
 
+                        // App Version
+                        _SettingsTile(
+                          icon: Icons.info_outline_rounded,
+                          label: 'App Version',
+                          subtitle: 'ReDrive Telemetry & Diagnostics',
+                          trailingText: 'v1.1.0+4',
+                          colorScheme: colorScheme,
+                        ),
+                        const SizedBox(height: 10),
+
                         // Headunit Autostart & Background Operation
                         _SettingsTile(
                           icon: Icons.power_settings_new_rounded,

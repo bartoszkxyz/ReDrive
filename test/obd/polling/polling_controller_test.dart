@@ -241,4 +241,47 @@ void main() {
     expect(connection.sentCommands, ['010D\r', '010D\r', '010D\r']);
     expect(controller.isPolling, isFalse);
   });
+
+  group('Tiered Priority Scheduling', () {
+    test('correctly maps PID priority tiers', () {
+      expect(PollingController.priorityFor(PidKey.vehicleSpeed), PidPriorityTier.high);
+      expect(PollingController.priorityFor(PidKey.engineRpm), PidPriorityTier.high);
+      expect(PollingController.priorityFor(PidKey.throttlePosition), PidPriorityTier.high);
+      expect(PollingController.priorityFor(PidKey.mafAirFlowRate), PidPriorityTier.high);
+
+      expect(PollingController.priorityFor(PidKey.engineLoad), PidPriorityTier.normal);
+      expect(PollingController.priorityFor(PidKey.shortTermFuelTrim1), PidPriorityTier.normal);
+      expect(PollingController.priorityFor(PidKey.timingAdvance), PidPriorityTier.normal);
+      expect(PollingController.priorityFor(PidKey.intakeManifoldPressure), PidPriorityTier.normal);
+
+      expect(PollingController.priorityFor(PidKey.coolantTemperature), PidPriorityTier.low);
+      expect(PollingController.priorityFor(PidKey.fuelTankLevel), PidPriorityTier.low);
+      expect(PollingController.priorityFor(PidKey.longTermFuelTrim1), PidPriorityTier.low);
+      expect(PollingController.priorityFor(PidKey.adapterVoltage), PidPriorityTier.low);
+    });
+
+    test('computeScheduledKeys includes all uninitialized keys on first cycle', () {
+      final controller = PollingController(
+        elmClient: elmClient,
+        registry: registry,
+        supportedEcuKeys: {
+          PidKey.vehicleSpeed,
+          PidKey.engineLoad,
+          PidKey.coolantTemperature,
+          PidKey.fuelTankLevel,
+        },
+      );
+
+      final effective = {
+        PidKey.vehicleSpeed,
+        PidKey.engineLoad,
+        PidKey.coolantTemperature,
+        PidKey.fuelTankLevel,
+      };
+
+      // When values are not yet known, ALL keys must be scheduled for immediate discovery
+      final scheduled = controller.computeScheduledKeys(effective);
+      expect(scheduled, containsAll(effective));
+    });
+  });
 }
