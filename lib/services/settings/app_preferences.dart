@@ -107,10 +107,10 @@ class AppPreferences {
     await prefs.setBool(_keyDebugLogging, enabled);
   }
 
-  /// Whether ReDrive automatically launches its UI on the headunit upon ignition/boot.
+  /// Whether ReDrive automatically brings its UI to the front on ignition (false = silent background start).
   static Future<bool> isAutoLaunchOnBootEnabled() async {
     final prefs = await _instance;
-    return prefs.getBool(_keyAutoLaunchOnBoot) ?? true;
+    return prefs.getBool(_keyAutoLaunchOnBoot) ?? false;
   }
 
   static Future<void> setAutoLaunchOnBootEnabled(bool enabled) async {

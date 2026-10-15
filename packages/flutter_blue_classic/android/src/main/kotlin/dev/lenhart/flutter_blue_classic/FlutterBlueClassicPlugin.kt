@@ -112,11 +112,12 @@ class FlutterBlueClassicPlugin : FlutterPlugin, MethodCallHandler, ActivityAware
             getSystemService(flutterPluginBinding.applicationContext, BluetoothManager::class.java)
         bluetoothAdapter = bluetoothManager?.adapter
 
+        permissionManager = PermissionManager(flutterPluginBinding.applicationContext, null)
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activityPluginBinding = binding
-        permissionManager = PermissionManager(context!!.applicationContext, binding.activity)
+        permissionManager.setActivity(binding.activity)
         binding.addRequestPermissionsResultListener(permissionManager)
     }
 
@@ -488,7 +489,7 @@ class FlutterBlueClassicPlugin : FlutterPlugin, MethodCallHandler, ActivityAware
         Thread {
             try {
                 connection.connect(address, connectUuid)
-                activityPluginBinding!!.activity.runOnUiThread {
+                Handler(Looper.getMainLooper()).post {
                     result.success(id)
                 }
             } catch (ex: java.lang.Exception) {
@@ -528,7 +529,7 @@ class FlutterBlueClassicPlugin : FlutterPlugin, MethodCallHandler, ActivityAware
             Thread {
                 try {
                 connection.write(bytes)
-                activityPluginBinding!!.activity.runOnUiThread {
+                Handler(Looper.getMainLooper()).post {
                     result.success(null)
                 }
             } catch (e: Exception) {

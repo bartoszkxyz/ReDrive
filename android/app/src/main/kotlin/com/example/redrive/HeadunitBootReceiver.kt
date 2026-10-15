@@ -80,24 +80,28 @@ class HeadunitBootReceiver : BroadcastReceiver() {
             Log.e(TAG, "Error starting background service on headunit wake", e)
         }
 
-        // 4. Direct Auto-Launch: Bring ReDrive UI onto the headunit screen upon ignition
+        // 4. Auto-Startup: Start ReDrive (silently in background by default, or onto screen if user enabled auto-launch)
         try {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val shouldAutoLaunch = prefs.getBoolean(KEY_AUTO_LAUNCH, true)
+            val shouldAutoLaunch = prefs.getBoolean(KEY_AUTO_LAUNCH, false)
 
-            if (shouldAutoLaunch) {
-                val activityIntent = Intent(context, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            val activityIntent = Intent(context, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                if (!shouldAutoLaunch) {
+                    putExtra("silent_start", true)
+                } else {
                     addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
                 }
-                context.startActivity(activityIntent)
+            }
+            context.startActivity(activityIntent)
+            if (shouldAutoLaunch) {
                 Log.i(TAG, "ReDrive MainActivity launched on headunit display from wake event ($action)")
             } else {
-                Log.i(TAG, "Auto-launch on ignition is disabled by user configuration")
+                Log.i(TAG, "ReDrive MainActivity started silently in background from wake event ($action)")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error launching MainActivity on headunit wake", e)
+            Log.e(TAG, "Error starting MainActivity on headunit wake", e)
         }
     }
 }

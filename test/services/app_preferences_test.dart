@@ -11,9 +11,9 @@ void main() {
   });
 
   group('AppPreferences - Boot & Autostart Configuration', () {
-    test('isAutoLaunchOnBootEnabled defaults to true', () async {
+    test('isAutoLaunchOnBootEnabled defaults to false (silent background startup)', () async {
       final enabled = await AppPreferences.isAutoLaunchOnBootEnabled();
-      expect(enabled, isTrue);
+      expect(enabled, isFalse);
     });
 
     test('setAutoLaunchOnBootEnabled persists value', () async {

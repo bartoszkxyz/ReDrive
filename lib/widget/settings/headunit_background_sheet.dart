@@ -160,7 +160,9 @@ class _HeadunitBackgroundSheetState extends State<HeadunitBackgroundSheet> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'When your vehicle ignition turns on (ACC_ON or system boot), ReDrive brings its dashboard directly onto the headunit screen and connects to your OBD-II adapter immediately.',
+                        _autoLaunch
+                            ? 'On ignition, ReDrive automatically brings its dashboard onto the screen and connects to your OBD-II adapter.'
+                            : 'Silent mode active: On ignition, ReDrive wakes up and connects in the background without interrupting your launcher or radio. Toggle ON if you prefer the dashboard to appear on screen immediately.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
                           height: 1.35,
