@@ -2,6 +2,7 @@ class ObdData {
   final int rpm;
   final int speed;
   final int coolantTemp;
+  final int intakeAirTemp;
   final double voltage;
   final double engineLoad;
   final double throttlePosition;
@@ -14,6 +15,7 @@ class ObdData {
     this.rpm = 0,
     this.speed = 0,
     this.coolantTemp = 0,
+    this.intakeAirTemp = 0,
     this.voltage = 0.0,
     this.engineLoad = 0.0,
     this.throttlePosition = 0.0,
@@ -27,6 +29,7 @@ class ObdData {
     int? rpm,
     int? speed,
     int? coolantTemp,
+    int? intakeAirTemp,
     double? voltage,
     double? engineLoad,
     double? throttlePosition,
@@ -39,6 +42,7 @@ class ObdData {
       rpm: rpm ?? this.rpm,
       speed: speed ?? this.speed,
       coolantTemp: coolantTemp ?? this.coolantTemp,
+      intakeAirTemp: intakeAirTemp ?? this.intakeAirTemp,
       voltage: voltage ?? this.voltage,
       engineLoad: engineLoad ?? this.engineLoad,
       throttlePosition: throttlePosition ?? this.throttlePosition,
@@ -55,6 +59,7 @@ class ObdData {
         'rpm: $rpm, '
         'speed: $speed km/h, '
         'coolantTemp: $coolantTemp°C, '
+        'iat: $intakeAirTemp°C, '
         'voltage: $voltage V, '
         'load: ${engineLoad.toStringAsFixed(1)}%, '
         'throttle: ${throttlePosition.toStringAsFixed(1)}%, '

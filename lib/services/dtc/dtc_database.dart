@@ -3,6 +3,30 @@ import '../../models/dtc_code.dart';
 /// Comprehensive offline database of standard SAE J2012 OBD-II Diagnostic Trouble Codes.
 class DtcDatabase {
   static const Map<String, DtcCode> _knownCodes = {
+    'P0011': DtcCode(
+      code: 'P0011',
+      system: 'Powertrain',
+      title: 'Camshaft Position - Timing Over-Advanced (Bank 1)',
+      description:
+          'Variable Valve Timing (VVT) intake camshaft timing is advanced beyond ECU target.',
+      severity: 'Warning',
+      symptoms:
+          'Rattling engine noise on start, sluggish acceleration, erratic idle, CEL on.',
+      possibleCauses:
+          'Dirty engine oil, clogged VVT oil control valve (OCV) screen, stuck VVT solenoid, stretched timing chain.',
+    ),
+    'P0012': DtcCode(
+      code: 'P0012',
+      system: 'Powertrain',
+      title: 'Camshaft Position - Timing Over-Retarded (Bank 1)',
+      description:
+          'Variable Valve Timing (VVT) intake camshaft timing is retarded beyond ECU target.',
+      severity: 'Warning',
+      symptoms:
+          'Poor engine performance at high RPM, rough idling, increased emissions.',
+      possibleCauses:
+          'Low oil pressure, faulty VVT oil control valve, defective camshaft phaser.',
+    ),
     'P0100': DtcCode(
       code: 'P0100',
       system: 'Powertrain',
@@ -30,6 +54,18 @@ class DtcDatabase {
       symptoms: 'Engine hesitates during acceleration, poor fuel efficiency.',
       possibleCauses: 'Broken wire, short to ground, unplugged sensor, faulty sensor.',
     ),
+    'P0103': DtcCode(
+      code: 'P0103',
+      system: 'Powertrain',
+      title: 'Mass Air Flow (MAF) Sensor Circuit High Input',
+      description:
+          'The MAF sensor voltage signal is higher than expected for current engine load.',
+      severity: 'Warning',
+      symptoms:
+          'Black exhaust smoke, engine surging, poor fuel economy, rich air-fuel mixture.',
+      possibleCauses:
+          'Short to power in MAF sensor wiring, contaminated MAF hot-wire, faulty MAF sensor.',
+    ),
     'P0113': DtcCode(
       code: 'P0113',
       system: 'Powertrain',
@@ -47,6 +83,42 @@ class DtcDatabase {
       severity: 'Critical',
       symptoms: 'Cooling fans run at 100% constantly, erratic idle, rich mixture.',
       possibleCauses: 'Bad ECT sensor, corroded connector, thermostat failure.',
+    ),
+    'P0117': DtcCode(
+      code: 'P0117',
+      system: 'Powertrain',
+      title: 'Engine Coolant Temperature (ECT) Circuit Low Input',
+      description:
+          'The ECT sensor reported high voltage indicating extreme high temperature or short to ground.',
+      severity: 'Critical',
+      symptoms:
+          'Temperature gauge pegged hot, engine running rich, cooling fans at maximum speed.',
+      possibleCauses:
+          'Short circuit in ECT wiring harness, failed ECT sensor, defective ECU ground.',
+    ),
+    'P0118': DtcCode(
+      code: 'P0118',
+      system: 'Powertrain',
+      title: 'Engine Coolant Temperature (ECT) Circuit High Input',
+      description:
+          'The ECT sensor voltage is abnormally high, indicating an open circuit or extreme low temperature (-40°C).',
+      severity: 'Warning',
+      symptoms:
+          'Hard engine starting when hot, cooling fans running continuously, rich exhaust smell.',
+      possibleCauses:
+          'Disconnected ECT wiring connector, broken signal wire, open sensor circuit.',
+    ),
+    'P0121': DtcCode(
+      code: 'P0121',
+      system: 'Powertrain',
+      title: 'Throttle Position Sensor (TPS) Range/Performance',
+      description:
+          'The TPS voltage reading does not correlate with calculated engine load and MAF sensor airflow.',
+      severity: 'Warning',
+      symptoms:
+          'Hesitation during acceleration, sudden throttle cut, erratic automatic gear shifts.',
+      possibleCauses:
+          'Worn TPS potentiometer, dirty throttle body butterfly valve, loose throttle cable.',
     ),
     'P0128': DtcCode(
       code: 'P0128',
@@ -74,6 +146,30 @@ class DtcDatabase {
       severity: 'Warning',
       symptoms: 'Degraded fuel economy, failed emissions inspection.',
       possibleCauses: 'Aged/poisoned oxygen sensor, exhaust leak before the sensor.',
+    ),
+    'P0134': DtcCode(
+      code: 'P0134',
+      system: 'Powertrain',
+      title: 'O2 Sensor Circuit No Activity Detected (Bank 1, Sensor 1)',
+      description:
+          'Upstream O2 sensor voltage remains flat-lined with no voltage switching.',
+      severity: 'Warning',
+      symptoms:
+          'Open loop fuel control, poor fuel economy, failed emissions.',
+      possibleCauses:
+          'Unplugged O2 sensor, broken signal wire, defective sensor zirconia element.',
+    ),
+    'P0135': DtcCode(
+      code: 'P0135',
+      system: 'Powertrain',
+      title: 'O2 Sensor Heater Circuit Malfunction (Bank 1, Sensor 1)',
+      description:
+          'The electrical heating element in the upstream oxygen sensor failed.',
+      severity: 'Warning',
+      symptoms:
+          'Delayed closed-loop operation on cold start, elevated cold emissions.',
+      possibleCauses:
+          'Blown O2 heater fuse, burnt heater resistance element, wiring open circuit.',
     ),
     'P0171': DtcCode(
       code: 'P0171',
@@ -137,6 +233,42 @@ class DtcDatabase {
       severity: 'Critical',
       symptoms: 'Engine shaking, loss of power, check engine light.',
       possibleCauses: 'Cylinder 4 spark plug or ignition coil failure, faulty injector 4.',
+    ),
+    'P0325': DtcCode(
+      code: 'P0325',
+      system: 'Powertrain',
+      title: 'Knock Sensor 1 Circuit Malfunction (Bank 1)',
+      description:
+          'The ECU cannot detect signal fluctuations from the piezoelectric knock sensor.',
+      severity: 'Warning',
+      symptoms:
+          'Retarded ignition timing, reduced engine power under heavy acceleration.',
+      possibleCauses:
+          'Defective knock sensor on engine block, corroded wiring connector, improper sensor torque.',
+    ),
+    'P0335': DtcCode(
+      code: 'P0335',
+      system: 'Powertrain',
+      title: 'Crankshaft Position Sensor (CKP) Circuit Malfunction',
+      description:
+          'The ECU lost pulse timing synchronization from the crankshaft reluctor wheel.',
+      severity: 'Critical',
+      symptoms:
+          'Engine stalling, no-start/crank-no-start condition, sudden engine misfire.',
+      possibleCauses:
+          'Damaged CKP sensor tip, loose crankshaft sensor bracket, severed harness.',
+    ),
+    'P0340': DtcCode(
+      code: 'P0340',
+      system: 'Powertrain',
+      title: 'Camshaft Position Sensor (CMP) Circuit Malfunction',
+      description:
+          'Missing or erratic camshaft angle reference signal during cylinder stroke recognition.',
+      severity: 'Critical',
+      symptoms:
+          'Extended cranking time before start, rough idle, loss of high-RPM power.',
+      possibleCauses:
+          'Faulty CMP sensor on cylinder head, damaged reluctor notch, wiring harness break.',
     ),
     'P0420': DtcCode(
       code: 'P0420',

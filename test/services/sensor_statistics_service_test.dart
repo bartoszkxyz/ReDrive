@@ -54,7 +54,7 @@ void main() {
 
     test('getFilteredSensors filters by category and allowedKeys', () {
       final coreOnly = service.getFilteredSensors(allowedKeys: PidRegistry.coreKeys);
-      expect(coreOnly.length, 8);
+      expect(coreOnly.length, 9);
       for (final sensor in coreOnly) {
         expect(PidRegistry.coreKeys.contains(sensor.key), isTrue);
       }

@@ -27,12 +27,13 @@ class DemoDataGenerator {
     _currentRpm = (800 + (_currentSpeed * 28) + _random.nextInt(200) - 100).clamp(800, 5500);
 
     final coolantTemp = 88 + _random.nextInt(6); // 88 to 93 °C
+    final intakeAirTemp = 26 + _random.nextInt(5); // 26 to 30 °C
     final voltage = 14.1 + (_random.nextDouble() * 0.4); // 14.1 to 14.5 V
     final load = 22.0 + (_currentSpeed / 130.0) * 35.0 + (_random.nextDouble() * 10.0); // 22% - 67%
     final throttle = (load * 0.85).clamp(10.0, 95.0);
 
-    // Instant fuel consumption
-    final airGramsSec = (_currentRpm * 1.8 * (load / 100.0)) / 125.0;
+    // Instant fuel consumption (Suzuki Swift 3 M15A 1.5L displacement)
+    final airGramsSec = (_currentRpm * 1.5 * (load / 100.0)) / 125.0;
     final fuelLPerH = (airGramsSec * 3600.0) / (14.7 * 820.0);
     final l100km = _currentSpeed > 0 ? (fuelLPerH / _currentSpeed) * 100.0 : 0.0;
 
@@ -40,6 +41,7 @@ class DemoDataGenerator {
       speed: _currentSpeed,
       rpm: _currentRpm,
       coolantTemp: coolantTemp,
+      intakeAirTemp: intakeAirTemp,
       voltage: voltage,
       engineLoad: load,
       throttlePosition: throttle,

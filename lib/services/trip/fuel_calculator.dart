@@ -41,9 +41,12 @@ class FuelCalculator {
 
     // Deceleration Fuel Cut-Off (DFCO):
     // When moving in gear at speed and coasting with throttle closed, the ECU completely shuts off injectors.
+    // Supports both relative throttle (< 1.0%) and Suzuki Swift 3 M15A absolute closed throttle (10% - 14%).
+    final isThrottleClosed = throttlePositionPercent < 1.0 ||
+        (throttlePositionPercent >= 10.0 && throttlePositionPercent <= 14.0);
     if (speedKmH > 20 &&
         rpm > 1300 &&
-        throttlePositionPercent < 1.0 &&
+        isThrottleClosed &&
         engineLoadPercent < 18.0) {
       return 0.0;
     }
@@ -53,23 +56,25 @@ class FuelCalculator {
       return (directFuelRateLPerHour * calibrationFactor).clamp(0.0, 60.0);
     }
 
-    // Compute effective AFR with fuel trim adjustment
-    final trimMultiplier = 1.0 + ((shortTermFuelTrimPercent + longTermFuelTrimPercent) / 100.0);
-    final effectiveAfr = (airFuelRatio * trimMultiplier).clamp(9.0, 20.0);
-    final airGramsPerFuelLiter = effectiveAfr * fuelDensityGramsPerLiter;
+    // Fuel Trim Compensation:
+    // Positive trims (ECU correcting lean mixture) command additional fuel.
+    // Negative trims (ECU correcting rich mixture) command less fuel.
+    // Multiplier is clamped to [0.5, 1.5] (±50%) to guard against corrupted OBD packets.
+    final trimMultiplier = (1.0 + ((shortTermFuelTrimPercent + longTermFuelTrimPercent) / 100.0)).clamp(0.5, 1.5);
+    final airGramsPerFuelLiter = airFuelRatio * fuelDensityGramsPerLiter;
 
     // Tier 2: Direct Air Mass (MAF) sensor (Mode 01 PID 0110)
     if (mafGramsPerSecond != null && mafGramsPerSecond > 0) {
-      final fuelLPerHour = (mafGramsPerSecond * 3600.0) / airGramsPerFuelLiter;
+      final fuelLPerHour = (mafGramsPerSecond * 3600.0) / airGramsPerFuelLiter * trimMultiplier;
       return (fuelLPerHour * calibrationFactor).clamp(0.0, 60.0);
     }
 
     // Tier 3: Load-adjusted speed-density volumetric fallback (Mode 01 PID 0104 + RPM)
     final load = engineLoadPercent.clamp(10.0, 100.0);
     final airGramsPerSec = (rpm * displacementLiters * (load / 100.0)) / 125.0;
-    final fuelLitersPerHour = (airGramsPerSec * 3600.0) / airGramsPerFuelLiter;
+    final fuelLPerHour = (airGramsPerSec * 3600.0) / airGramsPerFuelLiter * trimMultiplier;
 
-    return (fuelLitersPerHour * calibrationFactor).clamp(0.0, 60.0);
+    return (fuelLPerHour * calibrationFactor).clamp(0.0, 60.0);
   }
 
   /// Calculates fuel consumption in Liters per 100 Kilometers (L/100km).

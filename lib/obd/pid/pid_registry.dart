@@ -48,6 +48,7 @@ class PidRegistry {
     PidKey.throttlePosition,
     PidKey.mafAirFlowRate,
     PidKey.engineFuelRate,
+    PidKey.intakeAirTemperature,
   };
 
   Set<PidKey> get allKeys => Set.unmodifiable(_definitions.keys);

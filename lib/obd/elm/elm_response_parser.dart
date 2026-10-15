@@ -31,15 +31,31 @@ class ElmResponseParser {
   );
 
   static bool _isObdDataLine(String line) {
-    final bytes = line.split(RegExp(r'\s+'));
+    final trimmed = line.trim();
+    if (trimmed.isEmpty) return false;
 
-    if (bytes.length < 3) {
-      return false;
+    // 1. Unspaced pure hex (e.g. "44", "4300", "4100BE3FB813", "4303000171")
+    if (RegExp(r'^(?:[0-9A-Fa-f]{2})+$').hasMatch(trimmed)) {
+      return true;
     }
 
-    return bytes.every(
-      (byte) => byte.length == 2 && int.tryParse(byte, radix: 16) != null,
+    // 2. Spaced tokens (can include 2-digit hex bytes, CAN headers like 7E8, or ISO-TP prefixes like 0:, 1:)
+    final tokens = trimmed.split(RegExp(r'\s+'));
+    if (tokens.isEmpty) return false;
+
+    // Must contain at least one valid 2-digit hex byte to be an OBD data line
+    final hasHexByte = tokens.any(
+      (t) => RegExp(r'^[0-9A-Fa-f]{2}$').hasMatch(t),
     );
+    if (!hasHexByte) return false;
+
+    return tokens.every((token) {
+      if (RegExp(r'^[0-9A-Fa-f]{2}$').hasMatch(token)) return true;
+      if (RegExp(r'^[0-9A-Fa-f]{3}$').hasMatch(token)) return true; // 11-bit CAN header (e.g. 7E8)
+      if (RegExp(r'^[0-9A-Fa-f]{8}$').hasMatch(token)) return true; // 29-bit CAN header
+      if (RegExp(r'^[0-9A-Fa-f]+:$').hasMatch(token)) return true; // ISO-TP frame prefix (0:, 1:, ...)
+      return false;
+    });
   }
 
   static bool _isSearchingLine(String line) {

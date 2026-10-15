@@ -151,7 +151,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
                   Text(
                     tempValue == 0
                         ? 'Save all trips (0 km)'
-                        : '${tempValue.toStringAsFixed(0)} km',
+                        : '${tempValue < 1 ? tempValue.toStringAsFixed(1) : tempValue.toStringAsFixed(0)} km',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
@@ -173,15 +173,15 @@ class _SettingsSheetState extends State<SettingsSheet> {
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: [0.0, 5.0, 10.0, 15.0, 20.0, 25.0].map((preset) {
+                    children: [0.0, 0.1, 1.0, 5.0, 10.0, 20.0].map((preset) {
                       final isSelected = tempValue == preset;
                       return ActionChip(
                         label: Text(
-                          preset == 10.0
-                              ? '10 km (Default)'
+                          preset == 0.1
+                              ? '0.1 km (Default)'
                               : preset == 0.0
                                   ? '0 km (Off)'
-                                  : '${preset.toInt()} km',
+                                  : '${preset < 1 ? preset.toStringAsFixed(1) : preset.toInt()} km',
                         ),
                         backgroundColor: isSelected
                             ? colorScheme.primary.withValues(alpha: 0.2)
@@ -321,7 +321,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
                           subtitle: 'Save trips longer than this threshold',
                           trailingText: tripProvider.minTripDistanceKm == 0
                               ? '0 km (All)'
-                              : '${tripProvider.minTripDistanceKm.toStringAsFixed(0)} km',
+                              : '${tripProvider.minTripDistanceKm < 1 ? tripProvider.minTripDistanceKm.toStringAsFixed(1) : tripProvider.minTripDistanceKm.toStringAsFixed(0)} km',
                           colorScheme: colorScheme,
                           onTap: () => _showMinDistanceDialog(context, tripProvider),
                         ),

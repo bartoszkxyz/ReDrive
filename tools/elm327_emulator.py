@@ -30,21 +30,65 @@ class SuzukiSwiftSimulator:
         self.headers = False
         self.protocol = 0  # 0 = Auto, 5 = ISO 14230-4 KWP Fast
         self.start_time = time.time()
+        # Stored: P0171 (01 71), P0300 (03 00); Pending: P0420 (04 20)
+        self.stored_dtcs = [(0x01, 0x71), (0x03, 0x00)]
+        self.pending_dtcs = [(0x04, 0x20)]
+
+    def reset_adapter(self):
+        """Reset ELM327 adapter configuration to factory defaults on ATZ / ATWS."""
+        self.echo = True
+        self.linefeeds = True
+        self.spaces = True
+        self.headers = False
+        self.protocol = 0
 
     def get_dynamic_values(self):
         elapsed = time.time() - self.start_time
-        # RPM oscillates between 750 and 2400 RPM
-        rpm = int(1500 + 800 * math.sin(elapsed * 0.5))
-        # Speed oscillates between 0 and 60 km/h
-        speed = max(0, int(30 + 25 * math.sin(elapsed * 0.3)))
-        # Coolant slowly warms up to 88°C
+        phase_time = elapsed % 60.0
         coolant = min(88, int(60 + elapsed * 0.2))
-        # Engine load oscillates between 15% and 65%
-        load_pct = max(10, min(90, int(35 + 20 * math.sin(elapsed * 0.6))))
-        # Throttle position
-        throttle_pct = max(10, min(80, int(25 + 15 * math.sin(elapsed * 0.4))))
-        # MAF
-        maf = max(2.0, (rpm * load_pct) / 6000.0)
+
+        if phase_time < 10.0:
+            # Phase 1: Idle (0 - 10s)
+            speed = 0
+            rpm = int(750 + 30 * math.sin(phase_time * 0.8))
+            throttle_pct = 12.0
+            load_pct = 20.0
+            maf = 2.5 + 0.2 * math.sin(phase_time)
+        elif phase_time < 25.0:
+            # Phase 2: Acceleration (10 - 25s)
+            frac = (phase_time - 10.0) / 15.0
+            speed = int(frac * 60.0)
+            rpm = int(800.0 + frac * 2000.0)
+            throttle_pct = 20.0 + frac * 25.0
+            load_pct = 35.0 + frac * 30.0
+            maf = max(2.0, (rpm * load_pct) / 6000.0)
+        elif phase_time < 40.0:
+            # Phase 3: Cruise (25 - 40s)
+            frac = (phase_time - 25.0) / 15.0
+            speed = 60 + int(3.0 * math.sin(frac * 6.28))
+            rpm = 2000 + int(60.0 * math.sin(frac * 6.28))
+            throttle_pct = 18.0 + 2.0 * math.sin(frac * 6.28)
+            load_pct = 28.0 + 3.0 * math.sin(frac * 6.28)
+            maf = max(2.0, (rpm * load_pct) / 6000.0)
+        elif phase_time < 52.0:
+            # Phase 4: Dedicated Coast-Down / DFCO Phase (40 - 52s)
+            # Speed decelerates 60 -> 32 km/h (> 20 km/h)
+            # RPM decelerates 2500 -> 1400 RPM (> 1300 RPM)
+            # Throttle closed (0.0%, raw 41 11 00), load < 15.0%
+            frac = (phase_time - 40.0) / 12.0
+            speed = int(60.0 - frac * 28.0)
+            rpm = int(2500.0 - frac * 1100.0)
+            throttle_pct = 0.0
+            load_pct = max(9.0, 12.0 - frac * 3.0)
+            maf = 2.8 - frac * 0.8
+        else:
+            # Phase 5: Braking to Stop / Idle transition (52 - 60s)
+            frac = (phase_time - 52.0) / 8.0
+            speed = max(0, int(32.0 * (1.0 - frac)))
+            rpm = int(1400.0 - frac * 650.0)
+            throttle_pct = 8.0
+            load_pct = 18.0
+            maf = 2.4
 
         return {
             "rpm": rpm,
@@ -56,13 +100,13 @@ class SuzukiSwiftSimulator:
         }
 
     def process_command(self, cmd: str) -> str:
-        cmd = cmd.strip().upper()
+        cmd = cmd.replace(" ", "").strip().upper()
         if not cmd:
             return ""
 
         # AT commands
         if cmd == "ATZ" or cmd == "ATWS":
-            self.echo = True
+            self.reset_adapter()
             return "ELM327 v2.3\r\n>"
         if cmd == "ATE0":
             self.echo = False
@@ -71,6 +115,7 @@ class SuzukiSwiftSimulator:
             self.echo = True
             return "OK\r\n>"
         if cmd == "ATL0" or cmd == "ATL1":
+            self.linefeeds = (cmd == "ATL1")
             return "OK\r\n>"
         if cmd == "ATS0":
             self.spaces = False
@@ -98,8 +143,12 @@ class SuzukiSwiftSimulator:
             return "A5\r\n>"
         if cmd == "ATRV":
             return "14.1V\r\n>"
-        if cmd.startswith("AT"):
+        if cmd in ("ATI", "AT@1"):
+            return "ELM327 v2.3\r\n>"
+        if cmd.startswith("ATSH") or cmd.startswith("ATCRA") or cmd.startswith("ATCAF") or cmd.startswith("ATST") or cmd in ("ATD", "ATPC", "ATAL", "ATNL", "ATBD"):
             return "OK\r\n>"
+        if cmd.startswith("AT"):
+            return "?\r\n>"
 
         vals = self.get_dynamic_values()
 
@@ -118,8 +167,8 @@ class SuzukiSwiftSimulator:
             return "41 20 80 02 02 01\r\n>"
 
         if cmd == "0140":
-            # Range 0140 - 0160: supports 42, 46, 5C
-            return "41 40 44 04 00 00\r\n>"
+            # Range 0140 - 0160: supports 42, 46, 5C, 5E
+            return "41 40 44 04 00 14\r\n>"
 
         if cmd == "0104":
             # Engine load: A * 100 / 255
@@ -219,6 +268,35 @@ class SuzukiSwiftSimulator:
             oil_raw = int(vals["coolant"] + 4 + 40)
             return f"41 5C {oil_raw:02X}\r\n>"
 
+        if cmd == "015E":
+            # Engine fuel rate: ((256 * A) + B) / 20 L/h
+            # Deceleration Fuel Cut-Off (DFCO): when coasting in gear with closed throttle,
+            # fuel flow is cut off completely (0.0 L/h -> 41 5E 00 00).
+            if vals["speed"] > 20 and vals["rpm"] > 1300 and vals["throttle_pct"] < 1.0:
+                return "41 5E 00 00\r\n>"
+            # In non-DFCO phases (idle, acceleration, cruise), compute realistic fuel flow from MAF
+            # (stoichiometric 14.7:1 AFR, 820 g/L gasoline density)
+            fuel_lph = vals["maf"] * 3600.0 / (14.7 * 820.0)
+            fr_raw = int(fuel_lph * 20)
+            a = (fr_raw >> 8) & 0xFF
+            b = fr_raw & 0xFF
+            return f"41 5E {a:02X} {b:02X}\r\n>"
+
+        # OBD-II Mode 03 / 07: stored / pending DTCs (K-Line style, count byte first)
+        if cmd in ("03", "07"):
+            codes = self.stored_dtcs if cmd == "03" else self.pending_dtcs
+            header = "43" if cmd == "03" else "47"
+            if not codes:
+                return f"{header} 00\r\n>"
+            body = " ".join(f"{hi:02X} {lo:02X}" for hi, lo in codes)
+            return f"{header} {len(codes):02X} {body}\r\n>"
+
+        # OBD-II Mode 04: clear DTCs / reset MIL (clears stored and pending)
+        if cmd == "04":
+            self.stored_dtcs = []
+            self.pending_dtcs = []
+            return "44\r\n>"
+
         return "NO DATA\r\n>"
 
 def handle_client(conn, addr, simulator):
@@ -247,10 +325,13 @@ def handle_client(conn, addr, simulator):
                 if resp:
                     print(f"  [TX] ---> {repr(resp)}")
                     conn.sendall(resp.encode("ascii"))
-    except ConnectionResetError:
+    except (ConnectionResetError, BrokenPipeError, ConnectionError, OSError):
         pass
     finally:
-        conn.close()
+        try:
+            conn.close()
+        except OSError:
+            pass
         print(f"[-] Client {addr[0]}:{addr[1]} disconnected\n")
 
 def main():
@@ -262,7 +343,7 @@ def main():
 
     try:
         server.bind((args.host, args.port))
-        server.listen(1)
+        server.listen(16)
         print("=" * 60)
         print(f"  Vgate iCar Pro ELM327 v2.3 Emulator")
         print(f"  Target: Suzuki Swift 2007 (M15A)")

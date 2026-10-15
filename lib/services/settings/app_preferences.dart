@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Centralized service for persisting app & hardware configuration
@@ -12,6 +13,11 @@ class AppPreferences {
   static const String _keyDebugLogging = 'debug_logging_enabled';
 
   static SharedPreferences? _prefs;
+
+  /// Drops the cached [SharedPreferences] instance so tests that call
+  /// `SharedPreferences.setMockInitialValues` start from true defaults.
+  @visibleForTesting
+  static void resetCacheForTesting() => _prefs = null;
 
   static Future<SharedPreferences> get _instance async {
     _prefs ??= await SharedPreferences.getInstance();
@@ -76,10 +82,10 @@ class AppPreferences {
   }
 
   /// Minimum trip distance in kilometers required to save to history.
-  /// Defaults to 10.0 km.
+  /// Defaults to 0.1 km (allows short urban trips and test sequences to persist).
   static Future<double> getMinTripDistanceKm() async {
     final prefs = await _instance;
-    return prefs.getDouble(_keyMinTripDistance) ?? 10.0;
+    return prefs.getDouble(_keyMinTripDistance) ?? 0.1;
   }
 
   static Future<void> setMinTripDistanceKm(double km) async {

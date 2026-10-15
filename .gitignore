@@ -52,3 +52,5 @@ app.*.map.json
 
 # Local agent settings
 .agent-data/
+.agents/
+.config/

@@ -105,6 +105,23 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
   }
 
   Future<void> _handleClearDtc(ObdProvider obdProvider) async {
+    // 1. Pre-flight safety check
+    final isVehicleMoving = obdProvider.mode == ObdMode.real &&
+        (obdProvider.data.speed > 0 || obdProvider.data.rpm > 0);
+
+    if (isVehicleMoving) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Vehicle must be stationary with engine stopped before clearing trouble codes (${obdProvider.data.speed} km/h, ${obdProvider.data.rpm} RPM).',
+          ),
+          backgroundColor: Colors.orangeAccent,
+        ),
+      );
+      return;
+    }
+
+    // 2. User confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -140,29 +157,72 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     );
 
     if (confirmed != true) return;
+    if (!mounted) return;
 
     setState(() {
       _isScanningDtc = true;
     });
 
-    final success = await _dtcService.clearAllCodes(obdProvider);
+    try {
+      final success = await _dtcService.clearAllCodes(obdProvider);
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _isScanningDtc = false;
-      if (success) {
-        _dtcResults = [];
-        _hasScannedDtc = true;
-      }
-    });
+      setState(() {
+        _isScanningDtc = false;
+        if (success) {
+          _dtcResults = [];
+          _hasScannedDtc = true;
+          _dtcErrorMessage = null;
+        }
+      });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(success ? 'Fault codes cleared successfully.' : 'Failed to clear codes from ECU.'),
-        backgroundColor: success ? Colors.green : Colors.redAccent,
-      ),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success
+                ? 'Fault codes cleared successfully.'
+                : 'Failed to clear codes from ECU.',
+          ),
+          backgroundColor: success ? Colors.green : Colors.redAccent,
+        ),
+      );
+    } on DtcSafetyException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isScanningDtc = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Safety interlock: Vehicle must be stationary with engine stopped (${e.speed} km/h, ${e.rpm} RPM).',
+          ),
+          backgroundColor: Colors.orangeAccent,
+        ),
+      );
+    } on StateError catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isScanningDtc = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isScanningDtc = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error clearing codes: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
 
   @override

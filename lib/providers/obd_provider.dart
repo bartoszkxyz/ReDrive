@@ -33,6 +33,7 @@ class ObdProvider extends ChangeNotifier {
     PidKey.throttlePosition,
     PidKey.mafAirFlowRate,
     PidKey.engineFuelRate,
+    PidKey.intakeAirTemperature,
   };
 
   ObdConnection? _connection;
@@ -387,6 +388,9 @@ class ObdProvider extends ChangeNotifier {
 
       case PidKey.engineFuelRate:
         _data = _data.copyWith(engineFuelRate: update.value.toDouble());
+
+      case PidKey.intakeAirTemperature:
+        _data = _data.copyWith(intakeAirTemp: update.value.toInt());
 
       default:
         break;
