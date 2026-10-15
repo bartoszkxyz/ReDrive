@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:redrive/obd/elm/elm_response.dart';
+import 'package:redrive/obd/models/fuel_system_status.dart';
 import 'package:redrive/obd/pid/decoders/standard_sensor_decoders.dart';
 
 ElmResponse _resp(String line) => ElmResponse(
@@ -68,6 +69,18 @@ void main() {
     test('decodeRunTimeSinceStart decodes 011F correctly ((256 * A) + B)', () {
       // 0x01 0xF4 = (256 * 1) + 244 = 500 seconds
       expect(decodeRunTimeSinceStart(_resp('41 1F 01 F4')), 500.0);
+    });
+
+    test('decodeFuelSystemStatus decodes 0103 correctly', () {
+      expect(decodeFuelSystemStatus(_resp('41 03 01 00')), 1.0);
+      expect(decodeFuelSystemStatus(_resp('41 03 02 00')), 2.0);
+      expect(decodeFuelSystemStatus(_resp('41 03 04 00')), 4.0);
+      expect(decodeFuelSystemStatus(_resp('41 03 08 00')), 8.0);
+      expect(decodeFuelSystemStatus(_resp('41 03 10 00')), 16.0);
+
+      expect(FuelSystemStatus.fromNumeric(decodeFuelSystemStatus(_resp('41 03 01 00'))), FuelSystemStatus.openLoopWarmup);
+      expect(FuelSystemStatus.fromNumeric(decodeFuelSystemStatus(_resp('41 03 02 00'))), FuelSystemStatus.closedLoop);
+      expect(FuelSystemStatus.fromNumeric(decodeFuelSystemStatus(_resp('41 03 04 00'))), FuelSystemStatus.openLoopLoadOrDecel);
     });
   });
 }

@@ -170,6 +170,13 @@ class SuzukiSwiftSimulator:
             # Range 0140 - 0160: supports 42, 46, 5C, 5E
             return "41 40 44 04 00 14\r\n>"
 
+        if cmd == "0103":
+            # Fuel system status: 2 bytes (Bank 1, Bank 2)
+            # 0x02 = Closed loop (using O2 sensor for fuel control)
+            # 0x04 = Open loop due to driving conditions (fuel cut-off or power enrichment)
+            status = 0x04 if (vals["speed"] > 20 and vals["throttle_pct"] <= 1.0) else 0x02
+            return f"41 03 {status:02X} 00\r\n>"
+
         if cmd == "0104":
             # Engine load: A * 100 / 255
             load_raw = int(vals["load_pct"] * 255 / 100)

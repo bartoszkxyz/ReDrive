@@ -118,3 +118,11 @@ double decodeRunTimeSinceStart(ElmResponse response) {
   final b = int.parse(bytes[3], radix: 16);
   return ((256.0 * a) + b).toDouble();
 }
+
+/// Decodes Fuel System Status (OBD-II PID 0103).
+/// Returns numeric status code of Bank 1 (1: OL-Warmup, 2: Closed Loop, 4: OL-Drive/Decel, 8: OL-Fault, 16: CL-Fault).
+double decodeFuelSystemStatus(ElmResponse response) {
+  final bytes = _extractBytes(response, '03', 3);
+  final a = int.parse(bytes[2], radix: 16);
+  return a.toDouble();
+}

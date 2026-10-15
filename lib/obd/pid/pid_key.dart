@@ -20,4 +20,5 @@ enum PidKey {
   ambientAirTemperature,
   engineOilTemperature,
   runTimeSinceStart,
+  fuelSystemStatus,
 }

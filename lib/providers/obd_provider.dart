@@ -69,6 +69,10 @@ class ObdProvider extends ChangeNotifier {
   bool _transportReconnectUsed = false;
   bool _hadData = false;
 
+  DateTime? _lastSpeedTime;
+  int _lastSpeedVal = 0;
+  double _currentGForce = 0.0;
+
   ObdRecoveryStage get recoveryStage {
     if (isReconnecting) return ObdRecoveryStage.transport;
     if (_mode != ObdMode.real) return ObdRecoveryStage.none;
@@ -88,6 +92,12 @@ class ObdProvider extends ChangeNotifier {
 
   ObdData _data = const ObdData();
   ObdData get data => _data;
+
+  @visibleForTesting
+  void setDataForTesting(ObdData data) {
+    _data = data;
+    notifyListeners();
+  }
 
   bool _isCoolantOverheating = false;
   bool get isCoolantOverheating => _isCoolantOverheating;
@@ -192,6 +202,7 @@ class ObdProvider extends ChangeNotifier {
       _latestPidValues[PidKey.ambientAirTemperature] = 18.0;
       _latestPidValues[PidKey.engineOilTemperature] = newDemoData.coolantTemp + 5.0;
       _latestPidValues[PidKey.runTimeSinceStart] = 480.0;
+      _latestPidValues[PidKey.fuelSystemStatus] = 2.0;
       if (!_dataController.isClosed) {
         _dataController.add(_data);
       }
@@ -396,7 +407,19 @@ class ObdProvider extends ChangeNotifier {
         _data = _data.copyWith(rpm: update.value.toInt());
 
       case PidKey.vehicleSpeed:
-        _data = _data.copyWith(speed: update.value.toInt());
+        final newSpeed = update.value.toInt();
+        final now = DateTime.now();
+        if (_lastSpeedTime != null) {
+          final dtSec = now.difference(_lastSpeedTime!).inMicroseconds / 1000000.0;
+          if (dtSec > 0.08 && dtSec < 2.5) {
+            final dvMps = (newSpeed - _lastSpeedVal) * (1000.0 / 3600.0);
+            final instG = (dvMps / dtSec) / 9.80665;
+            _currentGForce = (_currentGForce * 0.65) + (instG.clamp(-1.5, 1.5) * 0.35);
+          }
+        }
+        _lastSpeedTime = now;
+        _lastSpeedVal = newSpeed;
+        _data = _data.copyWith(speed: newSpeed, accelerationG: _currentGForce);
 
       case PidKey.coolantTemperature:
         final temp = update.value.toInt();
@@ -421,9 +444,57 @@ class ObdProvider extends ChangeNotifier {
       case PidKey.intakeAirTemperature:
         _data = _data.copyWith(intakeAirTemp: update.value.toInt());
 
+      case PidKey.shortTermFuelTrim1:
+        _data = _data.copyWith(shortTermFuelTrim: update.value.toDouble());
+
+      case PidKey.longTermFuelTrim1:
+        _data = _data.copyWith(longTermFuelTrim: update.value.toDouble());
+
+      case PidKey.timingAdvance:
+        _data = _data.copyWith(timingAdvance: update.value.toDouble());
+
+      case PidKey.intakeManifoldPressure:
+        _data = _data.copyWith(manifoldPressure: update.value.toDouble());
+
+      case PidKey.fuelTankLevel:
+        final pct = update.value.toDouble().clamp(0.0, 100.0);
+        final remainingL = (pct / 100.0) * 45.0; // 45L tank for Suzuki Swift 3
+        final dte = _data.instantFuelL100km > 0.5
+            ? (remainingL / _data.instantFuelL100km) * 100.0
+            : (remainingL / 6.5) * 100.0;
+        _data = _data.copyWith(
+          fuelLevelPercent: pct,
+          remainingFuelLiters: remainingL,
+          estimatedRangeKm: dte,
+        );
+
+      case PidKey.fuelSystemStatus:
+        _data = _data.copyWith(fuelSystemStatus: FuelSystemStatus.fromNumeric(update.value));
+
       default:
         break;
     }
+
+    // Zero-Overhead Derived Metrics calculation
+    final relThrottle = ((_data.throttlePosition - 13.0) / (85.0 - 13.0) * 100.0).clamp(0.0, 100.0);
+    final hp = _data.maf > 0 ? (_data.maf * 1.25).clamp(0.0, 130.0) : 0.0;
+    final kw = hp * 0.7457;
+    final torque = (_data.rpm > 500) ? ((kw * 9549.0) / _data.rpm).clamp(0.0, 180.0) : 0.0;
+
+    final isThrottleClosed = _data.throttlePosition < 1.5 ||
+        (_data.throttlePosition >= 10.0 && _data.throttlePosition <= 15.0) ||
+        relThrottle <= 0.5;
+    final isDfco = _data.speed > 20 &&
+        _data.rpm > 1300 &&
+        isThrottleClosed &&
+        _data.engineLoad < 18.0;
+
+    _data = _data.copyWith(
+      relativeThrottle: relThrottle,
+      horsepower: hp,
+      torqueNm: torque,
+      isDfcoActive: isDfco,
+    );
 
     if (!_dataController.isClosed) {
       _dataController.add(_data);

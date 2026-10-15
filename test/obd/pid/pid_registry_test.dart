@@ -65,6 +65,14 @@ void main() {
     expect(definition?.pid, 0x5E);
   });
 
+  test('finds fuel system status definition', () {
+    final registry = PidRegistry();
+    final definition = registry.find(PidKey.fuelSystemStatus);
+
+    expect(definition?.command, '0103');
+    expect(definition?.pid, 0x03);
+  });
+
   group('PidRegistry.findSupportedEcuKeys', () {
     test('returns matching ECU PID keys including load, MAF, and fuel rate', () {
       final registry = PidRegistry();
@@ -117,7 +125,7 @@ void main() {
     test('ignores supported PIDs that are not registered', () {
       final registry = PidRegistry();
 
-      final result = registry.findSupportedEcuKeys({0x01, 0x02, 0x03});
+      final result = registry.findSupportedEcuKeys({0x01, 0x02, 0x08});
 
       expect(result, isEmpty);
     });

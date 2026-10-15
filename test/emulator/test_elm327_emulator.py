@@ -52,10 +52,18 @@ class TestSuzukiSwiftSimulatorUnit(unittest.TestCase):
         self.assertEqual(self.sim.process_command("0140"), "41 40 44 04 00 14\r\n>")
 
     def test_mode01_core_telemetry(self):
-        for pid in ["0104", "0105", "0106", "0107", "010A", "010B", "010C", "010D", "010E", "010F", "0110", "0111"]:
+        for pid in ["0103", "0104", "0105", "0106", "0107", "010A", "010B", "010C", "010D", "010E", "010F", "0110", "0111", "012F"]:
             res = self.sim.process_command(pid)
             self.assertTrue(res.startswith(f"41 {pid[2:]} "), f"PID {pid} response unexpected: {res}")
             self.assertTrue(res.endswith("\r\n>"))
+
+    def test_mode01_pid_0103_fuel_system_status(self):
+        res = self.sim.process_command("0103")
+        self.assertTrue(res.startswith("41 03 "))
+        parts = res.strip().split()
+        status_b1 = int(parts[2], 16)
+        # Bit 1 (0x02) = closed loop, or Bit 2 (0x04) = open loop decel/power
+        self.assertIn(status_b1, [0x02, 0x04])
 
     def test_mode01_pid_015e_fuel_rate(self):
         """PID 015E is required by Feature 17 / PROJECT.md."""

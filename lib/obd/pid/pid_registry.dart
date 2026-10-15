@@ -37,6 +37,7 @@ class PidRegistry {
     PidKey.ambientAirTemperature: ambientAirTemperatureDefinition,
     PidKey.engineOilTemperature: engineOilTemperatureDefinition,
     PidKey.runTimeSinceStart: runTimeSinceStartDefinition,
+    PidKey.fuelSystemStatus: fuelSystemStatusDefinition,
   };
 
   static const Set<PidKey> coreKeys = {

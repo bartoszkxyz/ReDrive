@@ -85,3 +85,10 @@ final PidDefinition<double> runTimeSinceStartDefinition = PidDefinition<double>(
   pid: 0x1F,
   decoder: decodeRunTimeSinceStart,
 );
+
+final PidDefinition<double> fuelSystemStatusDefinition = PidDefinition<double>(
+  key: PidKey.fuelSystemStatus,
+  command: "0103",
+  pid: 0x03,
+  decoder: decodeFuelSystemStatus,
+);

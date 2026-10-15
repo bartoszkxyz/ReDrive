@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:redrive/obd/models/fuel_system_status.dart';
 import 'package:redrive/obd/pid/pid_key.dart';
 import 'package:redrive/obd/polling/polling_controller.dart';
 import 'package:redrive/providers/obd_provider.dart';
@@ -30,8 +31,101 @@ class _DashboardScreenState extends State<DashboardScreen> {
         PidKey.throttlePosition,
         PidKey.mafAirFlowRate,
         PidKey.engineFuelRate,
+        // Category 2 Expanded Sensor Metrics
+        PidKey.shortTermFuelTrim1,
+        PidKey.longTermFuelTrim1,
+        PidKey.timingAdvance,
+        PidKey.intakeManifoldPressure,
+        PidKey.fuelTankLevel,
+        PidKey.fuelSystemStatus,
       });
     });
+  }
+
+  Widget _buildSectionHeader(String title, ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 14.0, bottom: 8.0),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 14,
+            decoration: BoxDecoration(
+              color: colorScheme.primary,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+              color: colorScheme.onSurface.withValues(alpha: 0.65),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardRow4({
+    required bool isWide,
+    required double cardHeight,
+    required Widget card1,
+    required Widget card2,
+    required Widget card3,
+    required Widget card4,
+  }) {
+    if (isWide) {
+      return Row(
+        children: [
+          Expanded(child: SizedBox(height: cardHeight, child: card1)),
+          const SizedBox(width: 12),
+          Expanded(child: SizedBox(height: cardHeight, child: card2)),
+          const SizedBox(width: 12),
+          Expanded(child: SizedBox(height: cardHeight, child: card3)),
+          const SizedBox(width: 12),
+          Expanded(child: SizedBox(height: cardHeight, child: card4)),
+        ],
+      );
+    } else {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: SizedBox(height: cardHeight, child: card1)),
+              const SizedBox(width: 12),
+              Expanded(child: SizedBox(height: cardHeight, child: card2)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: SizedBox(height: cardHeight, child: card3)),
+              const SizedBox(width: 12),
+              Expanded(child: SizedBox(height: cardHeight, child: card4)),
+            ],
+          ),
+        ],
+      );
+    }
+  }
+
+  Widget _buildCardRow2({
+    required double cardHeight,
+    required Widget card1,
+    required Widget card2,
+  }) {
+    return Row(
+      children: [
+        Expanded(child: SizedBox(height: cardHeight, child: card1)),
+        const SizedBox(width: 12),
+        Expanded(child: SizedBox(height: cardHeight, child: card2)),
+      ],
+    );
   }
 
   @override
@@ -69,6 +163,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isWide = size.width >= 850;
     final double cardHeight = isWide ? 160.0 : 190.0;
 
+    // --- Section 1: Core Drive Telemetry ---
     final speedCard = TelemetryCard(
       title: 'SPEED',
       value: obdData.speed.toDouble(),
@@ -105,6 +200,124 @@ class _DashboardScreenState extends State<DashboardScreen> {
       iconPath: 'assets/images/svg/dashboard/settings.svg',
       progress: ((obdData.voltage - 10) / 6).clamp(0.0, 1.0),
     );
+
+    // --- Section 2: Power & Driving Dynamics ---
+    final hpCard = TelemetryCard(
+      title: 'HORSEPOWER',
+      value: obdData.horsepower,
+      fractionDigits: 1,
+      valueSuffix: '',
+      unit: 'HP',
+      iconPath: 'assets/images/svg/dashboard/engine.svg',
+      progress: (obdData.horsepower / 110.0).clamp(0.0, 1.0),
+    );
+    final torqueCard = TelemetryCard(
+      title: 'TORQUE',
+      value: obdData.torqueNm,
+      fractionDigits: 1,
+      valueSuffix: '',
+      unit: 'N·m',
+      iconPath: 'assets/images/svg/dashboard/settings.svg',
+      progress: (obdData.torqueNm / 140.0).clamp(0.0, 1.0),
+    );
+    final gForceCard = TelemetryCard(
+      title: 'G-FORCE',
+      value: obdData.accelerationG,
+      fractionDigits: 2,
+      valueSuffix: '',
+      unit: 'g',
+      iconPath: 'assets/images/svg/dashboard/speed.svg',
+      progress: ((obdData.accelerationG + 0.5) / 1.0).clamp(0.0, 1.0),
+    );
+    final throttleCard = TelemetryCard(
+      title: 'THROTTLE',
+      value: obdData.relativeThrottle,
+      fractionDigits: 1,
+      valueSuffix: '',
+      unit: '%',
+      iconPath: 'assets/images/svg/dashboard/speed.svg',
+      progress: (obdData.relativeThrottle / 100.0).clamp(0.0, 1.0),
+    );
+
+    // --- Section 3: Intake & Combustion Health ---
+    final loadCard = TelemetryCard(
+      title: 'ENGINE LOAD',
+      value: obdData.engineLoad,
+      fractionDigits: 1,
+      valueSuffix: '',
+      unit: '%',
+      iconPath: 'assets/images/svg/dashboard/engine.svg',
+      progress: (obdData.engineLoad / 100.0).clamp(0.0, 1.0),
+    );
+    final mapCard = TelemetryCard(
+      title: 'MANIFOLD MAP',
+      value: obdData.manifoldPressure,
+      fractionDigits: 0,
+      valueSuffix: '',
+      unit: 'kPa',
+      iconPath: 'assets/images/svg/dashboard/engine.svg',
+      progress: (obdData.manifoldPressure / 120.0).clamp(0.0, 1.0),
+    );
+    final timingCard = TelemetryCard(
+      title: 'IGN TIMING',
+      value: obdData.timingAdvance,
+      fractionDigits: 1,
+      valueSuffix: '',
+      unit: '°BTDC',
+      iconPath: 'assets/images/svg/dashboard/temp.svg',
+      progress: ((obdData.timingAdvance + 10) / 60.0).clamp(0.0, 1.0),
+    );
+    final mafCard = TelemetryCard(
+      title: 'AIR FLOW (MAF)',
+      value: obdData.maf,
+      fractionDigits: 1,
+      valueSuffix: '',
+      unit: 'g/s',
+      iconPath: 'assets/images/svg/dashboard/temp.svg',
+      progress: (obdData.maf / 90.0).clamp(0.0, 1.0),
+    );
+
+    // --- Section 4: Fuel Tank & Air-Fuel Trims ---
+    final fuelTankCard = TelemetryCard(
+      title: 'FUEL TANK',
+      value: obdData.fuelLevelPercent,
+      fractionDigits: 0,
+      valueSuffix: '',
+      unit: obdData.remainingFuelLiters > 0
+          ? '% (${obdData.remainingFuelLiters.toStringAsFixed(0)}L)'
+          : '%',
+      iconPath: 'assets/images/svg/dashboard/fuel.svg',
+      progress: (obdData.fuelLevelPercent / 100.0).clamp(0.0, 1.0),
+    );
+    final rangeCard = TelemetryCard(
+      title: 'EST RANGE (DTE)',
+      value: obdData.estimatedRangeKm,
+      fractionDigits: 0,
+      valueSuffix: '',
+      unit: 'km',
+      iconPath: 'assets/images/svg/bottomBar/dtc.svg',
+      progress: (obdData.estimatedRangeKm / 600.0).clamp(0.0, 1.0),
+    );
+    final stftCard = TelemetryCard(
+      title: 'SHORT TRIM (STFT)',
+      value: obdData.shortTermFuelTrim,
+      fractionDigits: 1,
+      valueSuffix: '',
+      unit: '%',
+      iconPath: 'assets/images/svg/dashboard/fuel.svg',
+      progress: ((obdData.shortTermFuelTrim + 25) / 50.0).clamp(0.0, 1.0),
+    );
+    final ltftCard = TelemetryCard(
+      title: 'LONG TRIM (LTFT)',
+      value: obdData.longTermFuelTrim,
+      fractionDigits: 1,
+      valueSuffix: '',
+      unit: '%',
+      iconPath: 'assets/images/svg/dashboard/fuel.svg',
+      progress: ((obdData.longTermFuelTrim + 25) / 50.0).clamp(0.0, 1.0),
+    );
+
+    // --- Section 5: Trip & Efficiency ---
     final fuelCard = TelemetryCard(
       title: 'FUEL ECONOMY',
       value: fuelValue,
@@ -120,26 +333,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       fractionDigits: 2,
       valueSuffix: '',
       unit: 'km',
-      iconPath: 'assets/images/svg/bottomBar/dtc.svg',
+      iconPath: 'assets/images/svg/bottomBar/trips.svg',
       progress: (activeTrip.distanceKm / 50.0).clamp(0.0, 1.0),
-    );
-    final loadCard = TelemetryCard(
-      title: 'ENGINE LOAD',
-      value: obdData.engineLoad,
-      fractionDigits: 1,
-      valueSuffix: '',
-      unit: '%',
-      iconPath: 'assets/images/svg/dashboard/engine.svg',
-      progress: (obdData.engineLoad / 100.0).clamp(0.0, 1.0),
-    );
-    final throttleCard = TelemetryCard(
-      title: 'THROTTLE',
-      value: obdData.throttlePosition,
-      fractionDigits: 1,
-      valueSuffix: '',
-      unit: '%',
-      iconPath: 'assets/images/svg/dashboard/speed.svg',
-      progress: (obdData.throttlePosition / 100.0).clamp(0.0, 1.0),
     );
 
     return Scaffold(
@@ -156,6 +351,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               // Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,35 +378,112 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ],
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: statusColor, width: 1.5),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  Flexible(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      alignment: WrapAlignment.end,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: statusColor,
-                            shape: BoxShape.circle,
+                        if (obdData.isDfcoActive)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981)
+                                  .withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: const Color(0xFF10B981),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.eco,
+                                    size: 14, color: Color(0xFF10B981)),
+                                SizedBox(width: 4),
+                                Text(
+                                  'DFCO ACTIVE',
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    color: Color(0xFF10B981),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          statusText,
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            color: statusColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
+                        if (obdData.fuelSystemStatus !=
+                            FuelSystemStatus.unknown)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: (obdData.fuelSystemStatus.isClosedLoop
+                                      ? const Color(0xFF06B6D4)
+                                      : Colors.orangeAccent)
+                                  .withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: obdData.fuelSystemStatus.isClosedLoop
+                                    ? const Color(0xFF06B6D4)
+                                    : Colors.orangeAccent,
+                                width: 1.2,
+                              ),
+                            ),
+                            child: Text(
+                              'LOOP: ${obdData.fuelSystemStatus.shortCode}',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                color: obdData.fuelSystemStatus.isClosedLoop
+                                    ? const Color(0xFF06B6D4)
+                                    : Colors.orangeAccent,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: statusColor, width: 1.5),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: statusColor,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                statusText,
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  color: statusColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -218,92 +491,61 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ],
               ),
-              SizedBox(height: isWide ? 14 : 20),
+              const SizedBox(height: 12),
 
-              if (isWide) ...[
-                // Row 1 (4 cards)
-                Row(
-                  children: [
-                    Expanded(child: SizedBox(height: cardHeight, child: speedCard)),
-                    const SizedBox(width: 12),
-                    Expanded(child: SizedBox(height: cardHeight, child: rpmCard)),
-                    const SizedBox(width: 12),
-                    Expanded(child: SizedBox(height: cardHeight, child: coolantCard)),
-                    const SizedBox(width: 12),
-                    Expanded(child: SizedBox(height: cardHeight, child: voltageCard)),
-                  ],
-                ),
-                const SizedBox(height: 12),
+              // 1. Drive & Engine Telemetry
+              _buildSectionHeader('DRIVE & ENGINE TELEMETRY', colorScheme),
+              _buildCardRow4(
+                isWide: isWide,
+                cardHeight: cardHeight,
+                card1: speedCard,
+                card2: rpmCard,
+                card3: coolantCard,
+                card4: voltageCard,
+              ),
 
-                // Row 2 (4 cards)
-                Row(
-                  children: [
-                    Expanded(child: SizedBox(height: cardHeight, child: fuelCard)),
-                    const SizedBox(width: 12),
-                    Expanded(child: SizedBox(height: cardHeight, child: distanceCard)),
-                    const SizedBox(width: 12),
-                    Expanded(child: SizedBox(height: cardHeight, child: loadCard)),
-                    const SizedBox(width: 12),
-                    Expanded(child: SizedBox(height: cardHeight, child: throttleCard)),
-                  ],
-                ),
-              ] else ...[
-                // Speed & RPM Cards
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(height: cardHeight, child: speedCard),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: SizedBox(height: cardHeight, child: rpmCard),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+              // 2. Power & Dynamics
+              _buildSectionHeader('POWER & DRIVING DYNAMICS', colorScheme),
+              _buildCardRow4(
+                isWide: isWide,
+                cardHeight: cardHeight,
+                card1: hpCard,
+                card2: torqueCard,
+                card3: gForceCard,
+                card4: throttleCard,
+              ),
 
-                // Coolant Temp & Voltage Cards
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(height: cardHeight, child: coolantCard),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: SizedBox(height: cardHeight, child: voltageCard),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+              // 3. Intake & Combustion Health
+              _buildSectionHeader('INTAKE & COMBUSTION HEALTH', colorScheme),
+              _buildCardRow4(
+                isWide: isWide,
+                cardHeight: cardHeight,
+                card1: loadCard,
+                card2: mapCard,
+                card3: timingCard,
+                card4: mafCard,
+              ),
 
-                // Fuel Economy & Trip Distance Cards
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(height: cardHeight, child: fuelCard),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: SizedBox(height: cardHeight, child: distanceCard),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+              // 4. Fuel Tank & Air-Fuel Trims
+              _buildSectionHeader('FUEL TANK & AIR-FUEL TRIMS', colorScheme),
+              _buildCardRow4(
+                isWide: isWide,
+                cardHeight: cardHeight,
+                card1: fuelTankCard,
+                card2: rangeCard,
+                card3: stftCard,
+                card4: ltftCard,
+              ),
 
-                // Engine Load & Throttle Cards
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(height: cardHeight, child: loadCard),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: SizedBox(height: cardHeight, child: throttleCard),
-                    ),
-                  ],
-                ),
-              ],
-              SizedBox(height: isWide ? 14 : 20),
+              // 5. Trip & Consumption
+              _buildSectionHeader('TRIP & CONSUMPTION', colorScheme),
+              _buildCardRow2(
+                cardHeight: cardHeight,
+                card1: fuelCard,
+                card2: distanceCard,
+              ),
+
+              const SizedBox(height: 16),
 
               // Live Trip Summary Banner
               if (activeTrip.isActive) ...[
@@ -348,6 +590,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           const SizedBox(height: 4),
                           Text(
                             'Fuel: ${activeTrip.fuelConsumedLiters.toStringAsFixed(2)} L • Avg: ${activeTrip.distanceKm > 0.05 ? activeTrip.avgFuelConsumption.toStringAsFixed(1) : '--'} L/100'
+                            '${obdData.remainingFuelLiters > 0 ? " • Tank: ${obdData.remainingFuelLiters.toStringAsFixed(1)}L" : ""}'
+                            '${obdData.horsepower > 0 ? " • Power: ${obdData.horsepower.toStringAsFixed(0)} HP" : ""}'
                             '${obdData.maf > 0 ? " • MAF: ${obdData.maf.toStringAsFixed(1)} g/s" : ""}'
                             '${obdData.engineFuelRate > 0 ? " • Rate: ${obdData.engineFuelRate.toStringAsFixed(1)} L/h" : ""}',
                             style: const TextStyle(
