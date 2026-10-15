@@ -7,10 +7,11 @@ import 'package:provider/provider.dart';
 import 'package:redrive/l10n/app_localizations.dart';
 import 'package:redrive/providers/obd_provider.dart';
 import 'package:redrive/providers/trip_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:redrive/services/settings/app_preferences.dart';
 import 'package:redrive/services/logging/log_service.dart';
+import 'package:redrive/widget/settings/headunit_background_sheet.dart';
 import 'package:redrive/widget/settings/log_viewer_sheet.dart';
+import 'package:redrive/widget/settings/obd_adapter_test_sheet.dart';
 
 class _DismissibleCupertinoSheetRoute<T> extends CupertinoSheetRoute<T> {
   _DismissibleCupertinoSheetRoute({
@@ -399,24 +400,27 @@ class _SettingsSheetState extends State<SettingsSheet> {
                         ),
                         const SizedBox(height: 10),
 
-                        // Headunit Autostart & Background Permissions
+                        // Headunit Autostart & Background Operation
                         _SettingsTile(
                           icon: Icons.power_settings_new_rounded,
-                          label: 'Headunit Autostart',
-                          subtitle: 'Configure overlay & background permissions',
+                          label: 'Headunit Background Operation',
+                          subtitle: 'Foreground service active • Topway TS18 compatible',
                           colorScheme: colorScheme,
-                          onTap: () async {
-                            await [
-                              Permission.systemAlertWindow,
-                              Permission.ignoreBatteryOptimizations,
-                            ].request();
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Autostart and battery optimization permissions requested'),
-                                ),
-                              );
-                            }
+                          onTap: () {
+                            showHeadunitBackgroundSheet(context);
+                          },
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Test OBD Adapter Handshake
+                        _SettingsTile(
+                          icon: Icons.speed_rounded,
+                          label: 'Test OBD Adapter',
+                          subtitle: 'Benchmark ELM327 latency and AT/PID compatibility',
+                          colorScheme: colorScheme,
+                          onTap: () {
+                            final obdProvider = context.read<ObdProvider>();
+                            showObdAdapterTestSheet(context, obdProvider);
                           },
                         ),
                         const SizedBox(height: 10),

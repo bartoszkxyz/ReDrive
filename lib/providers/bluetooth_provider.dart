@@ -362,8 +362,13 @@ class BluetoothProvider extends ChangeNotifier {
     return false;
   }
 
-  /// Automatically connects to the most recently used OBD adapter on startup/ignition.
-  Future<bool> autoConnectLastDevice() async {
+  /// Automatically connects to the most recently used OBD adapter on startup/ignition
+  /// with a settle delay and silent retry loop.
+  Future<bool> autoConnectLastDevice({
+    int maxAttempts = 10,
+    Duration settleDelay = const Duration(milliseconds: 2500),
+    Duration retryDelay = const Duration(seconds: 3),
+  }) async {
     final isEnabled = await AppPreferences.isAutoConnectEnabled();
     if (!isEnabled) return false;
 
@@ -373,7 +378,14 @@ class BluetoothProvider extends ChangeNotifier {
     if (_isConnected || _isConnecting) return true;
 
     final lastName = await AppPreferences.getLastObdName() ?? "OBD Adapter";
-    _log("🚗 Headunit Auto-Connecting to $lastName ($lastMac)...");
+    _log("🚗 Headunit Auto-Connect initiated for $lastName ($lastMac). Settling for voltage & adapter boot...");
+
+    // 1. Initial stabilization delay for adapter boot & vehicle starter motor voltage dip
+    if (settleDelay > Duration.zero) {
+      await Future.delayed(settleDelay);
+    }
+
+    if (_isConnected) return true;
 
     final targetDevice = BluetoothObdDevice(
       name: lastName,
@@ -381,22 +393,44 @@ class BluetoothProvider extends ChangeNotifier {
       isBle: false,
     );
 
-    // Look for device in bonded devices or scan cache
-    try {
-      final bondedList = await _bluetooth.bondedDevices;
-      if (bondedList != null) {
-        for (final b in bondedList) {
-          _deviceMap[b.address] = b;
-          if (b.address.toLowerCase() == lastMac.toLowerCase()) {
-            _deviceMap[lastMac] = b;
+    // 2. Retry loop up to maxAttempts
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (_isConnected) return true;
+
+      _log("🚗 Headunit Auto-Connect attempt #$attempt of $maxAttempts to $lastName ($lastMac)...");
+      _setReconnecting(true);
+      _connectionMessage = "Connecting to $lastName ($attempt/$maxAttempts)...";
+      notifyListeners();
+
+      try {
+        final bondedList = await _bluetooth.bondedDevices;
+        if (bondedList != null) {
+          for (final b in bondedList) {
+            _deviceMap[b.address] = b;
+            if (b.address.toLowerCase() == lastMac.toLowerCase()) {
+              _deviceMap[lastMac] = b;
+            }
           }
         }
+      } catch (e) {
+        _log("Failed to query bonded devices during auto-connect: $e", level: LogLevel.warning, error: e);
       }
-    } catch (e) {
-      _log("Failed to query bonded devices during auto-connect: $e", level: LogLevel.warning, error: e);
+
+      final success = await connectToDevice(targetDevice);
+      if (success && _isConnected) {
+        _setReconnecting(false);
+        _log("✅ Headunit Auto-Connect succeeded on attempt #$attempt");
+        return true;
+      }
+
+      if (attempt < maxAttempts) {
+        await Future.delayed(retryDelay);
+      }
     }
 
-    return connectToDevice(targetDevice);
+    _setReconnecting(false);
+    _log("⚠️ Headunit Auto-Connect completed all $maxAttempts attempts without connection", level: LogLevel.warning);
+    return false;
   }
 
   /// Настраивает прослушивание входного потока данных от обд сканера

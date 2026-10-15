@@ -12,6 +12,7 @@ import '../obd/source/live_obd_source.dart';
 import '../obd/source/obd_source_state.dart';
 import '../obd/elm/elm_response.dart';
 import '../services/settings/app_preferences.dart';
+import '../services/background_service.dart';
 
 enum ObdMode { idle, demo, real }
 
@@ -87,6 +88,31 @@ class ObdProvider extends ChangeNotifier {
 
   ObdData _data = const ObdData();
   ObdData get data => _data;
+
+  bool _isCoolantOverheating = false;
+  bool get isCoolantOverheating => _isCoolantOverheating;
+
+  void _checkCoolantAlert(int temp) {
+    if (!_isCoolantOverheating && temp > 102) {
+      _isCoolantOverheating = true;
+      notifyListeners();
+      try {
+        updateServiceNotification(
+          title: '⚠️ ENGINE OVERHEAT ALERT',
+          content: 'Coolant temperature is $temp°C! Reduce load immediately.',
+        );
+      } catch (_) {}
+    } else if (_isCoolantOverheating && temp < 96) {
+      _isCoolantOverheating = false;
+      notifyListeners();
+      try {
+        updateServiceNotification(
+          title: 'ReDrive Connected',
+          content: 'Coolant normalized ($temp°C). Monitoring active.',
+        );
+      } catch (_) {}
+    }
+  }
 
   ObdMode _mode = ObdMode.idle;
   ObdMode get mode => _mode;
@@ -169,6 +195,7 @@ class ObdProvider extends ChangeNotifier {
       if (!_dataController.isClosed) {
         _dataController.add(_data);
       }
+      _checkCoolantAlert(newDemoData.coolantTemp);
       notifyListeners();
     });
 
@@ -372,7 +399,9 @@ class ObdProvider extends ChangeNotifier {
         _data = _data.copyWith(speed: update.value.toInt());
 
       case PidKey.coolantTemperature:
-        _data = _data.copyWith(coolantTemp: update.value.toInt());
+        final temp = update.value.toInt();
+        _data = _data.copyWith(coolantTemp: temp);
+        _checkCoolantAlert(temp);
 
       case PidKey.adapterVoltage:
         _data = _data.copyWith(voltage: update.value.toDouble());

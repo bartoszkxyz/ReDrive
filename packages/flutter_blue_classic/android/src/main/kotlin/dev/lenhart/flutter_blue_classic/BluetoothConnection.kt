@@ -46,12 +46,51 @@ abstract class BluetoothConnection(
         }
         val device = bluetoothAdapter.getRemoteDevice(address)
             ?: throw IOException("device not found")
-        val socket = device.createRfcommSocketToServiceRecord(uuid ?: DEFAULT_UUID)
-            ?: throw IOException("socket connection not established")
+        val targetUuid = uuid ?: DEFAULT_UUID
 
         // Cancel discovery just to be sure
         bluetoothAdapter.cancelDiscovery()
-        socket.connect()
+
+        var socket: BluetoothSocket? = null
+        var lastException: Exception? = null
+
+        // 1. Try standard secure RFCOMM socket first
+        try {
+            Log.d(TAG, "Attempting secure RFCOMM connection to $address with UUID $targetUuid")
+            socket = device.createRfcommSocketToServiceRecord(targetUuid)
+            socket?.connect()
+            Log.i(TAG, "Secure RFCOMM connection established successfully to $address")
+        } catch (e: Exception) {
+            lastException = e
+            Log.w(TAG, "Secure RFCOMM failed ($address): ${e.message}. Attempting insecure RFCOMM fallback (Chinese headunit / clone compatibility)...")
+            try {
+                socket?.close()
+            } catch (_: Exception) {}
+            socket = null
+        }
+
+        // 2. Fallback to insecure RFCOMM socket (Car Scanner pattern for Chinese headunits & ELM327 clones)
+        if (socket == null) {
+            try {
+                Log.d(TAG, "Attempting insecure RFCOMM connection to $address")
+                socket = device.createInsecureRfcommSocketToServiceRecord(targetUuid)
+                socket?.connect()
+                Log.i(TAG, "Insecure RFCOMM connection established successfully to $address")
+                lastException = null
+            } catch (e: Exception) {
+                lastException = e
+                Log.e(TAG, "Insecure RFCOMM connection also failed ($address): ${e.message}")
+                try {
+                    socket?.close()
+                } catch (_: Exception) {}
+                socket = null
+            }
+        }
+
+        if (socket == null || !socket.isConnected) {
+            throw IOException("Failed to establish Bluetooth RFCOMM connection to $address: ${lastException?.message}", lastException)
+        }
+
         connectionThread = ConnectionThread(socket).also { it.start() }
     }
 

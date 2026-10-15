@@ -26,7 +26,6 @@ class HeadunitBootReceiver : BroadcastReceiver() {
 
         if (isSleepEvent) {
             Log.i(TAG, "Ignition / power OFF detected on headunit. Preparing for sleep.")
-            // On sleep, background service and connections can finalize gracefully
             return
         }
 
@@ -39,28 +38,13 @@ class HeadunitBootReceiver : BroadcastReceiver() {
             }
         }
 
-        // 1. Start foreground service
+        // Start foreground service silently (Car Scanner pattern: headunit launcher remains active)
         try {
             val serviceIntent = Intent(context, BackgroundService::class.java)
             ContextCompat.startForegroundService(context, serviceIntent)
-            Log.i(TAG, "ReDrive BackgroundService started from headunit wake event")
+            Log.i(TAG, "ReDrive BackgroundService started silently from headunit wake event ($action)")
         } catch (e: Exception) {
             Log.e(TAG, "Error starting background service on headunit wake", e)
-        }
-
-        // 2. Launch ReDrive UI Activity so headunit displays the dashboard
-        try {
-            val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            }
-            if (launchIntent != null) {
-                context.startActivity(launchIntent)
-                Log.i(TAG, "ReDrive MainActivity successfully launched from headunit wake event")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error launching MainActivity on headunit wake", e)
         }
     }
 }

@@ -55,6 +55,8 @@ class FakeObdConnection implements ObdConnection {
     _setConnected(false);
   }
 
+  void Function(String command)? onSend;
+
   @override
   Future<void> send(String command) async {
     sentCommands.add(command);
@@ -62,6 +64,8 @@ class FakeObdConnection implements ObdConnection {
     if (sendError != null) {
       throw sendError!;
     }
+
+    onSend?.call(command);
   }
 
   void emit(String chunk) {
