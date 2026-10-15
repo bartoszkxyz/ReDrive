@@ -40,6 +40,18 @@ android {
     }
 }
 
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+    doLast {
+        val apkDir = layout.buildDirectory.dir("outputs/flutter-apk").get().asFile
+        val src = File(apkDir, "app-release.apk")
+        if (src.exists()) {
+            val dest = File(apkDir, "redrive-v${flutter.versionName}+${flutter.versionCode}-release.apk")
+            src.copyTo(dest, overwrite = true)
+            logger.lifecycle("✓ Generated versioned release APK: ${dest.name}")
+        }
+    }
+}
+
 flutter {
     source = "../.."
 }
