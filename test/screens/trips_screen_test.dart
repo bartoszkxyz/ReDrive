@@ -154,7 +154,7 @@ void main() {
 
       expect(find.text('0 problems, 0 suspicions'), findsOneWidget);
       expect(find.text('18.50 km'), findsOneWidget);
-      expect(find.text('6.8 L/100'), findsOneWidget);
+      expect(find.text('6.8 L/100'), findsNWidgets(2));
     });
 
     testWidgets(

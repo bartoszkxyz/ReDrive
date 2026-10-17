@@ -74,8 +74,8 @@ void main() {
         timestamp: t0,
       );
 
-      // Load shortfall is suspicion on cycle 1, fuel starvation is problem immediately
-      expect(detector.suspicionCount, 1);
+      // Load shortfall is suspicion on cycle 1, STFT 14% is suspicion, fuel starvation is problem immediately
+      expect(detector.suspicionCount, 2);
       expect(detector.problemCount, 1);
 
       // Sample 2 (500ms later): Second consecutive cycle of high-load shortfall -> upgrades load episode to problem
