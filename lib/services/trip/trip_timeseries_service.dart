@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:redrive/models/trip.dart';
 import 'package:redrive/obd/models/fuel_system_status.dart';
 import 'package:redrive/obd/models/obd_data.dart';
@@ -503,6 +505,9 @@ class TripTimeseriesService {
     }
   }
 
+  static const MethodChannel _storageChannel =
+      MethodChannel('com.example.redrive/storage');
+
   /// Exports recorded timeseries samples for [trip] into CSV, JSON, or both formats.
   /// Throws [StateError] if no samples exist for the trip.
   /// Returns the list of written file paths.
@@ -516,15 +521,12 @@ class TripTimeseriesService {
       throw StateError('No timeseries samples found for trip ${trip.id}');
     }
 
-    final exportDir = await _resolveExportDirectory();
     final timestampStr = _formatExportTimestamp(exportTime ?? DateTime.now());
     final writtenFiles = <String>[];
 
     if (format == TimeseriesExportFormat.csv ||
         format == TimeseriesExportFormat.both) {
-      final csvFile = File(
-        '${exportDir.path}/redrive_trip_${trip.id}_$timestampStr.csv',
-      );
+      final csvFileName = 'redrive_trip_${trip.id}_$timestampStr.csv';
       final csvBuffer = StringBuffer();
       csvBuffer.writeln(
         'timestamp_iso,elapsed_s,rpm,speed_kmh,engine_load_pct,throttle_raw_pct,throttle_rel_pct,maf_gps,map_kpa,stft_pct,ltft_pct,total_trim_pct,timing_adv_deg,coolant_c,iat_c,voltage_v,fuel_rate_lph,fuel_level_pct,fuel_system_status,is_dfco,active_problems,active_suspicions',
@@ -560,15 +562,17 @@ class TripTimeseriesService {
         ];
         csvBuffer.writeln(row.map(_toCsvField).join(','));
       }
-      await csvFile.writeAsString(csvBuffer.toString(), flush: true);
-      writtenFiles.add(csvFile.path);
+      final savedCsvPath = await _writeExportFile(
+        fileName: csvFileName,
+        content: csvBuffer.toString(),
+        mimeType: 'text/csv',
+      );
+      writtenFiles.add(savedCsvPath);
     }
 
     if (format == TimeseriesExportFormat.json ||
         format == TimeseriesExportFormat.both) {
-      final jsonFile = File(
-        '${exportDir.path}/redrive_trip_${trip.id}_$timestampStr.json',
-      );
+      final jsonFileName = 'redrive_trip_${trip.id}_$timestampStr.json';
       final exportMap = <String, dynamic>{
         'trip': trip.toJson(),
         'anomalies': trip.anomalies.map((e) => e.toJson()).toList(),
@@ -576,52 +580,99 @@ class TripTimeseriesService {
         'sampleCount': samples.length,
         'samples': samples.map((s) => s.toJson()).toList(),
       };
-      await jsonFile.writeAsString(
-        const JsonEncoder.withIndent('  ').convert(exportMap),
-        flush: true,
+      final jsonContent =
+          const JsonEncoder.withIndent('  ').convert(exportMap);
+      final savedJsonPath = await _writeExportFile(
+        fileName: jsonFileName,
+        content: jsonContent,
+        mimeType: 'application/json',
       );
-      writtenFiles.add(jsonFile.path);
+      writtenFiles.add(savedJsonPath);
     }
 
     return writtenFiles;
   }
 
-  Future<Directory> _resolveExportDirectory() async {
+  Future<String> _writeExportFile({
+    required String fileName,
+    required String content,
+    required String mimeType,
+  }) async {
+    // 1. Custom export directory (used by unit tests)
     if (customExportDirectory != null) {
       if (!await customExportDirectory!.exists()) {
         await customExportDirectory!.create(recursive: true);
       }
-      return customExportDirectory!;
+      final file = File('${customExportDirectory!.path}/$fileName');
+      await file.writeAsString(content, flush: true);
+      return file.path;
     }
 
+    // 2. Android: save to /storage/emulated/0/ReDrive or /storage/emulated/0/Download/ReDrive
     if (Platform.isAndroid) {
-      final androidDownload = Directory('/storage/emulated/0/Download/ReDrive');
       try {
-        if (!await androidDownload.exists()) {
-          await androidDownload.create(recursive: true);
-        }
-        return androidDownload;
-      } catch (_) {
-        Directory fallbackBase;
+        await Permission.storage.request();
+      } catch (_) {}
+
+      const androidCandidateDirs = <String>[
+        '/storage/emulated/0/ReDrive',
+        '/storage/emulated/0/Download/ReDrive',
+        '/storage/emulated/0/Download',
+        '/storage/emulated/0',
+      ];
+
+      for (final dirPath in androidCandidateDirs) {
         try {
-          fallbackBase = await getApplicationSupportDirectory();
-        } catch (_) {
-          try {
-            fallbackBase = await getApplicationDocumentsDirectory();
-          } catch (_) {
-            final home = Platform.environment['HOME'] ?? '.';
-            fallbackBase = Directory('$home/.local/share/redrive');
+          final dir = Directory(dirPath);
+          if (!await dir.exists()) {
+            await dir.create(recursive: true);
           }
+          final file = File('${dir.path}/$fileName');
+          await file.writeAsString(content, flush: true);
+          return file.path;
+        } catch (_) {
+          // Try next candidate or native MediaStore channel
         }
-        final fallbackDir = Directory('${fallbackBase.path}/ReDrive_Exports');
-        if (!await fallbackDir.exists()) {
-          await fallbackDir.create(recursive: true);
-        }
-        return fallbackDir;
       }
+
+      // Use native Android MediaStore.Downloads / external storage channel in MainActivity.kt
+      try {
+        final nativeSavedPath = await _storageChannel.invokeMethod<String>(
+          'saveExportFile',
+          <String, dynamic>{
+            'fileName': fileName,
+            'content': content,
+            'mimeType': mimeType,
+          },
+        );
+        if (nativeSavedPath != null && nativeSavedPath.isNotEmpty) {
+          return nativeSavedPath;
+        }
+      } catch (_) {}
+
+      // Fallback to /storage/emulated/0/Android/data/<pkg>/files/ReDrive_Exports
+      try {
+        final extDir = await getExternalStorageDirectory();
+        if (extDir != null) {
+          final exportDir = Directory('${extDir.path}/ReDrive_Exports');
+          if (!await exportDir.exists()) {
+            await exportDir.create(recursive: true);
+          }
+          final file = File('${exportDir.path}/$fileName');
+          await file.writeAsString(content, flush: true);
+          return file.path;
+        }
+      } catch (_) {}
     }
 
-    // Linux, macOS, Windows, etc.
+    // 3. Desktop (Linux, macOS, Windows) or final fallback
+    final exportDir = await _resolveDesktopExportDirectory();
+    final file = File('${exportDir.path}/$fileName');
+    await file.writeAsString(content, flush: true);
+    return file.path;
+  }
+
+  Future<Directory> _resolveDesktopExportDirectory() async {
     final home = Platform.environment['HOME'] ??
         Platform.environment['USERPROFILE'] ??
         '.';
