@@ -42,12 +42,18 @@ android {
 
 tasks.matching { it.name == "assembleRelease" }.configureEach {
     doLast {
-        val apkDir = layout.buildDirectory.dir("outputs/flutter-apk").get().asFile
-        val src = File(apkDir, "app-release.apk")
+        val gradleApkDir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
+        val flutterApkDir = layout.buildDirectory.dir("outputs/flutter-apk").get().asFile
+        if (!flutterApkDir.exists()) {
+            flutterApkDir.mkdirs()
+        }
+        val gradleSrc = File(gradleApkDir, "app-release.apk")
+        val fallbackSrc = File(flutterApkDir, "app-release.apk")
+        val src = if (gradleSrc.exists()) gradleSrc else fallbackSrc
         if (src.exists()) {
-            val dest = File(apkDir, "redrive-v${flutter.versionName}+${flutter.versionCode}-release.apk")
+            val dest = File(flutterApkDir, "redrive-v${flutter.versionName}+${flutter.versionCode}-release.apk")
             src.copyTo(dest, overwrite = true)
-            logger.lifecycle("✓ Generated versioned release APK: ${dest.name}")
+            logger.lifecycle("✓ Generated versioned release APK: ${dest.name} (${dest.length()} bytes)")
         }
     }
 }
