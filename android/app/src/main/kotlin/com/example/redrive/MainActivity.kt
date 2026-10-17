@@ -1,16 +1,33 @@
 package com.example.redrive
 
+import android.app.ActivityManager
 import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.provider.Settings
+import android.util.DisplayMetrics
 import android.util.Log
+import android.view.InputDevice
+import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.BufferedReader
 import java.io.File
+import java.io.InputStreamReader
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : FlutterActivity() {
     companion object {
@@ -22,25 +39,398 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, STORAGE_CHANNEL)
             .setMethodCallHandler { call, result ->
-                if (call.method == "saveExportFile") {
-                    val fileName = call.argument<String>("fileName")
-                    val content = call.argument<String>("content")
-                    val mimeType = call.argument<String>("mimeType") ?: "text/plain"
-                    if (fileName.isNullOrBlank() || content == null) {
-                        result.error("INVALID_ARGS", "fileName and content are required", null)
-                        return@setMethodCallHandler
+                when (call.method) {
+                    "saveExportFile" -> {
+                        val fileName = call.argument<String>("fileName")
+                        val content = call.argument<String>("content")
+                        val mimeType = call.argument<String>("mimeType") ?: "text/plain"
+                        if (fileName.isNullOrBlank() || content == null) {
+                            result.error("INVALID_ARGS", "fileName and content are required", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            val savedPath = saveToExternalStorage(fileName, content, mimeType)
+                            result.success(savedPath)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to save export file $fileName", e)
+                            result.error("SAVE_FAILED", e.message, null)
+                        }
                     }
-                    try {
-                        val savedPath = saveToExternalStorage(fileName, content, mimeType)
-                        result.success(savedPath)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to save export file $fileName", e)
-                        result.error("SAVE_FAILED", e.message, null)
+
+                    "dumpHeadunitProfile" -> {
+                        val flutterMetrics = call.argument<Map<String, Any?>>("flutterMetrics") ?: emptyMap()
+                        Thread {
+                            try {
+                                val dumpResult = buildAndSaveHeadunitDump(flutterMetrics)
+                                runOnUiThread {
+                                    result.success(dumpResult)
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to dump headunit profile", e)
+                                runOnUiThread {
+                                    result.error("DUMP_FAILED", e.message, null)
+                                }
+                            }
+                        }.start()
                     }
-                } else {
-                    result.notImplemented()
+
+                    else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun buildAndSaveHeadunitDump(flutterMetrics: Map<String, Any?>): Map<String, Any?> {
+        val root = JSONObject()
+        val now = Date()
+        val isoFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US)
+        val fileFmt = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+        root.put("timestamp", isoFmt.format(now))
+        root.put("flutterMetrics", JSONObject(flutterMetrics))
+
+        // 1. Native Android Display & Window Metrics
+        val displayJson = JSONObject()
+        try {
+            val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            @Suppress("DEPRECATION")
+            val display = wm.defaultDisplay
+            val dm = DisplayMetrics()
+            val realDm = DisplayMetrics()
+            @Suppress("DEPRECATION")
+            display.getMetrics(dm)
+            @Suppress("DEPRECATION")
+            display.getRealMetrics(realDm)
+            displayJson.put("widthPixels", dm.widthPixels)
+            displayJson.put("heightPixels", dm.heightPixels)
+            displayJson.put("realWidthPixels", realDm.widthPixels)
+            displayJson.put("realHeightPixels", realDm.heightPixels)
+            displayJson.put("density", dm.density.toDouble())
+            displayJson.put("densityDpi", dm.densityDpi)
+            displayJson.put("xdpi", dm.xdpi.toDouble())
+            displayJson.put("ydpi", dm.ydpi.toDouble())
+            displayJson.put("logicalWidthDp", (realDm.widthPixels / dm.density).toDouble())
+            displayJson.put("logicalHeightDp", (realDm.heightPixels / dm.density).toDouble())
+            @Suppress("DEPRECATION")
+            displayJson.put("refreshRate", display.refreshRate.toDouble())
+            @Suppress("DEPRECATION")
+            displayJson.put("rotation", display.rotation)
+        } catch (e: Exception) {
+            displayJson.put("error", e.message)
+        }
+        root.put("androidDisplayMetrics", displayJson)
+
+        // 2. Build, SoC, CPU & Memory Info (detects spoofed Android versions on TS18 knockoffs)
+        val buildJson = JSONObject()
+        buildJson.put("sdkInt", Build.VERSION.SDK_INT)
+        buildJson.put("release", Build.VERSION.RELEASE)
+        buildJson.put("codename", Build.VERSION.CODENAME)
+        buildJson.put("incremental", Build.VERSION.INCREMENTAL)
+        buildJson.put("securityPatch", if (Build.VERSION.SDK_INT >= 23) Build.VERSION.SECURITY_PATCH else "")
+        buildJson.put("manufacturer", Build.MANUFACTURER)
+        buildJson.put("brand", Build.BRAND)
+        buildJson.put("model", Build.MODEL)
+        buildJson.put("device", Build.DEVICE)
+        buildJson.put("product", Build.PRODUCT)
+        buildJson.put("hardware", Build.HARDWARE)
+        buildJson.put("board", Build.BOARD)
+        buildJson.put("display", Build.DISPLAY)
+        buildJson.put("fingerprint", Build.FINGERPRINT)
+        buildJson.put("bootloader", Build.BOOTLOADER)
+        buildJson.put("supportedAbis", JSONArray(Build.SUPPORTED_ABIS.toList()))
+        try {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val memInfo = ActivityManager.MemoryInfo()
+            am.getMemoryInfo(memInfo)
+            buildJson.put("totalRamMb", memInfo.totalMem / (1024 * 1024))
+            buildJson.put("availRamMb", memInfo.availMem / (1024 * 1024))
+            buildJson.put("lowMemory", memInfo.lowMemory)
+        } catch (_: Exception) {}
+        try {
+            val cpuFile = File("/proc/cpuinfo")
+            if (cpuFile.exists() && cpuFile.canRead()) {
+                val lines = cpuFile.readLines().take(60)
+                buildJson.put("cpuInfoHead", JSONArray(lines))
+            }
+        } catch (_: Exception) {}
+        root.put("buildAndHardware", buildJson)
+
+        val pm = packageManager
+
+        // 3. Home Launchers & Default Home Resolution
+        val homeJson = JSONObject()
+        try {
+            val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            val defaultHome = pm.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            if (defaultHome?.activityInfo != null) {
+                homeJson.put("currentDefaultHomePackage", defaultHome.activityInfo.packageName)
+                homeJson.put("currentDefaultHomeActivity", defaultHome.activityInfo.name)
+            }
+            val allHomes = pm.queryIntentActivities(homeIntent, PackageManager.MATCH_ALL)
+            val homeList = JSONArray()
+            for (ri in allHomes) {
+                val ai = ri.activityInfo ?: continue
+                val obj = JSONObject()
+                obj.put("packageName", ai.packageName)
+                obj.put("activityName", ai.name)
+                obj.put("label", try { ri.loadLabel(pm).toString() } catch (_: Exception) { ai.name })
+                homeList.put(obj)
+            }
+            homeJson.put("installedHomeLaunchers", homeList)
+
+            val homeSettingsIntent = Intent(Settings.ACTION_HOME_SETTINGS)
+            val homeSettingsResolved = pm.resolveActivity(homeSettingsIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            homeJson.put("supportsActionHomeSettings", homeSettingsResolved != null)
+            homeJson.put("supportsAppWidgets", packageManager.hasSystemFeature(PackageManager.FEATURE_APP_WIDGETS))
+        } catch (e: Exception) {
+            homeJson.put("error", e.message)
+        }
+        root.put("homeLauncherInfo", homeJson)
+
+        // 4. All Standard Launchable Apps (App Drawer icons: ACTION_MAIN + CATEGORY_LAUNCHER)
+        val launchableArray = JSONArray()
+        try {
+            val mainIntent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
+            val resolvedList = pm.queryIntentActivities(mainIntent, 0)
+            for (ri in resolvedList) {
+                val ai = ri.activityInfo ?: continue
+                val isSystem = (ai.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                val isUpdatedSystem = (ai.applicationInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+                val obj = JSONObject()
+                obj.put("packageName", ai.packageName)
+                obj.put("activityName", ai.name)
+                obj.put("label", try { ri.loadLabel(pm).toString() } catch (_: Exception) { ai.packageName })
+                obj.put("isSystemApp", isSystem || isUpdatedSystem)
+                obj.put("sourceDir", ai.applicationInfo.sourceDir ?: "")
+                launchableArray.put(obj)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error querying launchable apps", e)
+        }
+        root.put("launchableApps", launchableArray)
+
+        // 5. All Installed Packages + Deep Inspection of Vendor / Headunit / Monolithic Packages (e.g. com.ts.MainUI)
+        val allPackagesSummary = JSONArray()
+        val deepVendorPackages = JSONArray()
+        val vendorKeywords = listOf(
+            "ts", "topway", "mainui", "syu", "fyt", "xy", "autochips", "atc",
+            "microntek", "mtc", "hct", "forfan", "junsun", "ankai", "allwinner",
+            "rockchip", "sprd", "unisoc", "mcu", "can", "canbus", "radio", "fm",
+            "bt", "bluetooth", "dsp", "eq", "equalizer", "aux", "avin", "camera",
+            "avm", "dvr", "tpms", "car", "vehicle", "launcher", "swc", "key",
+            "music", "video", "navi", "settings", "zlink", "carplay", "tlx", "qf"
+        )
+
+        var vendorPackageCount = 0
+        try {
+            @Suppress("DEPRECATION")
+            val installed = pm.getInstalledPackages(0)
+            for (pkg in installed) {
+                val pkgName = pkg.packageName ?: continue
+                val appInfo = pkg.applicationInfo
+                val sourceDir = appInfo?.sourceDir ?: ""
+                val isSystem = appInfo != null && (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                val label = try {
+                    if (appInfo != null) pm.getApplicationLabel(appInfo).toString() else pkgName
+                } catch (_: Exception) {
+                    pkgName
+                }
+
+                val summaryObj = JSONObject()
+                summaryObj.put("packageName", pkgName)
+                summaryObj.put("label", label)
+                summaryObj.put("versionName", pkg.versionName ?: "")
+                summaryObj.put("isSystem", isSystem)
+                summaryObj.put("sourceDir", sourceDir)
+                allPackagesSummary.put(summaryObj)
+
+                val lowerPkg = pkgName.lowercase(Locale.ROOT)
+                val lowerSrc = sourceDir.lowercase(Locale.ROOT)
+                val isGoogleOrStock = lowerPkg.startsWith("com.google.") ||
+                    lowerPkg.startsWith("com.android.cts.") ||
+                    lowerPkg.startsWith("com.android.providers.") ||
+                    lowerPkg.startsWith("com.android.theme.") ||
+                    lowerPkg.startsWith("android.auto_generated")
+
+                val matchesVendorKeyword = vendorKeywords.any { kw ->
+                    lowerPkg.contains(kw) || lowerSrc.contains("/oem/") || lowerSrc.contains("/custom/")
+                }
+
+                if (!isGoogleOrStock && (matchesVendorKeyword || !isSystem)) {
+                    try {
+                        @Suppress("DEPRECATION")
+                        val flags = PackageManager.GET_ACTIVITIES or
+                            PackageManager.GET_RECEIVERS or
+                            PackageManager.GET_SERVICES
+                        @Suppress("DEPRECATION")
+                        val detailed: PackageInfo = pm.getPackageInfo(pkgName, flags)
+                        val detailObj = JSONObject()
+                        detailObj.put("packageName", pkgName)
+                        detailObj.put("label", label)
+                        detailObj.put("sourceDir", sourceDir)
+                        detailObj.put("sharedUserId", detailed.sharedUserId ?: "")
+
+                        val actArr = JSONArray()
+                        detailed.activities?.forEach { act ->
+                            val aObj = JSONObject()
+                            aObj.put("name", act.name)
+                            aObj.put("exported", act.exported)
+                            aObj.put("permission", act.permission ?: "")
+                            aObj.put("targetActivity", act.targetActivity ?: "")
+                            aObj.put(
+                                "label",
+                                try { act.loadLabel(pm).toString() } catch (_: Exception) { "" }
+                            )
+                            actArr.put(aObj)
+                        }
+                        detailObj.put("activities", actArr)
+
+                        val rcvArr = JSONArray()
+                        detailed.receivers?.forEach { rcv ->
+                            val rObj = JSONObject()
+                            rObj.put("name", rcv.name)
+                            rObj.put("exported", rcv.exported)
+                            rObj.put("permission", rcv.permission ?: "")
+                            rcvArr.put(rObj)
+                        }
+                        detailObj.put("receivers", rcvArr)
+
+                        val srvArr = JSONArray()
+                        detailed.services?.forEach { srv ->
+                            val sObj = JSONObject()
+                            sObj.put("name", srv.name)
+                            sObj.put("exported", srv.exported)
+                            sObj.put("permission", srv.permission ?: "")
+                            srvArr.put(sObj)
+                        }
+                        detailObj.put("services", srvArr)
+
+                        deepVendorPackages.put(detailObj)
+                        vendorPackageCount++
+                    } catch (_: Exception) {}
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error inspecting installed packages", e)
+        }
+        root.put("allInstalledPackages", allPackagesSummary)
+        root.put("deepVendorPackages", deepVendorPackages)
+
+        // 6. Running Background Services (identifies active MCU / CAN / Radio / BT services)
+        val runningServicesArr = JSONArray()
+        try {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            @Suppress("DEPRECATION")
+            val services = am.getRunningServices(250)
+            services?.forEach { srv ->
+                val sObj = JSONObject()
+                sObj.put("packageName", srv.service.packageName)
+                sObj.put("className", srv.service.className)
+                sObj.put("process", srv.process ?: "")
+                sObj.put("foreground", srv.foreground)
+                sObj.put("started", srv.started)
+                runningServicesArr.put(sObj)
+            }
+        } catch (_: Exception) {}
+        root.put("runningServices", runningServicesArr)
+
+        // 7. Broadcast Receiver Probe for Common Headunit / Media / Ignition Actions
+        val probedActions = listOf(
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_MEDIA_BUTTON,
+            "com.android.music.metachanged",
+            "com.android.music.playstatechanged",
+            "com.ts.action.ACC_ON",
+            "com.ts.action.ACC_OFF",
+            "com.topway.action.ACC_ON",
+            "com.topway.action.ACC_OFF",
+            "com.syu.action.ACC_ON",
+            "com.fyt.action.ACC_ON",
+            "com.microntek.acc.on",
+            "com.microntek.bootcheck",
+            "com.xy.android.acc.on",
+            "autochips.intent.action.QB_POWERON",
+            "com.forfan.operator.ACC_ON"
+        )
+        val broadcastProbeObj = JSONObject()
+        for (action in probedActions) {
+            try {
+                @Suppress("DEPRECATION")
+                val receivers = pm.queryBroadcastReceivers(Intent(action), PackageManager.MATCH_ALL)
+                if (!receivers.isNullOrEmpty()) {
+                    val arr = JSONArray()
+                    for (ri in receivers) {
+                        val ai = ri.activityInfo ?: continue
+                        arr.put("${ai.packageName}/${ai.name}")
+                    }
+                    broadcastProbeObj.put(action, arr)
+                }
+            } catch (_: Exception) {}
+        }
+        root.put("broadcastReceiversByAction", broadcastProbeObj)
+
+        // 8. Input Devices (Steering Wheel Controls / Bezel Hardware Keys) & Audio State
+        val inputArr = JSONArray()
+        try {
+            for (id in InputDevice.getDeviceIds()) {
+                val dev = InputDevice.getDevice(id) ?: continue
+                val dObj = JSONObject()
+                dObj.put("id", dev.id)
+                dObj.put("name", dev.name)
+                dObj.put("descriptor", dev.descriptor)
+                dObj.put("vendorId", dev.vendorId)
+                dObj.put("productId", dev.productId)
+                dObj.put("isVirtual", dev.isVirtual)
+                dObj.put("sources", dev.sources)
+                inputArr.put(dObj)
+            }
+        } catch (_: Exception) {}
+        root.put("inputDevices", inputArr)
+
+        val audioObj = JSONObject()
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            audioObj.put("musicVolume", audioManager.getStreamVolume(AudioManager.STREAM_MUSIC))
+            audioObj.put("musicMaxVolume", audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC))
+            audioObj.put("isMusicActive", audioManager.isMusicActive)
+            audioObj.put("mode", audioManager.mode)
+        } catch (_: Exception) {}
+        root.put("audioState", audioObj)
+
+        // 9. Complete System Properties (`getprop`)
+        val propsObj = JSONObject()
+        try {
+            val proc = ProcessBuilder("getprop").redirectErrorStream(true).start()
+            BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    val trimmed = line!!.trim()
+                    if (trimmed.startsWith("[") && trimmed.contains("]: [")) {
+                        val splitIdx = trimmed.indexOf("]: [")
+                        val key = trimmed.substring(1, splitIdx)
+                        val value = trimmed.substring(splitIdx + 4).removeSuffix("]")
+                        propsObj.put(key, value)
+                    }
+                }
+            }
+            proc.waitFor()
+        } catch (e: Exception) {
+            propsObj.put("_error", e.message)
+        }
+        root.put("systemProperties", propsObj)
+
+        // Save formatted JSON to /storage/emulated/0/ReDrive or /storage/emulated/0/Download/ReDrive
+        val fileName = "redrive_headunit_dump_${fileFmt.format(now)}.json"
+        val jsonContent = root.toString(2)
+        val savedPath = saveToExternalStorage(fileName, jsonContent, "application/json")
+
+        return mapOf(
+            "savedPath" to savedPath,
+            "sdkInt" to Build.VERSION.SDK_INT,
+            "release" to Build.VERSION.RELEASE,
+            "model" to "${Build.MANUFACTURER} ${Build.MODEL}",
+            "launchableAppsCount" to launchableArray.length(),
+            "vendorPackagesCount" to vendorPackageCount,
+            "systemPropsCount" to propsObj.length()
+        )
     }
 
     private fun saveToExternalStorage(fileName: String, content: String, mimeType: String): String {

@@ -23,10 +23,16 @@ class HeadunitBackgroundSheet extends StatefulWidget {
 }
 
 class _HeadunitBackgroundSheetState extends State<HeadunitBackgroundSheet> {
+  static const MethodChannel _storageChannel =
+      MethodChannel('com.example.redrive/storage');
+
   bool _autoLaunch = true;
   String? _lastBootAction;
   String? _lastBootTimestamp;
   bool _isLoading = true;
+  bool _isDumping = false;
+  String? _lastDumpPath;
+  String? _lastDumpSummary;
 
   @override
   void initState() {
@@ -46,6 +52,68 @@ class _HeadunitBackgroundSheetState extends State<HeadunitBackgroundSheet> {
         _lastBootTimestamp = timestamp;
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _exportHeadunitProfile(BuildContext context) async {
+    if (_isDumping) return;
+    final mq = MediaQuery.of(context);
+    final flutterMetrics = <String, dynamic>{
+      'logicalWidthDp': mq.size.width,
+      'logicalHeightDp': mq.size.height,
+      'devicePixelRatio': mq.devicePixelRatio,
+      'paddingTop': mq.padding.top,
+      'paddingBottom': mq.padding.bottom,
+      'paddingLeft': mq.padding.left,
+      'paddingRight': mq.padding.right,
+      'viewPaddingTop': mq.viewPadding.top,
+      'viewPaddingBottom': mq.viewPadding.bottom,
+      'systemGestureInsetsBottom': mq.systemGestureInsets.bottom,
+    };
+
+    setState(() => _isDumping = true);
+    try {
+      final res = await _storageChannel.invokeMapMethod<String, dynamic>(
+        'dumpHeadunitProfile',
+        <String, dynamic>{'flutterMetrics': flutterMetrics},
+      );
+      if (!mounted) return;
+      final savedPath = res?['savedPath']?.toString() ?? '';
+      final sdkInt = res?['sdkInt'];
+      final release = res?['release'];
+      final appsCount = res?['launchableAppsCount'];
+      final vendorCount = res?['vendorPackagesCount'];
+      final propsCount = res?['systemPropsCount'];
+
+      setState(() {
+        _lastDumpPath = savedPath;
+        _lastDumpSummary =
+            'Android $release (API $sdkInt) • $appsCount apps • $vendorCount vendor pkgs • $propsCount props';
+      });
+
+      if (context.mounted && savedPath.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Headunit dump saved:\n$savedPath'),
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(
+              label: 'Copy Path',
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: savedPath));
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Headunit dump failed: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isDumping = false);
+      }
     }
   }
 
@@ -223,6 +291,102 @@ class _HeadunitBackgroundSheetState extends State<HeadunitBackgroundSheet> {
                     _buildStatusChip(theme, Icons.power_settings_new_rounded, 'ACC Ignition Hooks', Colors.amberAccent),
                     _buildStatusChip(theme, Icons.bluetooth_audio_rounded, 'Insecure RFCOMM', Colors.blueAccent),
                   ],
+                ),
+                const SizedBox(height: 14),
+
+                // Headunit Discovery Dump Card (TS18 / Knockoff Launcher Extractor)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.cyanAccent.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.cyanAccent.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.developer_board_rounded, color: Colors.cyanAccent, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Headunit Profile & TS18 Launcher Dump',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Exports a complete JSON snapshot (screen DPI/dimensions, real Android SDK & SoC, all getprop system properties, installed apps, internal com.ts.MainUI / MCU activities for Radio, BT, DSP/EQ, running services, and SWC input devices) to /storage/emulated/0/Download/ReDrive.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
+                          height: 1.35,
+                        ),
+                      ),
+                      if (_lastDumpPath != null) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.black26,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (_lastDumpSummary != null)
+                                Text(
+                                  _lastDumpSummary!,
+                                  style: const TextStyle(
+                                    color: Colors.greenAccent,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _lastDumpPath!,
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 11,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.cyanAccent,
+                            side: BorderSide(color: Colors.cyanAccent.withValues(alpha: 0.5)),
+                          ),
+                          onPressed: _isDumping ? null : () => _exportHeadunitProfile(context),
+                          icon: _isDumping
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.download_rounded, size: 18),
+                          label: Text(
+                            _isDumping
+                                ? 'Scanning Headunit Packages & Props...'
+                                : 'Export Headunit Profile Dump',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
 
