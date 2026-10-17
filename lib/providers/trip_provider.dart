@@ -1,10 +1,15 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:redrive/models/dtc_code.dart';
 import 'package:redrive/models/trip.dart';
+import 'package:redrive/models/trip_anomaly.dart';
 import 'package:redrive/obd/models/obd_data.dart';
 import 'package:redrive/providers/obd_provider.dart';
+import 'package:redrive/services/dtc/dtc_service.dart';
 import 'package:redrive/services/trip/fuel_calculator.dart';
+import 'package:redrive/services/trip/trip_anomaly_detector.dart';
 import 'package:redrive/services/trip/trip_history_service.dart';
+import 'package:redrive/services/trip/trip_timeseries_service.dart';
 import 'package:redrive/services/settings/app_preferences.dart';
 import 'package:redrive/services/background_service.dart';
 import 'package:redrive/services/logging/log_service.dart';
@@ -24,6 +29,10 @@ class ActiveTripState {
   final int maxRpm;
   final int currentSpeed;
   final int currentRpm;
+  final int problemCount;
+  final int suspicionCount;
+  final List<TripAnomalyEpisode> anomalies;
+  final List<String> recordedDtcs;
 
   const ActiveTripState({
     required this.isActive,
@@ -39,6 +48,10 @@ class ActiveTripState {
     required this.maxRpm,
     required this.currentSpeed,
     required this.currentRpm,
+    this.problemCount = 0,
+    this.suspicionCount = 0,
+    this.anomalies = const [],
+    this.recordedDtcs = const [],
   });
 
   factory ActiveTripState.initial() => ActiveTripState(
@@ -55,13 +68,20 @@ class ActiveTripState {
         maxRpm: 0,
         currentSpeed: 0,
         currentRpm: 0,
+        problemCount: 0,
+        suspicionCount: 0,
+        anomalies: const [],
+        recordedDtcs: const [],
       );
 }
 
 /// Provider managing real-time fuel consumption calculation, active trip accumulation,
-/// and past trip persistence.
+/// anomaly detection, timeseries recording, and past trip persistence.
 class TripProvider extends ChangeNotifier {
   final TripHistoryService _historyService;
+  final TripTimeseriesService _timeseriesService;
+  final TripAnomalyDetector _anomalyDetector;
+  final DtcService _dtcService;
   final FuelCalculator _fuelCalculator;
   DateTime Function() _clock;
 
@@ -71,7 +91,12 @@ class TripProvider extends ChangeNotifier {
   ActiveTripState _activeTrip = ActiveTripState.initial();
   ActiveTripState get activeTrip => _activeTrip;
 
+  TripTimeseriesService get timeseriesService => _timeseriesService;
+  TripAnomalyDetector get anomalyDetector => _anomalyDetector;
+
+  String? _activeTripId;
   DateTime? _lastUpdateTime;
+  DateTime? _lastDtcScanTime;
   DateTime? _engineOffTime;
   DateTime? _disconnectTime;
   int _rpmSum = 0;
@@ -98,9 +123,19 @@ class TripProvider extends ChangeNotifier {
 
   TripProvider({
     TripHistoryService? historyService,
+    TripTimeseriesService? timeseriesService,
+    TripAnomalyDetector? anomalyDetector,
+    DtcService? dtcService,
     FuelCalculator? fuelCalculator,
     DateTime Function()? clock,
   })  : _historyService = historyService ?? TripHistoryService(),
+        _timeseriesService = timeseriesService ??
+            TripTimeseriesService(
+              customDirectory: historyService?.customDirectory ??
+                  historyService?.customFile?.parent,
+            ),
+        _anomalyDetector = anomalyDetector ?? TripAnomalyDetector(),
+        _dtcService = dtcService ?? DtcService(),
         _fuelCalculator =
             fuelCalculator ?? const FuelCalculator(displacementLiters: 1.5),
         _clock = clock ?? (() => DateTime.now()) {
@@ -142,12 +177,17 @@ class TripProvider extends ChangeNotifier {
             maxRpm: _activeTrip.maxRpm,
             currentSpeed: _activeTrip.currentSpeed,
             currentRpm: _activeTrip.currentRpm,
+            problemCount: _activeTrip.problemCount,
+            suspicionCount: _activeTrip.suspicionCount,
+            anomalies: _activeTrip.anomalies,
+            recordedDtcs: _activeTrip.recordedDtcs,
           );
         }
 
-        // Periodic checkpoint every 5 seconds
+        // Periodic checkpoint & timeseries flush every 5 seconds
         if (now.second % 5 == 0) {
           saveCheckpoint(now);
+          unawaited(_timeseriesService.flush());
         }
 
         if (now.second % 3 == 0) {
@@ -214,7 +254,13 @@ class TripProvider extends ChangeNotifier {
 
   Future<void> _loadHistory() async {
     await _recoverActiveCheckpointIfNeeded();
-    _pastTrips = await _historyService.loadTrips();
+    final loadedTrips = await _historyService.loadTrips();
+    final retainedIds = await _timeseriesService.enforceRetentionPolicy(
+      loadedTrips.map((t) => t.id).toList(),
+    );
+    _pastTrips = loadedTrips
+        .map((t) => t.copyWith(hasTimeseries: retainedIds.contains(t.id)))
+        .toList();
     notifyListeners();
   }
 
@@ -248,11 +294,34 @@ class TripProvider extends ChangeNotifier {
 
         final meetsThreshold = distanceKm >= _minTripDistanceKm;
         final hasMovement = durationSeconds >= 5 || distanceKm > 0.01;
+        final recoveredId = checkpoint['id']?.toString() ??
+            'recovered_${startTime.millisecondsSinceEpoch}';
 
         if (meetsThreshold && hasMovement) {
+          final hasTs = await _timeseriesService.hasTimeseries(recoveredId);
+          final parsedAnomalies = <TripAnomalyEpisode>[];
+          final rawAnomalies = checkpoint['anomalies'];
+          if (rawAnomalies is Iterable) {
+            for (final item in rawAnomalies) {
+              if (item is Map<String, dynamic>) {
+                parsedAnomalies.add(TripAnomalyEpisode.fromJson(item));
+              } else if (item is Map) {
+                parsedAnomalies.add(
+                  TripAnomalyEpisode.fromJson(Map<String, dynamic>.from(item)),
+                );
+              }
+            }
+          }
+          final rawDtcs = checkpoint['recordedDtcs'];
+          final parsedDtcs = <String>[];
+          if (rawDtcs is Iterable) {
+            for (final d in rawDtcs) {
+              if (d != null) parsedDtcs.add(d.toString());
+            }
+          }
+
           final recoveredTrip = Trip(
-            id: checkpoint['id']?.toString() ??
-                'recovered_${startTime.millisecondsSinceEpoch}',
+            id: recoveredId,
             startTime: startTime,
             endTime: lastUpdated ??
                 startTime.add(Duration(seconds: durationSeconds)),
@@ -264,12 +333,25 @@ class TripProvider extends ChangeNotifier {
             maxSpeed: maxSpeed,
             maxRpm: maxRpm,
             avgRpm: sampleCount > 0 ? (rpmSum / sampleCount).round() : 0,
+            problemCount: (checkpoint['problemCount'] as num?)?.toInt() ??
+                parsedAnomalies
+                    .where((a) => a.severity == AnomalySeverity.problem)
+                    .length,
+            suspicionCount: (checkpoint['suspicionCount'] as num?)?.toInt() ??
+                parsedAnomalies
+                    .where((a) => a.severity == AnomalySeverity.suspicion)
+                    .length,
+            anomalies: parsedAnomalies,
+            recordedDtcs: parsedDtcs,
+            hasTimeseries: hasTs,
           );
           await _historyService.saveTrip(recoveredTrip);
           LogService.i(
             'Crash recovery: saved interrupted trip ${recoveredTrip.id} (${recoveredTrip.distanceKm.toStringAsFixed(2)} km)',
             tag: 'Trip',
           );
+        } else {
+          await _timeseriesService.deleteTimeseries(recoveredId);
         }
       }
     } catch (e) {
@@ -284,7 +366,7 @@ class TripProvider extends ChangeNotifier {
     if (!_activeTrip.isActive) return;
     final timestamp = now ?? _clock();
     final checkpointData = {
-      'id': '${_activeTrip.startTime.millisecondsSinceEpoch}',
+      'id': _activeTripId ?? '${_activeTrip.startTime.millisecondsSinceEpoch}',
       'startTime': _activeTrip.startTime.toIso8601String(),
       'lastUpdated': timestamp.toIso8601String(),
       'durationSeconds': _activeTrip.duration.inSeconds,
@@ -297,6 +379,10 @@ class TripProvider extends ChangeNotifier {
       'rpmSum': _rpmSum,
       'sampleCount': _sampleCount,
       'lastSpeed': _lastSpeed,
+      'problemCount': _activeTrip.problemCount,
+      'suspicionCount': _activeTrip.suspicionCount,
+      'anomalies': _activeTrip.anomalies.map((a) => a.toJson()).toList(),
+      'recordedDtcs': _activeTrip.recordedDtcs,
     };
     await _historyService.saveActiveCheckpoint(checkpointData);
   }
@@ -371,10 +457,13 @@ class TripProvider extends ChangeNotifier {
   void _startTrip([DateTime? startTime]) {
     final now = startTime ?? _clock();
     _lastUpdateTime = now;
+    _lastDtcScanTime = null;
     _lastSpeed = 0;
     _lastFuelFlowLPerHour = null;
     _rpmSum = 0;
     _sampleCount = 0;
+    _anomalyDetector.reset();
+    _activeTripId = '${now.millisecondsSinceEpoch}';
 
     _activeTrip = ActiveTripState(
       isActive: true,
@@ -390,11 +479,18 @@ class TripProvider extends ChangeNotifier {
       maxRpm: 0,
       currentSpeed: 0,
       currentRpm: 0,
+      problemCount: 0,
+      suspicionCount: 0,
+      anomalies: const [],
+      recordedDtcs: const [],
     );
+
+    unawaited(_timeseriesService.startRecording(_activeTripId!, now));
+    _triggerBackgroundDtcScanIfNeeded(now, isTripStart: true);
 
     _updateNotificationInfo();
     LogService.i(
-      "Trip started. Tracking real-time fuel, distance, and speeds.",
+      "Trip started. Tracking real-time fuel, distance, anomalies, and timeseries.",
       tag: 'Trip',
     );
     notifyListeners();
@@ -412,6 +508,8 @@ class TripProvider extends ChangeNotifier {
     if (!_activeTrip.isActive) {
       _startTrip(now);
     } else if (_sampleCount == 0 && timestamp != null) {
+      _activeTripId = '${timestamp.millisecondsSinceEpoch}';
+      unawaited(_timeseriesService.startRecording(_activeTripId!, timestamp));
       _activeTrip = ActiveTripState(
         isActive: true,
         startTime: timestamp,
@@ -442,7 +540,7 @@ class TripProvider extends ChangeNotifier {
     final avgSpeedForSlice = (_lastSpeed + speed) / 2.0;
     _lastSpeed = speed;
 
-    // Calculate instantaneous fuel flow (L/h)
+    // Calculate instantaneous fuel flow (L/h) with STFT & LTFT fuel trim correction
     final instantFuelLPerHour = _fuelCalculator.calculateFuelFlowLitersPerHour(
       rpm: rpm,
       engineLoadPercent: data.engineLoad > 0 ? data.engineLoad : 25.0,
@@ -451,6 +549,8 @@ class TripProvider extends ChangeNotifier {
           data.engineFuelRate > 0 ? data.engineFuelRate : null,
       throttlePositionPercent: data.throttlePosition,
       speedKmH: speed,
+      shortTermFuelTrimPercent: data.shortTermFuelTrim,
+      longTermFuelTrimPercent: data.longTermFuelTrim,
     );
 
     // Symmetrical trapezoidal numerical integration for fuel accumulation
@@ -479,6 +579,28 @@ class TripProvider extends ChangeNotifier {
     _sampleCount++;
     _rpmSum += rpm;
 
+    // Evaluate diagnostic anomalies & high-load power-loss rules
+    final enrichedData = data.copyWith(
+      instantFuelLPerHour: instantFuelLPerHour,
+      instantFuelL100km: instantFuelL100km,
+    );
+    final triggeredProblem = _anomalyDetector.evaluateSample(
+      enrichedData,
+      timestamp: now,
+    );
+    if (triggeredProblem) {
+      _triggerBackgroundDtcScanIfNeeded(now, isTripStart: false);
+    }
+
+    // Record timeseries sample (coalescing rapid per-PID notifications within <350ms on live OBD)
+    _timeseriesService.recordSample(
+      enrichedData,
+      timestamp: now,
+      activeProblems: _anomalyDetector.activeProblems,
+      activeSuspicions: _anomalyDetector.activeSuspicions,
+      replaceLastIfWithinMs: timestamp == null ? 350 : null,
+    );
+
     final rawDuration = now.difference(_activeTrip.startTime);
     final duration = rawDuration.isNegative ? Duration.zero : rawDuration;
     final hours = duration.inMilliseconds / (3600.0 * 1000.0);
@@ -502,9 +624,72 @@ class TripProvider extends ChangeNotifier {
       maxRpm: maxRpm,
       currentSpeed: speed,
       currentRpm: rpm,
+      problemCount: _anomalyDetector.problemCount,
+      suspicionCount: _anomalyDetector.suspicionCount,
+      anomalies: _anomalyDetector.episodes,
+      recordedDtcs: _anomalyDetector.recordedDtcs,
     );
 
     notifyListeners();
+  }
+
+  /// Records scanned [DtcCode] items into the active trip's anomaly detector.
+  void recordDtcCodes(
+    List<DtcCode> codes, {
+    DateTime? timestamp,
+    bool isTripStart = false,
+  }) {
+    if (!_activeTrip.isActive) return;
+    final now = timestamp ?? _clock();
+    _anomalyDetector.recordDtcs(
+      codes,
+      timestamp: now,
+      isTripStart: isTripStart,
+    );
+    _activeTrip = ActiveTripState(
+      isActive: _activeTrip.isActive,
+      startTime: _activeTrip.startTime,
+      duration: _activeTrip.duration,
+      distanceKm: _activeTrip.distanceKm,
+      fuelConsumedLiters: _activeTrip.fuelConsumedLiters,
+      avgFuelConsumption: _activeTrip.avgFuelConsumption,
+      instantFuelL100km: _activeTrip.instantFuelL100km,
+      instantFuelLPerHour: _activeTrip.instantFuelLPerHour,
+      avgSpeed: _activeTrip.avgSpeed,
+      maxSpeed: _activeTrip.maxSpeed,
+      maxRpm: _activeTrip.maxRpm,
+      currentSpeed: _activeTrip.currentSpeed,
+      currentRpm: _activeTrip.currentRpm,
+      problemCount: _anomalyDetector.problemCount,
+      suspicionCount: _anomalyDetector.suspicionCount,
+      anomalies: _anomalyDetector.episodes,
+      recordedDtcs: _anomalyDetector.recordedDtcs,
+    );
+    notifyListeners();
+  }
+
+  void _triggerBackgroundDtcScanIfNeeded(
+    DateTime now, {
+    required bool isTripStart,
+  }) {
+    final obd = _boundObd;
+    if (obd == null || !obd.isEcuConnected || obd.mode != ObdMode.real) {
+      return;
+    }
+    if (!isTripStart &&
+        _lastDtcScanTime != null &&
+        now.difference(_lastDtcScanTime!).inSeconds < 60) {
+      return;
+    }
+    _lastDtcScanTime = now;
+    unawaited(() async {
+      try {
+        final codes = await _dtcService.scanAllCodes(obd);
+        if (_activeTrip.isActive && codes.isNotEmpty) {
+          recordDtcCodes(codes, timestamp: _clock(), isTripStart: isTripStart);
+        }
+      } catch (_) {}
+    }());
   }
 
   @visibleForTesting
@@ -515,15 +700,23 @@ class TripProvider extends ChangeNotifier {
   Future<void> _finishTrip([DateTime? finishTime]) async {
     final now = finishTime ?? _clock();
     final duration = now.difference(_activeTrip.startTime);
+    final tripId =
+        _activeTripId ?? '${_activeTrip.startTime.millisecondsSinceEpoch}';
 
     // Only save trip if distance traveled satisfies the configured minimum distance threshold (default 0.1 km)
     final meetsDistanceThreshold = _activeTrip.distanceKm >= _minTripDistanceKm;
     final hasValidMovement =
         duration.inSeconds >= 5 || _activeTrip.distanceKm > 0.01;
+    final keepTrip = meetsDistanceThreshold && hasValidMovement;
 
-    if (meetsDistanceThreshold && hasValidMovement) {
+    final hasTimeseries = await _timeseriesService.finishTrip(
+      tripId,
+      keep: keepTrip,
+    );
+
+    if (keepTrip) {
       final trip = Trip(
-        id: '${_activeTrip.startTime.millisecondsSinceEpoch}',
+        id: tripId,
         startTime: _activeTrip.startTime,
         endTime: now,
         duration: duration,
@@ -534,13 +727,19 @@ class TripProvider extends ChangeNotifier {
         maxSpeed: _activeTrip.maxSpeed,
         maxRpm: _activeTrip.maxRpm,
         avgRpm: _sampleCount > 0 ? (_rpmSum / _sampleCount).round() : 0,
+        problemCount: _anomalyDetector.problemCount,
+        suspicionCount: _anomalyDetector.suspicionCount,
+        anomalies: _anomalyDetector.episodes,
+        recordedDtcs: _anomalyDetector.recordedDtcs,
+        hasTimeseries: hasTimeseries,
       );
 
       await _historyService.saveTrip(trip);
       await _loadHistory();
       LogService.i(
         "Trip saved to history: ${trip.distanceKm.toStringAsFixed(2)} km, "
-        "${trip.duration.inMinutes}m, avg fuel: ${trip.avgFuelConsumption.toStringAsFixed(1)} L/100km",
+        "${trip.duration.inMinutes}m, avg fuel: ${trip.avgFuelConsumption.toStringAsFixed(1)} L/100km, "
+        "problems: ${trip.problemCount}, suspicions: ${trip.suspicionCount}",
         tag: 'Trip',
       );
     } else {
@@ -554,13 +753,37 @@ class TripProvider extends ChangeNotifier {
     await _historyService.clearActiveCheckpoint();
 
     _activeTrip = ActiveTripState.initial();
+    _activeTripId = null;
     _lastUpdateTime = null;
+    _lastDtcScanTime = null;
     _lastSpeed = 0;
     _lastFuelFlowLPerHour = null;
     _engineOffTime = null;
     _disconnectTime = null;
+    _anomalyDetector.reset();
     _updateNotificationInfo();
     notifyListeners();
+  }
+
+  /// Exports a completed trip's recorded timeseries to local storage (CSV/JSON)
+  /// and persists its `isExported` status and `exportedPath` in trip history.
+  Future<List<String>> exportTripTimeseries(
+    Trip trip, {
+    TimeseriesExportFormat format = TimeseriesExportFormat.both,
+  }) async {
+    final paths = await _timeseriesService.exportTripTimeseries(
+      trip: trip,
+      format: format,
+    );
+    if (paths.isNotEmpty) {
+      final updated = trip.copyWith(
+        isExported: true,
+        exportedPath: paths.first,
+      );
+      await _historyService.saveTrip(updated);
+      await _loadHistory();
+    }
+    return paths;
   }
 
   /// Manually starts a new driving trip immediately.
@@ -578,11 +801,13 @@ class TripProvider extends ChangeNotifier {
   }
 
   Future<void> deleteTrip(String id) async {
+    await _timeseriesService.deleteTimeseries(id);
     await _historyService.deleteTrip(id);
     await _loadHistory();
   }
 
   Future<void> clearHistory() async {
+    await _timeseriesService.enforceRetentionPolicy(const []);
     await _historyService.clearAll();
     await _loadHistory();
   }

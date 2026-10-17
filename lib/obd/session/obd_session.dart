@@ -14,6 +14,7 @@ enum ObdSessionState { disconnected, initializing, ready, error }
 class ObdSession {
   final ElmClient _elmClient;
   final String protocolCommand;
+  final bool enableAdaptiveTiming;
 
   ObdSessionState _state = ObdSessionState.disconnected;
   Object? _lastError;
@@ -21,6 +22,7 @@ class ObdSession {
   ObdSession({
     required ElmClient elmClient,
     this.protocolCommand = 'ATSP0',
+    this.enableAdaptiveTiming = false,
   }) : _elmClient = elmClient;
 
   ObdSessionState get state => _state;
@@ -44,6 +46,21 @@ class ObdSession {
       await _executeAndExpect('ATL0', ElmResponseType.ok);
       await _executeAndExpect(protocolCommand, ElmResponseType.ok);
       LogService.i("ELM adapter configured with $protocolCommand", tag: 'OBD');
+
+      if (enableAdaptiveTiming) {
+        try {
+          final atatResp = await _elmClient.execute('ATAT2');
+          if (atatResp.type != ElmResponseType.ok) {
+            LogService.w("ATAT2 returned ${atatResp.type}, continuing", tag: 'OBD');
+          }
+          final atstResp = await _elmClient.execute('ATST19');
+          if (atstResp.type != ElmResponseType.ok) {
+            LogService.w("ATST19 returned ${atstResp.type}, continuing", tag: 'OBD');
+          }
+        } catch (e) {
+          LogService.w("Adaptive timing configuration skipped: $e", tag: 'OBD');
+        }
+      }
 
       final supportedPids = <int>{};
       // On K-Line/KWP2000 vehicles like Suzuki Swift, automatic protocol search

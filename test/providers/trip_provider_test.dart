@@ -175,5 +175,45 @@ void main() {
         provider.dispose();
       },
     );
+
+    test(
+      'applies STFT + LTFT fuel trim correction and persists anomalies & 2-trip rolling timeseries',
+      () async {
+        final historyService = TripHistoryService(customDirectory: tempDir);
+        final provider = TripProvider(historyService: historyService);
+        await provider.initialized;
+        await provider.setMinTripDistanceKm(0.0);
+
+        final t0 = DateTime(2026, 10, 17, 10, 0, 0);
+        provider.manualStartTrip(t0);
+
+        // Process high-RPM power loss with +15% STFT and +5% LTFT (+20% trim multiplier)
+        for (int s = 0; s <= 10; s++) {
+          provider.processDataPoint(
+            const ObdData(
+              speed: 80,
+              rpm: 3600,
+              relativeThrottle: 65.0,
+              engineLoad: 32.0,
+              maf: 10.0,
+              shortTermFuelTrim: 15.0,
+              longTermFuelTrim: 5.0,
+            ),
+            timestamp: t0.add(Duration(seconds: s)),
+          );
+        }
+
+        expect(provider.activeTrip.problemCount, greaterThanOrEqualTo(2));
+        await provider.manualEndTrip(t0.add(const Duration(seconds: 10)));
+
+        expect(provider.pastTrips, hasLength(1));
+        final savedTrip = provider.pastTrips.first;
+        expect(savedTrip.hasTimeseries, isTrue);
+        expect(savedTrip.problemCount, greaterThanOrEqualTo(2));
+        expect(savedTrip.anomalies, isNotEmpty);
+
+        provider.dispose();
+      },
+    );
   });
 }

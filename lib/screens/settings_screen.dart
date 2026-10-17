@@ -405,7 +405,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
                           icon: Icons.info_outline_rounded,
                           label: 'App Version',
                           subtitle: 'ReDrive Telemetry & Diagnostics',
-                          trailingText: 'v1.1.1+5',
+                          trailingText: 'v1.2.0+6',
                           colorScheme: colorScheme,
                         ),
                         const SizedBox(height: 10),

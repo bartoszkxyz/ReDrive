@@ -32,6 +32,8 @@ class ActiveTripTile extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final bool isActive = activeTrip.isActive;
     final Trip? lastTrip = pastTrips.firstOrNull;
+    final int pCount = isActive ? activeTrip.problemCount : (lastTrip?.problemCount ?? 0);
+    final int sCount = isActive ? activeTrip.suspicionCount : (lastTrip?.suspicionCount ?? 0);
 
     return Container(
       width: double.infinity,
@@ -242,7 +244,15 @@ class ActiveTripTile extends StatelessWidget {
                 ],
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
+
+              // Trip Health Badge
+              _TripHealthBadge(
+                problemCount: pCount,
+                suspicionCount: sCount,
+              ),
+
+              const SizedBox(height: 10),
               Container(
                 height: 1,
                 color: Colors.white.withValues(alpha: 0.07),
@@ -539,6 +549,80 @@ class _ComplimentaryMetric extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _TripHealthBadge extends StatelessWidget {
+  final int problemCount;
+  final int suspicionCount;
+
+  const _TripHealthBadge({
+    required this.problemCount,
+    required this.suspicionCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isClean = problemCount == 0 && suspicionCount == 0;
+    final bool isWarning = problemCount == 0 && suspicionCount > 0;
+
+    final Color badgeColor;
+    final Color bgColor;
+    final IconData icon;
+
+    if (isClean) {
+      badgeColor = const Color(0xFF2ECC71);
+      bgColor = const Color(0xFF2ECC71).withValues(alpha: 0.12);
+      icon = Icons.check_circle_outline_rounded;
+    } else if (isWarning) {
+      badgeColor = const Color(0xFFF39C12);
+      bgColor = const Color(0xFFF39C12).withValues(alpha: 0.12);
+      icon = Icons.warning_amber_rounded;
+    } else {
+      badgeColor = const Color(0xFFE74C3C);
+      bgColor = const Color(0xFFE74C3C).withValues(alpha: 0.15);
+      icon = Icons.error_outline_rounded;
+    }
+
+    final pLabel = problemCount == 1 ? '1 problem' : '$problemCount problems';
+    final sLabel = suspicionCount == 1 ? '1 suspicion' : '$suspicionCount suspicions';
+    final text = '$pLabel, $sLabel';
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: badgeColor.withValues(alpha: 0.35),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: badgeColor),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                text,
+                textScaler: TextScaler.noScaling,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: badgeColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

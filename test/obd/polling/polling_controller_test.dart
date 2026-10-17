@@ -242,21 +242,22 @@ void main() {
     expect(controller.isPolling, isFalse);
   });
 
-  group('Tiered Priority Scheduling', () {
-    test('correctly maps PID priority tiers', () {
+  group('Tiered Priority Scheduling & Smart High-Load Boost', () {
+    test('correctly maps PID priority tiers with promoted Load, STFT, and LTFT', () {
       expect(PollingController.priorityFor(PidKey.vehicleSpeed), PidPriorityTier.high);
       expect(PollingController.priorityFor(PidKey.engineRpm), PidPriorityTier.high);
       expect(PollingController.priorityFor(PidKey.throttlePosition), PidPriorityTier.high);
       expect(PollingController.priorityFor(PidKey.mafAirFlowRate), PidPriorityTier.high);
+      expect(PollingController.priorityFor(PidKey.engineLoad), PidPriorityTier.high);
+      expect(PollingController.priorityFor(PidKey.shortTermFuelTrim1), PidPriorityTier.high);
 
-      expect(PollingController.priorityFor(PidKey.engineLoad), PidPriorityTier.normal);
-      expect(PollingController.priorityFor(PidKey.shortTermFuelTrim1), PidPriorityTier.normal);
+      expect(PollingController.priorityFor(PidKey.longTermFuelTrim1), PidPriorityTier.normal);
       expect(PollingController.priorityFor(PidKey.timingAdvance), PidPriorityTier.normal);
       expect(PollingController.priorityFor(PidKey.intakeManifoldPressure), PidPriorityTier.normal);
+      expect(PollingController.priorityFor(PidKey.fuelSystemStatus), PidPriorityTier.normal);
 
       expect(PollingController.priorityFor(PidKey.coolantTemperature), PidPriorityTier.low);
       expect(PollingController.priorityFor(PidKey.fuelTankLevel), PidPriorityTier.low);
-      expect(PollingController.priorityFor(PidKey.longTermFuelTrim1), PidPriorityTier.low);
       expect(PollingController.priorityFor(PidKey.adapterVoltage), PidPriorityTier.low);
     });
 
@@ -282,6 +283,123 @@ void main() {
       // When values are not yet known, ALL keys must be scheduled for immediate discovery
       final scheduled = controller.computeScheduledKeys(effective);
       expect(scheduled, containsAll(effective));
+    });
+
+    test('interleaves overdue normal and low keys without dumping all low keys at once', () {
+      final allKeys = {
+        PidKey.engineRpm,
+        PidKey.vehicleSpeed,
+        PidKey.longTermFuelTrim1,
+        PidKey.timingAdvance,
+        PidKey.intakeManifoldPressure,
+        PidKey.coolantTemperature,
+        PidKey.intakeAirTemperature,
+        PidKey.fuelTankLevel,
+      };
+      final controller = PollingController(
+        elmClient: elmClient,
+        registry: registry,
+        supportedEcuKeys: allKeys,
+      );
+
+      // Cycle 0 discovery: seed all keys at cycle 0 with normal idle values
+      for (final k in allKeys) {
+        controller.seedValueForTesting(k, 20, polledAtCycle: 0);
+      }
+      controller.seedValueForTesting(PidKey.engineRpm, 800, polledAtCycle: 0);
+      controller.seedValueForTesting(PidKey.throttlePosition, 13.0, polledAtCycle: 0);
+
+      // Simulate advancing to cycle 8 ( manual computeScheduledKeys after 8 cycles )
+      for (int c = 1; c <= 8; c++) {
+        // advance internal cycle tracking by calling computeScheduledKeys
+        controller.computeScheduledKeys(allKeys);
+      }
+
+      // Even when multiple low keys are overdue, at most 1 low key is scheduled per cycle
+      final scheduled = controller.computeScheduledKeys(allKeys);
+      final lowCount = scheduled
+          .where((k) => PollingController.priorityFor(k) == PidPriorityTier.low)
+          .length;
+      expect(lowCount, lessThanOrEqualTo(1));
+    });
+
+    test('Smart High-Load Boost activates when RPM > 3000 or relative throttle > 50%', () {
+      final allKeys = {
+        PidKey.engineRpm,
+        PidKey.throttlePosition,
+        PidKey.longTermFuelTrim1,
+        PidKey.timingAdvance,
+        PidKey.intakeManifoldPressure,
+        PidKey.fuelTankLevel,
+        PidKey.intakeAirTemperature,
+      };
+      final controller = PollingController(
+        elmClient: elmClient,
+        registry: registry,
+        supportedEcuKeys: allKeys,
+      );
+
+      for (final k in allKeys) {
+        controller.seedValueForTesting(k, 20, polledAtCycle: 0);
+      }
+      controller.seedValueForTesting(PidKey.engineRpm, 3800, polledAtCycle: 0);
+      controller.seedValueForTesting(PidKey.throttlePosition, 65.0, polledAtCycle: 0);
+
+      expect(controller.isHighLoadBoostActive, isTrue);
+
+      final scheduled = controller.computeScheduledKeys(allKeys);
+      expect(scheduled, containsAll([
+        PidKey.longTermFuelTrim1,
+        PidKey.timingAdvance,
+        PidKey.intakeManifoldPressure,
+      ]));
+      expect(scheduled, isNot(contains(PidKey.fuelTankLevel)));
+    });
+
+    test('quarantines a PID after 5 consecutive NO DATA responses', () async {
+      final controller = PollingController(
+        elmClient: elmClient,
+        registry: registry,
+        supportedEcuKeys: {PidKey.vehicleSpeed, PidKey.engineRpm},
+      );
+      addTearDown(controller.dispose);
+
+      controller.setWatchlist(WatchSource.visibleScreen, {
+        PidKey.vehicleSpeed,
+        PidKey.engineRpm,
+      });
+
+      controller.start();
+
+      for (int i = 0; i < 5; i++) {
+        while (connection.sentCommands.isEmpty) {
+          await Future<void>.delayed(const Duration(milliseconds: 2));
+        }
+        final cmd = connection.sentCommands.removeAt(0);
+        if (cmd == '010D\r') {
+          connection.emit('NO DATA\r>');
+        } else {
+          connection.emit('41 0C 0F A0\r>');
+        }
+        await pumpEventQueue();
+        // Handle second command in the cycle
+        while (connection.sentCommands.isEmpty) {
+          await Future<void>.delayed(const Duration(milliseconds: 2));
+        }
+        final cmd2 = connection.sentCommands.removeAt(0);
+        if (cmd2 == '010D\r') {
+          connection.emit('NO DATA\r>');
+        } else {
+          connection.emit('41 0C 0F A0\r>');
+        }
+        await pumpEventQueue();
+      }
+
+      expect(controller.quarantinedKeys, contains(PidKey.vehicleSpeed));
+      expect(controller.computeEffectiveKeys(), isNot(contains(PidKey.vehicleSpeed)));
+      expect(controller.computeEffectiveKeys(), contains(PidKey.engineRpm));
+
+      controller.stop();
     });
   });
 }

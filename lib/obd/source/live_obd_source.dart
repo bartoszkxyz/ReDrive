@@ -27,7 +27,10 @@ class LiveObdSource {
 
   final _updatesController =
       StreamController<({PidKey key, num value})>.broadcast();
+  final _cycleCompleteController =
+      StreamController<Map<PidKey, num>>.broadcast();
   StreamSubscription<({PidKey key, num value})>? _pollingSubscription;
+  StreamSubscription<Map<PidKey, num>>? _cycleCompleteSubscription;
 
   Set<PidKey> _supportedKeys = const {};
   Set<int> _rawSupportedPids = const {};
@@ -37,11 +40,13 @@ class LiveObdSource {
   int _recoveryAttempts = 0;
 
   final String protocolCommand;
+  final bool enableAdaptiveTiming;
 
   LiveObdSource({
     required ObdConnection connection,
     required PidRegistry registry,
     this.protocolCommand = 'ATSP0',
+    this.enableAdaptiveTiming = false,
   }) : _connection = connection,
        _registry = registry;
 
@@ -51,6 +56,8 @@ class LiveObdSource {
   Set<PidKey> get supportedKeys => _supportedKeys;
   Set<int> get rawSupportedPids => _rawSupportedPids;
   Stream<({PidKey key, num value})> get updates => _updatesController.stream;
+  Stream<Map<PidKey, num>> get onCycleComplete =>
+      _cycleCompleteController.stream;
   Map<PidKey, num> get latestValues =>
       _pollingController?.latestValues ?? const {};
 
@@ -120,6 +127,7 @@ class LiveObdSource {
     final session = ObdSession(
       elmClient: client,
       protocolCommand: protocolCommand,
+      enableAdaptiveTiming: enableAdaptiveTiming,
     );
     _session = session;
 
@@ -151,6 +159,12 @@ class LiveObdSource {
         unawaited(_recoverSession(error, stackTrace));
       },
     );
+
+    _cycleCompleteSubscription = controller.onCycleComplete.listen((snapshot) {
+      if (!_cycleCompleteController.isClosed) {
+        _cycleCompleteController.add(snapshot);
+      }
+    });
   }
 
   Future<void> _recoverSession(Object error, StackTrace stackTrace) async {
@@ -197,6 +211,9 @@ class LiveObdSource {
     await _pollingSubscription?.cancel();
     _pollingSubscription = null;
 
+    await _cycleCompleteSubscription?.cancel();
+    _cycleCompleteSubscription = null;
+
     await _pollingController?.dispose();
     _pollingController = null;
 
@@ -209,6 +226,7 @@ class LiveObdSource {
   Future<void> dispose() async {
     await stop();
     await _updatesController.close();
+    await _cycleCompleteController.close();
     await _stateController.close();
   }
 }

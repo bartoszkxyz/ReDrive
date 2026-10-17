@@ -35,6 +35,12 @@ class ObdProvider extends ChangeNotifier {
     PidKey.mafAirFlowRate,
     PidKey.engineFuelRate,
     PidKey.intakeAirTemperature,
+    PidKey.shortTermFuelTrim1,
+    PidKey.longTermFuelTrim1,
+    PidKey.timingAdvance,
+    PidKey.intakeManifoldPressure,
+    PidKey.fuelSystemStatus,
+    PidKey.fuelTankLevel,
   };
 
   ObdConnection? _connection;
@@ -47,6 +53,7 @@ class ObdProvider extends ChangeNotifier {
   }
 
   StreamSubscription<({PidKey key, num value})>? _updatesSubscription;
+  StreamSubscription<Map<PidKey, num>>? _cycleCompleteSubscription;
   StreamSubscription<ObdSourceState>? _stateSubscription;
   StreamSubscription<bool>? _connectionStateSubscription;
   StreamSubscription<bool>? _reconnectingStateSubscription;
@@ -56,6 +63,9 @@ class ObdProvider extends ChangeNotifier {
 
   final _dataController = StreamController<ObdData>.broadcast();
   Stream<ObdData> get dataStream => _dataController.stream;
+
+  final _cycleController = StreamController<ObdData>.broadcast();
+  Stream<ObdData> get cycleStream => _cycleController.stream;
 
   final Map<WatchSource, Set<PidKey>> _watchlists = {};
 
@@ -206,6 +216,9 @@ class ObdProvider extends ChangeNotifier {
       if (!_dataController.isClosed) {
         _dataController.add(_data);
       }
+      if (!_cycleController.isClosed) {
+        _cycleController.add(_data);
+      }
       _checkCoolantAlert(newDemoData.coolantTemp);
       notifyListeners();
     });
@@ -301,6 +314,12 @@ class ObdProvider extends ChangeNotifier {
       onError: _onLiveError,
     );
 
+    _cycleCompleteSubscription = source.onCycleComplete.listen((_) {
+      if (!_cycleController.isClosed) {
+        _cycleController.add(_data);
+      }
+    });
+
     await source.start();
   }
 
@@ -331,6 +350,9 @@ class ObdProvider extends ChangeNotifier {
 
     await _updatesSubscription?.cancel();
     _updatesSubscription = null;
+
+    await _cycleCompleteSubscription?.cancel();
+    _cycleCompleteSubscription = null;
 
     if (_liveSource != null) {
       await _liveSource?.stop();
@@ -508,10 +530,12 @@ class ObdProvider extends ChangeNotifier {
     _demoGenerator?.stop();
     _stateSubscription?.cancel();
     _updatesSubscription?.cancel();
+    _cycleCompleteSubscription?.cancel();
     _connectionStateSubscription?.cancel();
     _reconnectingStateSubscription?.cancel();
     _errorsController.close();
     _dataController.close();
+    _cycleController.close();
 
     super.dispose();
   }

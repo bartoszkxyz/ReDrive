@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import '../elm/elm_client.dart';
 import '../elm/elm_response.dart';
 import '../pid/pid_definition.dart';
@@ -9,11 +10,11 @@ enum WatchSource { visibleScreen, backgroundMonitoring, logging, session }
 
 /// Priority tier determining polling frequency over the OBD-II serial bus.
 enum PidPriorityTier {
-  /// Fast tier: polled on every loop (RPM, Speed, Throttle, MAF).
+  /// Fast tier: polled on every loop (RPM, Speed, Throttle, MAF, Load, STFT).
   high,
-  /// Normal tier: polled every 2nd loop (Load, STFT, MAP, Timing, Fuel Rate, Loop Status).
+  /// Normal tier: interleaved medium rate (LTFT, MAP, Timing, Fuel Rate, Loop Status).
   normal,
-  /// Slow tier: polled every 8th loop (Coolant, IAT, Fuel Tank, LTFT, Voltage, Temp sensors).
+  /// Slow tier: interleaved low rate (Coolant, IAT, Fuel Tank, Voltage, Temp sensors).
   low,
 }
 
@@ -23,16 +24,23 @@ enum PidPriorityTier {
 /// (screen, logs, session and other), schedules PID requests,
 /// stores the latest values, and emits decoded updates.
 class PollingController {
+  static const int maxConsecutiveNoData = 5;
+
   final ElmClient _elmClient;
   final PidRegistry _registry;
   final Set<PidKey> _supportedEcuKeys;
 
   final Map<WatchSource, Set<PidKey>> _watchlists = {};
   final Map<PidKey, num> _latestValues = {};
+  final Map<PidKey, int> _lastPolledCycle = {};
+  final Map<PidKey, int> _consecutiveNoData = {};
+  final Set<PidKey> _quarantinedKeys = {};
   int _cycleCount = 0;
 
   final _updatesController =
       StreamController<({PidKey key, num value})>.broadcast();
+  final _cycleCompleteController =
+      StreamController<Map<PidKey, num>>.broadcast();
 
   bool _isPolling = false;
 
@@ -46,8 +54,27 @@ class PollingController {
 
   bool get isPolling => _isPolling;
   Map<PidKey, num> get latestValues => Map.unmodifiable(_latestValues);
+  Set<PidKey> get quarantinedKeys => Set.unmodifiable(_quarantinedKeys);
   Stream<({PidKey key, num value})> get updates => _updatesController.stream;
+  Stream<Map<PidKey, num>> get onCycleComplete =>
+      _cycleCompleteController.stream;
   int get cycleCount => _cycleCount;
+
+  /// Whether Smart High-Load Boost is currently active (RPM > 3000 or Rel Throttle > 50%).
+  bool get isHighLoadBoostActive {
+    final rpm = (_latestValues[PidKey.engineRpm] ?? 0).toDouble();
+    final rawThrottle = (_latestValues[PidKey.throttlePosition] ?? 0).toDouble();
+    final relThrottle = ((rawThrottle - 13.0) / (85.0 - 13.0) * 100.0).clamp(0.0, 100.0);
+    return rpm > 3000 || relThrottle > 50.0;
+  }
+
+  @visibleForTesting
+  void seedValueForTesting(PidKey key, num value, {int? polledAtCycle}) {
+    _latestValues[key] = value;
+    if (polledAtCycle != null) {
+      _lastPolledCycle[key] = polledAtCycle;
+    }
+  }
 
   static PidPriorityTier priorityFor(PidKey key) {
     switch (key) {
@@ -55,10 +82,11 @@ class PollingController {
       case PidKey.vehicleSpeed:
       case PidKey.throttlePosition:
       case PidKey.mafAirFlowRate:
-        return PidPriorityTier.high;
-
       case PidKey.engineLoad:
       case PidKey.shortTermFuelTrim1:
+        return PidPriorityTier.high;
+
+      case PidKey.longTermFuelTrim1:
       case PidKey.timingAdvance:
       case PidKey.intakeManifoldPressure:
       case PidKey.engineFuelRate:
@@ -69,7 +97,6 @@ class PollingController {
       case PidKey.intakeAirTemperature:
       case PidKey.adapterVoltage:
       case PidKey.fuelTankLevel:
-      case PidKey.longTermFuelTrim1:
       case PidKey.fuelPressure:
       case PidKey.barometricPressure:
       case PidKey.controlModuleVoltage:
@@ -96,6 +123,8 @@ class PollingController {
 
     final effective = <PidKey>{};
     for (final key in allRequested) {
+      if (_quarantinedKeys.contains(key)) continue;
+
       final definition = _registry.find(key);
       if (definition == null) continue;
 
@@ -108,21 +137,93 @@ class PollingController {
     return effective;
   }
 
-  /// Determines which keys to poll this cycle based on tiered priority.
+  /// Determines which keys to poll this cycle using interleaved overdue scheduling
+  /// and Smart High-Load Boost.
   /// Uninitialized keys are always included to ensure fast initial discovery.
   List<PidKey> computeScheduledKeys(Set<PidKey> effectiveKeys) {
-    return effectiveKeys.where((key) {
-      if (!_latestValues.containsKey(key)) return true;
-      final tier = priorityFor(key);
-      switch (tier) {
-        case PidPriorityTier.high:
-          return true;
-        case PidPriorityTier.normal:
-          return _cycleCount % 2 == 0;
-        case PidPriorityTier.low:
-          return _cycleCount % 8 == 0;
+    if (effectiveKeys.isEmpty) return const [];
+    _cycleCount++;
+
+    final scheduled = <PidKey>[];
+    final normalCandidates = <PidKey>[];
+    final lowCandidates = <PidKey>[];
+
+    for (final key in effectiveKeys) {
+      if (!_latestValues.containsKey(key) && !_lastPolledCycle.containsKey(key)) {
+        scheduled.add(key);
+        continue;
       }
-    }).toList();
+
+      switch (priorityFor(key)) {
+        case PidPriorityTier.high:
+          scheduled.add(key);
+        case PidPriorityTier.normal:
+          normalCandidates.add(key);
+        case PidPriorityTier.low:
+          lowCandidates.add(key);
+      }
+    }
+
+    int overdueCycles(PidKey key) =>
+        _cycleCount - (_lastPolledCycle[key] ?? 0);
+
+    normalCandidates.sort((a, b) => overdueCycles(b).compareTo(overdueCycles(a)));
+    lowCandidates.sort((a, b) => overdueCycles(b).compareTo(overdueCycles(a)));
+
+    final boostActive = isHighLoadBoostActive;
+
+    if (boostActive) {
+      // Smart High-Load Boost: yield Tier-3 slow slots to Normal tier (LTFT, Timing, MAP, Loop)
+      final dueNormal = normalCandidates
+          .where((k) => overdueCycles(k) >= 1)
+          .take(3);
+      for (final k in dueNormal) {
+        scheduled.add(k);
+        _lastPolledCycle[k] = _cycleCount;
+      }
+
+      // Preserve coolant thermal safety check every 12 cycles during sustained high RPM
+      if (lowCandidates.contains(PidKey.coolantTemperature) &&
+          overdueCycles(PidKey.coolantTemperature) >= 12) {
+        scheduled.add(PidKey.coolantTemperature);
+        _lastPolledCycle[PidKey.coolantTemperature] = _cycleCount;
+      }
+    } else {
+      // Standard Interleaved Pacing: up to 2 overdue normal keys + at most 1 overdue low key
+      final dueNormal = normalCandidates
+          .where((k) => overdueCycles(k) >= 2)
+          .take(2);
+      for (final k in dueNormal) {
+        scheduled.add(k);
+        _lastPolledCycle[k] = _cycleCount;
+      }
+
+      final dueLow = lowCandidates
+          .where((k) => overdueCycles(k) >= 8)
+          .take(1);
+      for (final k in dueLow) {
+        scheduled.add(k);
+        _lastPolledCycle[k] = _cycleCount;
+      }
+    }
+
+    // Fallback: if effectiveKeys only contains normal/low keys and none met the cycle threshold yet,
+    // schedule the most overdue key so single-key watchlists never spin idle.
+    if (scheduled.isEmpty) {
+      final allRemaining = [...normalCandidates, ...lowCandidates]
+        ..sort((a, b) => overdueCycles(b).compareTo(overdueCycles(a)));
+      if (allRemaining.isNotEmpty) {
+        final pick = allRemaining.first;
+        scheduled.add(pick);
+        _lastPolledCycle[pick] = _cycleCount;
+      }
+    }
+
+    for (final k in scheduled) {
+      _lastPolledCycle[k] = _cycleCount;
+    }
+
+    return scheduled;
   }
 
   void start() {
@@ -147,8 +248,8 @@ class PollingController {
         continue;
       }
 
-      _cycleCount++;
       final keys = computeScheduledKeys(effective);
+      var anyUpdatedInCycle = false;
 
       for (final key in keys) {
         if (!_isPolling) break;
@@ -177,6 +278,11 @@ class PollingController {
           }
 
           if (response.type == ElmResponseType.noData) {
+            final failures = (_consecutiveNoData[key] ?? 0) + 1;
+            _consecutiveNoData[key] = failures;
+            if (failures >= maxConsecutiveNoData) {
+              _quarantinedKeys.add(key);
+            }
             continue;
           }
 
@@ -186,9 +292,12 @@ class PollingController {
               'Polling ${definition.command} failed: ${response.type}',
             );
           }
+
+          _consecutiveNoData[key] = 0;
           final value = definition.decoder(response);
 
           _latestValues[key] = value;
+          anyUpdatedInCycle = true;
 
           if (!_updatesController.isClosed) {
             _updatesController.add((key: key, value: value));
@@ -205,11 +314,18 @@ class PollingController {
           return;
         }
       }
+
+      if (_isPolling &&
+          anyUpdatedInCycle &&
+          !_cycleCompleteController.isClosed) {
+        _cycleCompleteController.add(Map<PidKey, num>.unmodifiable(_latestValues));
+      }
     }
   }
 
   Future<void> dispose() async {
     stop();
     await _updatesController.close();
+    await _cycleCompleteController.close();
   }
 }
