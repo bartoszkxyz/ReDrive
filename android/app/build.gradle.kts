@@ -29,6 +29,22 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["appLabel"] = "ReDrive"
+    }
+
+    flavorDimensions += "default"
+
+    productFlavors {
+        create("headunit") {
+            dimension = "default"
+            applicationIdSuffix = ".headunit"
+            manifestPlaceholders["appLabel"] = "ReDrive Headunit"
+        }
+        create("phone") {
+            dimension = "default"
+            applicationIdSuffix = ".phone"
+            manifestPlaceholders["appLabel"] = "ReDrive Companion"
+        }
     }
 
     buildTypes {
@@ -40,13 +56,25 @@ android {
     }
 }
 
-tasks.matching { it.name == "assembleRelease" }.configureEach {
+tasks.matching { it.name.matches(Regex("assemble.*Release")) }.configureEach {
     doLast {
-        val gradleApkDir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
         val flutterApkDir = layout.buildDirectory.dir("outputs/flutter-apk").get().asFile
         if (!flutterApkDir.exists()) {
             flutterApkDir.mkdirs()
         }
+        val flavors = listOf("headunit", "phone")
+        for (flavor in flavors) {
+            val gradleFlavorDir = layout.buildDirectory.dir("outputs/apk/$flavor/release").get().asFile
+            val gradleSrc = File(gradleFlavorDir, "app-$flavor-release.apk")
+            val flutterSrc = File(flutterApkDir, "app-$flavor-release.apk")
+            val src = if (gradleSrc.exists()) gradleSrc else flutterSrc
+            if (src.exists()) {
+                val dest = File(flutterApkDir, "redrive-$flavor-v${flutter.versionName}+${flutter.versionCode}-release.apk")
+                src.copyTo(dest, overwrite = true)
+                logger.lifecycle("✓ Generated versioned release APK: ${dest.name} (${dest.length()} bytes)")
+            }
+        }
+        val gradleApkDir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
         val gradleSrc = File(gradleApkDir, "app-release.apk")
         val fallbackSrc = File(flutterApkDir, "app-release.apk")
         val src = if (gradleSrc.exists()) gradleSrc else fallbackSrc

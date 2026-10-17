@@ -1,0 +1,87 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Receiver boot permission -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Automotive & Headunit background start permissions -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- External storage permissions for exporting trip timeseries and dumps directly to /storage/emulated/0/ -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
+
+    <!-- Package visibility for Headunit Discovery Dump & Car Launcher App Drawer -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+    </queries>
+
+    <application>
+        <activity
+            android:name=".MainActivity"
+            android:screenOrientation="sensorLandscape">
+            <!-- Headunit Android Home Launcher Intent Filter -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <receiver
+            android:name=".HeadunitBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <!-- Standard Android Boot, Lock, Power -->
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.ACTION_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
+
+                <!-- Hardware triggers upon ignition -->
+                <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
+
+                <!-- FYT / SYU Headunits (Joying, Mekede, Teyes, etc.) -->
+                <action android:name="com.syu.action.ACC_ON" />
+                <action android:name="com.syu.action.ACC_OFF" />
+                <action android:name="com.fyt.action.ACC_ON" />
+                <action android:name="com.fyt.action.ACC_OFF" />
+                <action android:name="com.syu.boot" />
+
+                <!-- Microntek / MTC / HCT Headunits (PX5, PX6) -->
+                <action android:name="com.microntek.bootcheck" />
+                <action android:name="com.microntek.acc.on" />
+                <action android:name="com.microntek.acc.off" />
+                <action android:name="hct.bootcheck" />
+
+                <!-- Topway / Allwinner Headunits (TS10, TS18, T3, T5, T8) -->
+                <action android:name="com.android.boot.action.ACC_ON" />
+                <action android:name="com.android.boot.action.ACC_OFF" />
+                <action android:name="com.ts.main.action.ACC_ON" />
+                <action android:name="com.ts.main.action.ACC_OFF" />
+                <action android:name="com.topway.action.ACC_ON" />
+                <action android:name="com.topway.action.ACC_OFF" />
+                <action android:name="com.allwinner.boot.action.ACC_ON" />
+                <action android:name="com.allwinner.boot.action.ACC_OFF" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

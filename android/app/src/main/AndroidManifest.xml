@@ -5,47 +5,27 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
-        <!-- legacy for Android 11 or lower -->
+    <!-- legacy for Android 11 or lower -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
 
-        <!-- legacy for Android 9 or lower -->
+    <!-- legacy for Android 9 or lower -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="28" />
+
+    <!-- Network permissions for Phone companion tile maps and online spec parsing -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!-- Foreground Service permissions -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Automotive & Headunit background start permissions -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-
-    <!-- External storage permissions for exporting trip timeseries to /storage/emulated/0/ -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
-
-    <!-- Package visibility for Headunit Discovery Dump & Car Launcher App Drawer -->
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
-
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.LAUNCHER" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.HOME" />
-        </intent>
-    </queries>
-
     <application
-        android:label="redrive"
+        android:label="${appLabel}"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:requestLegacyExternalStorage="true"
@@ -85,51 +65,6 @@
             android:exported="true"
             android:foregroundServiceType="connectedDevice"
             tools:node="merge" />
-
-        <receiver
-            android:name=".HeadunitBootReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter>
-                <!-- Standard Android Boot, Lock, Power -->
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                <action android:name="android.intent.action.ACTION_BOOT_COMPLETED" />
-                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
-                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
-
-                <!-- Hardware triggers upon ignition -->
-                <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
-
-                <!-- FYT / SYU Headunits (Joying, Mekede, Teyes, etc.) -->
-                <action android:name="com.syu.action.ACC_ON" />
-                <action android:name="com.syu.action.ACC_OFF" />
-                <action android:name="com.fyt.action.ACC_ON" />
-                <action android:name="com.fyt.action.ACC_OFF" />
-                <action android:name="com.syu.boot" />
-
-                <!-- Microntek / MTC / HCT Headunits (PX5, PX6) -->
-                <action android:name="com.microntek.bootcheck" />
-                <action android:name="com.microntek.acc.on" />
-                <action android:name="com.microntek.acc.off" />
-                <action android:name="hct.bootcheck" />
-
-                <!-- Topway / Allwinner Headunits (TS10, TS18, T3, T5, T8) -->
-                <action android:name="com.android.boot.action.ACC_ON" />
-                <action android:name="com.android.boot.action.ACC_OFF" />
-                <action android:name="com.ts.main.action.ACC_ON" />
-                <action android:name="com.ts.main.action.ACC_OFF" />
-                <action android:name="com.topway.action.ACC_ON" />
-                <action android:name="com.topway.action.ACC_OFF" />
-                <action android:name="com.allwinner.boot.action.ACC_ON" />
-                <action android:name="com.allwinner.boot.action.ACC_OFF" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

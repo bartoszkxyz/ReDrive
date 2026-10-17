@@ -434,13 +434,9 @@ class _StatDivider extends StatelessWidget {
 class _PastTripCard extends StatefulWidget {
   final Trip trip;
   final VoidCallback onDelete;
-  final Future<List<String>> Function(Trip trip)? onExport;
-
   const _PastTripCard({
-    super.key,
     required this.trip,
     required this.onDelete,
-    this.onExport,
   });
 
   @override
@@ -472,12 +468,10 @@ class _PastTripCardState extends State<_PastTripCard> {
     setState(() => _isExporting = true);
     final tripProvider = context.read<TripProvider>();
     try {
-      final paths = widget.onExport != null
-          ? await widget.onExport!(widget.trip)
-          : await tripProvider.exportTripTimeseries(
-              widget.trip,
-              format: TimeseriesExportFormat.both,
-            );
+      final paths = await tripProvider.exportTripTimeseries(
+        widget.trip,
+        format: TimeseriesExportFormat.both,
+      );
 
       if (!context.mounted) return;
 

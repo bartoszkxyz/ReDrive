@@ -1,9 +1,11 @@
 import 'l10n/app_localizations.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:redrive/services/bluetooth/connection/bluetooth_obd_connection.dart';
 
+import 'core/app_flavor.dart';
 import 'providers/obd_provider.dart';
 import 'providers/bluetooth_provider.dart';
 import 'providers/trip_provider.dart';
@@ -16,10 +18,35 @@ import 'package:redrive/services/logging/log_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  final flavor = AppFlavor.fromString(appFlavor);
+  AppConfig.initialize(
+    flavor: flavor,
+    appTitle: flavor.isPhone ? 'ReDrive' : 'ReDrive Headunit',
+  );
+
+  if (flavor.isPhone) {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  } else {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+  }
+
   await LogService.init();
-  LogService.i('ReDrive application starting up', tag: 'App');
-  await initializeBackgroundService();
-  ObdBackgroundProxy().init();
+  LogService.i(
+    'ReDrive application starting up (flavor: ${flavor.name})',
+    tag: 'App',
+  );
+
+  if (flavor.isHeadunit) {
+    await initializeBackgroundService();
+    ObdBackgroundProxy().init();
+  }
 
   final bluetoothProvider = BluetoothProvider();
   final obdProvider = ObdProvider();
@@ -46,7 +73,7 @@ class RedriveApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Redrive OBD2',
+      title: AppConfig.current.appTitle,
       debugShowCheckedModeBanner: false,
       localizationsDelegates: const [AppLocalizations.delegate],
       supportedLocales: AppLocalizations.supportedLocales,
