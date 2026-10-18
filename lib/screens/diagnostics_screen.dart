@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/dtc_code.dart';
 import '../models/live_sensor_item.dart';
+import '../models/sync_models.dart';
+import '../models/vehicle_profile.dart';
 import '../obd/pid/pid_key.dart';
 import '../obd/pid/pid_registry.dart';
 import '../obd/polling/polling_controller.dart';
 import '../providers/obd_provider.dart';
+import '../providers/sync_provider.dart';
 import '../services/dtc/dtc_service.dart';
 import '../services/sensor/sensor_statistics_service.dart';
+import '../widget/companion/mechanic_report_sheet.dart';
 
 enum DiagnosticTabMode { dtc, liveSensors }
 
@@ -225,6 +229,38 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     }
   }
 
+  Future<void> _handleShareMechanicReport(BuildContext context) async {
+    SyncProvider? syncProvider;
+    try {
+      syncProvider = context.read<SyncProvider>();
+    } catch (_) {
+      syncProvider = null;
+    }
+
+    final stored = _dtcResults.where((d) => !d.isPending).toList();
+    final pending = _dtcResults.where((d) => d.isPending).toList();
+
+    final MechanicDiagnosticReport report;
+    if (syncProvider != null) {
+      report = await syncProvider.generateMechanicReport(
+        storedDtcs: stored,
+        pendingDtcs: pending,
+      );
+    } else {
+      report = MechanicDiagnosticReport(
+        reportId: 'rep_${DateTime.now().millisecondsSinceEpoch}',
+        generatedAt: DateTime.now(),
+        vehicle: VehicleProfile.defaultSuzukiSwiftM15A(),
+        currentOdometerKm: 150000.0,
+        storedDtcs: stored,
+        pendingDtcs: pending,
+      );
+    }
+
+    if (!context.mounted) return;
+    MechanicReportSheet.show(context, report: report);
+  }
+
   @override
   Widget build(BuildContext context) {
     final obdProvider = context.watch<ObdProvider>();
@@ -322,14 +358,17 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                                               : Colors.white70,
                                         ),
                                         const SizedBox(width: 6),
-                                        Text(
-                                          'Fault Codes (DTC)',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 12,
-                                            color: _mode == DiagnosticTabMode.dtc
-                                                ? colorScheme.onPrimary
-                                                : Colors.white70,
+                                        Flexible(
+                                          child: Text(
+                                            'Fault Codes (DTC)',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 12,
+                                              color: _mode == DiagnosticTabMode.dtc
+                                                  ? colorScheme.onPrimary
+                                                  : Colors.white70,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
                                       ],
@@ -361,14 +400,17 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                                               : Colors.white70,
                                         ),
                                         const SizedBox(width: 6),
-                                        Text(
-                                          'Live Sensors',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 12,
-                                            color: _mode == DiagnosticTabMode.liveSensors
-                                                ? colorScheme.onPrimary
-                                                : Colors.white70,
+                                        Flexible(
+                                          child: Text(
+                                            'Live Sensors',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 12,
+                                              color: _mode == DiagnosticTabMode.liveSensors
+                                                  ? colorScheme.onPrimary
+                                                  : Colors.white70,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
                                       ],
@@ -643,6 +685,19 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                               : () => _handleClearDtc(obdProvider),
                         ),
                       ],
+                      const SizedBox(width: 12),
+                      OutlinedButton.icon(
+                        key: const Key('generate_mechanic_report_button'),
+                        icon: const Icon(Icons.assignment_outlined, size: 20),
+                        label: const Text('Share Mechanic Report'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: colorScheme.primary,
+                          side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.6)),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => _handleShareMechanicReport(context),
+                      ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Text(
@@ -703,6 +758,22 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                             ),
                           ],
                         ],
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          key: const Key('generate_mechanic_report_button'),
+                          icon: const Icon(Icons.assignment_outlined, size: 20),
+                          label: const Text('Share Mechanic Report'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: colorScheme.primary,
+                            side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.6)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: () => _handleShareMechanicReport(context),
+                        ),
                       ),
                       if (!isConnected) ...[
                         const SizedBox(height: 10),

@@ -158,6 +158,28 @@ class FakeTripProvider extends ChangeNotifier implements TripProvider {
   }
 
   @override
+  Future<void> markTripsAsSynced(
+    Iterable<String> tripIds, {
+    int maxUnsyncedTrips = 35,
+    int maxSyncedTrips = 5,
+  }) async {
+    final ids = tripIds.toSet();
+    pastTrips = pastTrips
+        .map((t) => ids.contains(t.id) ? t.copyWith(isSynced: true) : t)
+        .toList();
+    notifyListeners();
+  }
+
+  @override
+  Future<void> ingestSyncedTrip(
+    Trip trip, {
+    List<String>? timeseriesLines,
+  }) async {
+    pastTrips = [trip.copyWith(isSynced: true), ...pastTrips];
+    notifyListeners();
+  }
+
+  @override
   Future<void> clearHistory() async {
     pastTrips = [];
     notifyListeners();

@@ -3,7 +3,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:redrive/screens/settings_screen.dart';
 
 class HeaderBar extends StatelessWidget {
-  const HeaderBar({super.key});
+  final Widget? trailing;
+  const HeaderBar({super.key, this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +15,16 @@ class HeaderBar extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         _LogoSection(colorScheme: colorScheme),
-        _SettingsButton(colorScheme: colorScheme),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (trailing != null) ...[
+              trailing!,
+              const SizedBox(width: 10),
+            ],
+            _SettingsButton(colorScheme: colorScheme),
+          ],
+        ),
       ],
     );
   }

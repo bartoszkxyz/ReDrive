@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:redrive/models/trip.dart';
 import 'package:redrive/models/trip_anomaly.dart';
-import 'package:redrive/obd/models/fuel_system_status.dart';
 import 'package:redrive/obd/models/obd_data.dart';
 import 'package:redrive/services/trip/trip_timeseries_service.dart';
 

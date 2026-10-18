@@ -10,6 +10,8 @@ import 'providers/garage_provider.dart';
 import 'providers/obd_provider.dart';
 import 'providers/bluetooth_provider.dart';
 import 'providers/trip_provider.dart';
+import 'providers/sync_provider.dart';
+import 'services/sync/bluetooth_sync_service.dart';
 import 'core/app_themes.dart';
 import 'screens/root_screen.dart';
 
@@ -57,6 +59,16 @@ void main() async {
   final tripProvider = TripProvider()..bindToObd(obdProvider);
   final garageProvider = GarageProvider()
     ..bindProviders(obdProvider: obdProvider, tripProvider: tripProvider);
+  final syncProvider = SyncProvider(
+    syncService: BluetoothSyncService(
+      deviceId: 'redrive_${flavor.name}_${DateTime.now().millisecondsSinceEpoch}',
+      deviceRole: flavor.name,
+    ),
+  )..bindProviders(
+      tripProvider: tripProvider,
+      garageProvider: garageProvider,
+      obdProvider: obdProvider,
+    );
 
   runApp(
     MultiProvider(
@@ -65,6 +77,7 @@ void main() async {
         ChangeNotifierProvider.value(value: obdProvider),
         ChangeNotifierProvider.value(value: tripProvider),
         ChangeNotifierProvider.value(value: garageProvider),
+        ChangeNotifierProvider.value(value: syncProvider),
       ],
       child: const RedriveApp(),
     ),

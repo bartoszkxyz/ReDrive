@@ -11,7 +11,11 @@ import 'package:redrive/widget/home_screen/engine_load_card.dart';
 import 'package:redrive/widget/home_screen/engine_temp_card.dart';
 import 'package:redrive/widget/home_screen/header_bar.dart';
 
+import 'package:redrive/core/app_flavor.dart';
 import 'package:redrive/obd/connection/tcp_obd_connection.dart';
+import 'package:redrive/providers/sync_provider.dart';
+import 'package:redrive/widget/companion/parked_car_status_card.dart';
+import 'package:redrive/widget/companion/sync_status_pill.dart';
 import '../providers/obd_provider.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -106,6 +110,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final obdProvider = context.watch<ObdProvider>();
     final tripProvider = context.watch<TripProvider>();
 
+    SyncProvider? syncProvider;
+    try {
+      syncProvider = context.watch<SyncProvider>();
+    } catch (_) {
+      syncProvider = null;
+    }
+
     final obdData = obdProvider.data;
     final activeTrip = tripProvider.activeTrip;
     final bool isDeviceConnected = obdProvider.isDeviceConnected;
@@ -128,6 +139,9 @@ class _HomeScreenState extends State<HomeScreen> {
       title: l.engineLoad,
     );
 
+    final showParkedCarCard = syncProvider?.latestSnapshot != null &&
+        (AppConfig.current.flavor.isPhone || syncProvider?.latestSnapshot != null);
+
     return Scaffold(
       backgroundColor: colorScheme.surface,
       body: SafeArea(
@@ -140,8 +154,23 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const HeaderBar(),
+                HeaderBar(
+                  trailing: syncProvider != null
+                      ? SyncStatusPill(
+                          connectionState: syncProvider.connectionState,
+                          lastSyncTime: syncProvider.lastSyncTime,
+                          onTap: () {
+                            syncProvider?.startSyncSession();
+                          },
+                        )
+                      : null,
+                ),
                 SizedBox(height: isWide ? 14 : 20),
+
+                if (showParkedCarCard) ...[
+                  ParkedCarStatusCard(snapshot: syncProvider!.latestSnapshot!),
+                  SizedBox(height: isWide ? 14 : 16),
+                ],
 
                 if (isWide) ...[
                   Row(

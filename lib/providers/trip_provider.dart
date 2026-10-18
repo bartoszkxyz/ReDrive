@@ -954,6 +954,65 @@ class TripProvider extends ChangeNotifier {
     await _loadHistory();
   }
 
+  /// Marks the specified [tripIds] as synced (`isSynced: true`), persists them to
+  /// history, and enforces the sync-aware timeseries retention policy.
+  Future<void> markTripsAsSynced(
+    Iterable<String> tripIds, {
+    int maxUnsyncedTrips = 35,
+    int maxSyncedTrips = 5,
+  }) async {
+    final idSet = tripIds.toSet();
+    if (idSet.isEmpty) return;
+
+    final loaded = await _historyService.loadTrips();
+    for (final trip in loaded) {
+      if (idSet.contains(trip.id) && !trip.isSynced) {
+        await _historyService.saveTrip(trip.copyWith(isSynced: true));
+      }
+    }
+
+    final updatedTrips = await _historyService.loadTrips();
+    final retainedIds = await _timeseriesService.enforceSyncAwareRetentionPolicy(
+      updatedTrips,
+      maxUnsyncedTrips: maxUnsyncedTrips,
+      maxSyncedTrips: maxSyncedTrips,
+    );
+    _pastTrips = updatedTrips
+        .map((t) => t.copyWith(hasTimeseries: retainedIds.contains(t.id)))
+        .toList();
+    notifyListeners();
+  }
+
+  /// Ingests a [trip] and optional raw `.jsonl` [timeseriesLines] received from
+  /// the Headunit onto the Phone Companion archive, retaining all synced timeseries.
+  Future<void> ingestSyncedTrip(
+    Trip trip, {
+    List<String>? timeseriesLines,
+  }) async {
+    bool hasTs = trip.hasTimeseries;
+    if (timeseriesLines != null && timeseriesLines.isNotEmpty) {
+      hasTs = await _timeseriesService.writeRawLines(trip.id, timeseriesLines);
+    } else {
+      hasTs = await _timeseriesService.hasTimeseries(trip.id);
+    }
+
+    final syncedTrip = trip.copyWith(
+      isSynced: true,
+      hasTimeseries: hasTs,
+    );
+    await _historyService.saveTrip(syncedTrip);
+
+    final updatedTrips = await _historyService.loadTrips();
+    final retainedIds = await _timeseriesService.enforceSyncAwareRetentionPolicy(
+      updatedTrips,
+      retainAll: true,
+    );
+    _pastTrips = updatedTrips
+        .map((t) => t.copyWith(hasTimeseries: retainedIds.contains(t.id)))
+        .toList();
+    notifyListeners();
+  }
+
   Future<void> clearHistory() async {
     await _timeseriesService.enforceRetentionPolicy(const []);
     await _historyService.clearAll();

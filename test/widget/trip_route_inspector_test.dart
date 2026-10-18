@@ -145,6 +145,28 @@ class _MockTripProvider extends ChangeNotifier implements TripProvider {
     pastTrips = [];
     notifyListeners();
   }
+
+  @override
+  Future<void> ingestSyncedTrip(
+    Trip trip, {
+    List<String>? timeseriesLines,
+  }) async {
+    pastTrips = [trip, ...pastTrips];
+    notifyListeners();
+  }
+
+  @override
+  Future<void> markTripsAsSynced(
+    Iterable<String> tripIds, {
+    int maxUnsyncedTrips = 35,
+    int maxSyncedTrips = 5,
+  }) async {
+    final idSet = tripIds.toSet();
+    pastTrips = pastTrips
+        .map((t) => idSet.contains(t.id) ? t.copyWith(isSynced: true) : t)
+        .toList();
+    notifyListeners();
+  }
 }
 
 Trip _createSampleTrip() {

@@ -500,6 +500,122 @@ class TripTimeseriesService {
     });
   }
 
+  /// Enforces a sync-aware retention policy on the Headunit Outbox or Phone Archive:
+  /// - Retains raw `.jsonl` files for up to [maxUnsyncedTrips] (default 35) unsynced trips
+  ///   (`!trip.isSynced`) in newest-first order.
+  /// - Retains raw `.jsonl` files for up to [maxSyncedTrips] (default 5) synced trips
+  ///   (`trip.isSynced`) in newest-first order.
+  /// - If [retainAll] is true (e.g., on the Phone Archive), retains all existing `.jsonl` files
+  ///   for trips in [orderedCompletedTrips].
+  /// Returns the Set of trip IDs that still have an existing non-empty `.jsonl` file on disk.
+  Future<Set<String>> enforceSyncAwareRetentionPolicy(
+    List<Trip> orderedCompletedTrips, {
+    int maxUnsyncedTrips = 35,
+    int maxSyncedTrips = 5,
+    bool retainAll = false,
+  }) async {
+    return _synchronized(() async {
+      final dir = await timeseriesDir;
+      if (!await dir.exists()) return {};
+
+      final keptTripIds = <String>{};
+      int unsyncedCount = 0;
+      int syncedCount = 0;
+
+      for (final trip in orderedCompletedTrips) {
+        final file = File('${dir.path}/trip_${trip.id}.jsonl');
+        if (await file.exists() && (await file.length()) > 0) {
+          if (retainAll) {
+            keptTripIds.add(trip.id);
+          } else if (!trip.isSynced) {
+            if (unsyncedCount < maxUnsyncedTrips) {
+              keptTripIds.add(trip.id);
+              unsyncedCount++;
+            }
+          } else {
+            if (syncedCount < maxSyncedTrips) {
+              keptTripIds.add(trip.id);
+              syncedCount++;
+            }
+          }
+        }
+      }
+
+      await for (final entity in dir.list()) {
+        if (entity is File) {
+          final fileName = entity.uri.pathSegments.last;
+          if (fileName.startsWith('trip_') && fileName.endsWith('.jsonl')) {
+            final tripId = fileName.substring(
+              'trip_'.length,
+              fileName.length - '.jsonl'.length,
+            );
+            if (tripId == _activeTripId) {
+              continue;
+            }
+            if (!keptTripIds.contains(tripId)) {
+              try {
+                await entity.delete();
+              } catch (_) {}
+            }
+          }
+        }
+      }
+
+      final remaining = <String>{};
+      await for (final entity in dir.list()) {
+        if (entity is File) {
+          final fileName = entity.uri.pathSegments.last;
+          if (fileName.startsWith('trip_') && fileName.endsWith('.jsonl')) {
+            if ((await entity.length()) > 0) {
+              final tripId = fileName.substring(
+                'trip_'.length,
+                fileName.length - '.jsonl'.length,
+              );
+              remaining.add(tripId);
+            }
+          }
+        }
+      }
+      return remaining;
+    });
+  }
+
+  /// Reads the raw non-empty `.jsonl` lines for [tripId] without re-serializing,
+  /// ideal for chunked Bluetooth sync transmission.
+  Future<List<String>> readRawLines(String tripId) async {
+    final file = await _fileForTrip(tripId);
+    if (!await file.exists()) return [];
+    final lines = <String>[];
+    try {
+      final stream = file
+          .openRead()
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
+      await for (final line in stream) {
+        final trimmed = line.trim();
+        if (trimmed.isNotEmpty) {
+          lines.add(trimmed);
+        }
+      }
+    } catch (_) {}
+    return lines;
+  }
+
+  /// Writes reassembled raw `.jsonl` lines for [tripId] atomically to disk
+  /// (used by the Phone Companion when receiving a synced trip timeseries).
+  Future<bool> writeRawLines(String tripId, List<String> lines) async {
+    return _synchronized(() async {
+      if (lines.isEmpty) return false;
+      final file = await _fileForTrip(tripId);
+      if (!await file.parent.exists()) {
+        await file.parent.create(recursive: true);
+      }
+      final content = '${lines.join('\n')}\n';
+      await file.writeAsString(content, mode: FileMode.write, flush: true);
+      return await file.exists() && (await file.length()) > 0;
+    });
+  }
+
   /// Checks if `<timeseriesDir>/trip_<tripId>.jsonl` exists and has length > 0.
   Future<bool> hasTimeseries(String tripId) async {
     final file = await _fileForTrip(tripId);

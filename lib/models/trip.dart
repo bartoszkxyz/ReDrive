@@ -21,6 +21,7 @@ class Trip {
   final List<String> recordedDtcs;
   final List<TripRoutePoint> routePoints;
   final bool hasTimeseries;
+  final bool isSynced;
   final bool isExported;
   final String? exportedPath;
 
@@ -42,6 +43,7 @@ class Trip {
     this.recordedDtcs = const [],
     this.routePoints = const [],
     this.hasTimeseries = false,
+    this.isSynced = false,
     this.isExported = false,
     this.exportedPath,
   });
@@ -72,6 +74,7 @@ class Trip {
     List<String>? recordedDtcs,
     List<TripRoutePoint>? routePoints,
     bool? hasTimeseries,
+    bool? isSynced,
     bool? isExported,
     String? exportedPath,
   }) =>
@@ -93,6 +96,7 @@ class Trip {
         recordedDtcs: recordedDtcs ?? this.recordedDtcs,
         routePoints: routePoints ?? this.routePoints,
         hasTimeseries: hasTimeseries ?? this.hasTimeseries,
+        isSynced: isSynced ?? this.isSynced,
         isExported: isExported ?? this.isExported,
         exportedPath: exportedPath ?? this.exportedPath,
       );
@@ -115,6 +119,7 @@ class Trip {
         'recordedDtcs': recordedDtcs,
         'routePoints': routePoints.map((p) => p.toJson()).toList(),
         'hasTimeseries': hasTimeseries,
+        'isSynced': isSynced,
         'isExported': isExported,
         'exportedPath': exportedPath,
         // Aliases for compatibility
@@ -210,6 +215,7 @@ class Trip {
       recordedDtcs: parsedDtcs,
       routePoints: parsedRoutePoints,
       hasTimeseries: _toBool(json['hasTimeseries']),
+      isSynced: _toBool(json['isSynced']),
       isExported: _toBool(json['isExported']),
       exportedPath: json['exportedPath']?.toString(),
     );
@@ -234,6 +240,7 @@ class Trip {
           problemCount == other.problemCount &&
           suspicionCount == other.suspicionCount &&
           hasTimeseries == other.hasTimeseries &&
+          isSynced == other.isSynced &&
           isExported == other.isExported &&
           exportedPath == other.exportedPath;
 
@@ -253,6 +260,7 @@ class Trip {
       problemCount.hashCode ^
       suspicionCount.hashCode ^
       hasTimeseries.hashCode ^
+      isSynced.hashCode ^
       isExported.hashCode ^
       (exportedPath?.hashCode ?? 0);
 
