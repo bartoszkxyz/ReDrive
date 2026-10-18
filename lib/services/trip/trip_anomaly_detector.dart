@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:redrive/models/dtc_code.dart';
 import 'package:redrive/models/trip_anomaly.dart';
+import 'package:redrive/models/vehicle_profile.dart';
 import 'package:redrive/obd/models/obd_data.dart';
 
 /// Evaluates real-time [ObdData] telemetry and [DtcCode] scans against
@@ -10,6 +11,13 @@ import 'package:redrive/obd/models/obd_data.dart';
 class TripAnomalyDetector {
   /// Merge window for contiguous or closely spaced breaches of the same rule.
   final Duration episodeMergeWindow;
+
+  VehicleProfile _vehicleProfile = VehicleProfile.defaultSuzukiSwiftM15A();
+  VehicleProfile get vehicleProfile => _vehicleProfile;
+
+  void applyVehicleProfile(VehicleProfile profile) {
+    _vehicleProfile = profile;
+  }
 
   final List<TripAnomalyEpisode> _episodes = [];
   final Set<String> _recordedDtcs = {};
@@ -66,10 +74,14 @@ class TripAnomalyDetector {
     _activeSuspicions.clear();
     var triggeredNewProblem = false;
 
+    final idleBase = _vehicleProfile.idleThrottleBaselinePercent;
+    final wotBase = _vehicleProfile.wotThrottleBaselinePercent > idleBase
+        ? _vehicleProfile.wotThrottleBaselinePercent
+        : 85.0;
     final effectiveRelThrottle = data.relativeThrottle > 0
         ? data.relativeThrottle
-        : (data.throttlePosition > 13.0
-            ? ((data.throttlePosition - 13.0) / (85.0 - 13.0) * 100.0)
+        : (data.throttlePosition > idleBase
+            ? ((data.throttlePosition - idleBase) / (wotBase - idleBase) * 100.0)
                 .clamp(0.0, 100.0)
             : 0.0);
 
@@ -92,8 +104,10 @@ class TripAnomalyDetector {
     // 1. Single-Metric Dashboard Thresholds
     // -------------------------------------------------------------------------
 
-    // 1a. Coolant Temperature (M15A normal: 82-98°C; 99-104°C suspicion; >104°C problem)
-    if (data.coolantTemp > 104) {
+    // 1a. Coolant Temperature (M15A default overheat=102°C -> problem >104°C, suspicion >=99°C)
+    final criticalCoolantC = _vehicleProfile.coolantOverheatTempC + 2;
+    final warningCoolantC = _vehicleProfile.coolantOverheatTempC - 3;
+    if (data.coolantTemp > criticalCoolantC) {
       _activeProblems.add('COOLANT_OVERHEAT');
       if (_recordOrMergeEpisode(
         ruleKey: 'thermal_coolant',
@@ -101,13 +115,13 @@ class TripAnomalyDetector {
         category: AnomalyCategory.thermal,
         title: 'Engine Overheating (${data.coolantTemp}°C)',
         description:
-            'Coolant temperature exceeded critical threshold (>104°C). Peak: ${data.coolantTemp}°C.',
+            'Coolant temperature exceeded critical threshold (>$criticalCoolantC°C). Peak: ${data.coolantTemp}°C.',
         timestamp: timestamp,
         metrics: baseMetrics,
       )) {
         triggeredNewProblem = true;
       }
-    } else if (data.coolantTemp >= 99) {
+    } else if (data.coolantTemp >= warningCoolantC) {
       _activeSuspicions.add('COOLANT_HIGH');
       _recordOrMergeEpisode(
         ruleKey: 'thermal_coolant',
@@ -115,7 +129,7 @@ class TripAnomalyDetector {
         category: AnomalyCategory.thermal,
         title: 'Elevated Coolant Temp (${data.coolantTemp}°C)',
         description:
-            'Coolant temperature entered warning range (99–104°C). Peak: ${data.coolantTemp}°C.',
+            'Coolant temperature entered warning range ($warningCoolantC–$criticalCoolantC°C). Peak: ${data.coolantTemp}°C.',
         timestamp: timestamp,
         metrics: baseMetrics,
       );

@@ -1,3 +1,5 @@
+import 'package:redrive/models/vehicle_profile.dart';
+
 /// Computes instantaneous fuel flow and fuel economy from OBD telemetry
 /// based on industry-standard SAE J1979 / ISO 15031-5 specifications.
 class FuelCalculator {
@@ -13,12 +15,30 @@ class FuelCalculator {
   /// User-adjustable calibration multiplier (e.g. 1.00 ± 0.15) for pump receipt reconciliation.
   final double calibrationFactor;
 
+  /// Baseline absolute throttle position (%) at closed-throttle idle.
+  final double idleThrottleBaselinePercent;
+
   const FuelCalculator({
     this.displacementLiters = 1.5,
     this.airFuelRatio = 14.7,
     this.fuelDensityGramsPerLiter = 820.0,
     this.calibrationFactor = 1.0,
+    this.idleThrottleBaselinePercent = 13.0,
   });
+
+  /// Creates a [FuelCalculator] calibrated from a [VehicleProfile].
+  factory FuelCalculator.fromVehicleProfile(
+    VehicleProfile profile, {
+    double calibrationFactor = 1.0,
+  }) {
+    return FuelCalculator(
+      displacementLiters: profile.displacementLiters,
+      airFuelRatio: profile.fuelType.defaultStoichAfr,
+      fuelDensityGramsPerLiter: profile.fuelType.defaultDensityGramsPerLiter,
+      calibrationFactor: calibrationFactor,
+      idleThrottleBaselinePercent: profile.idleThrottleBaselinePercent,
+    );
+  }
 
   /// Calculates instantaneous fuel flow in liters per hour (L/h).
   ///
@@ -41,9 +61,12 @@ class FuelCalculator {
 
     // Deceleration Fuel Cut-Off (DFCO):
     // When moving in gear at speed and coasting with throttle closed, the ECU completely shuts off injectors.
-    // Supports both relative throttle (< 1.0%) and Suzuki Swift 3 M15A absolute closed throttle (10% - 14%).
+    // Supports relative throttle (< 1.0%), Suzuki Swift 3 M15A absolute closed throttle (10% - 14%),
+    // and profile-specific idle throttle baseline (±2.5%).
     final isThrottleClosed = throttlePositionPercent < 1.0 ||
-        (throttlePositionPercent >= 10.0 && throttlePositionPercent <= 14.0);
+        (throttlePositionPercent >= 10.0 && throttlePositionPercent <= 14.0) ||
+        (throttlePositionPercent >= (idleThrottleBaselinePercent - 3.0) &&
+            throttlePositionPercent <= (idleThrottleBaselinePercent + 1.0));
     if (speedKmH > 20 &&
         rpm > 1300 &&
         isThrottleClosed &&

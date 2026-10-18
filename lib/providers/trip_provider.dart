@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:redrive/models/dtc_code.dart';
 import 'package:redrive/models/trip.dart';
 import 'package:redrive/models/trip_anomaly.dart';
+import 'package:redrive/models/vehicle_profile.dart';
 import 'package:redrive/obd/models/obd_data.dart';
 import 'package:redrive/providers/obd_provider.dart';
 import 'package:redrive/services/dtc/dtc_service.dart';
@@ -82,8 +83,24 @@ class TripProvider extends ChangeNotifier {
   final TripTimeseriesService _timeseriesService;
   final TripAnomalyDetector _anomalyDetector;
   final DtcService _dtcService;
-  final FuelCalculator _fuelCalculator;
+  FuelCalculator _fuelCalculator;
   DateTime Function() _clock;
+
+  VehicleProfile _activeVehicleProfile = VehicleProfile.defaultSuzukiSwiftM15A();
+  VehicleProfile get activeVehicleProfile => _activeVehicleProfile;
+  FuelCalculator get fuelCalculator => _fuelCalculator;
+
+  /// Updates the active vehicle profile used for fuel calculation, anomaly thresholds,
+  /// and cumulative odometer tracking.
+  void applyVehicleProfile(VehicleProfile profile) {
+    _activeVehicleProfile = profile;
+    _fuelCalculator = FuelCalculator.fromVehicleProfile(
+      profile,
+      calibrationFactor: _fuelCalculator.calibrationFactor,
+    );
+    _anomalyDetector.applyVehicleProfile(profile);
+    notifyListeners();
+  }
 
   List<Trip> _pastTrips = [];
   List<Trip> get pastTrips => _pastTrips;
@@ -409,6 +426,11 @@ class TripProvider extends ChangeNotifier {
 
   double get totalDistance =>
       _pastTrips.fold(0.0, (acc, t) => acc + t.distanceKm);
+
+  /// Total vehicle odometer (base odometer from active VehicleProfile + cumulative trip distance).
+  double get effectiveOdometerKm => _activeVehicleProfile.effectiveOdometerKm(
+        totalDistance + (_activeTrip.isActive ? _activeTrip.distanceKm : 0.0),
+      );
 
   double get totalFuelConsumed =>
       _pastTrips.fold(0.0, (acc, t) => acc + t.fuelConsumedLiters);

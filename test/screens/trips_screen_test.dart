@@ -4,10 +4,12 @@ import 'package:provider/provider.dart';
 import 'package:redrive/models/dtc_code.dart';
 import 'package:redrive/models/trip.dart';
 import 'package:redrive/models/trip_anomaly.dart';
+import 'package:redrive/models/vehicle_profile.dart';
 import 'package:redrive/obd/models/obd_data.dart';
 import 'package:redrive/providers/obd_provider.dart';
 import 'package:redrive/providers/trip_provider.dart';
 import 'package:redrive/screens/trips_screen.dart';
+import 'package:redrive/services/trip/fuel_calculator.dart';
 import 'package:redrive/services/trip/trip_anomaly_detector.dart';
 import 'package:redrive/services/trip/trip_timeseries_service.dart';
 
@@ -32,6 +34,23 @@ class FakeTripProvider extends ChangeNotifier implements TripProvider {
       '/storage/emulated/0/Download/ReDrive/re_drive_trip.json',
     ],
   }) : activeTrip = activeTrip ?? ActiveTripState.initial();
+
+  VehicleProfile _profile = VehicleProfile.defaultSuzukiSwiftM15A();
+
+  @override
+  VehicleProfile get activeVehicleProfile => _profile;
+
+  @override
+  FuelCalculator get fuelCalculator =>
+      FuelCalculator.fromVehicleProfile(_profile);
+
+  @override
+  void applyVehicleProfile(VehicleProfile profile) {
+    _profile = profile;
+  }
+
+  @override
+  double get effectiveOdometerKm => _profile.effectiveOdometerKm(totalDistance);
 
   @override
   double get totalDistance =>

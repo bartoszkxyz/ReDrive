@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:redrive/models/vehicle_profile.dart';
 import 'package:redrive/obd/pid/pid_key.dart';
 import 'package:redrive/obd/polling/polling_controller.dart';
 
@@ -109,11 +110,33 @@ class ObdProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  VehicleProfile _vehicleProfile = VehicleProfile.defaultSuzukiSwiftM15A();
+  VehicleProfile get vehicleProfile => _vehicleProfile;
+
+  void applyVehicleProfile(VehicleProfile profile) {
+    _vehicleProfile = profile;
+    if (_data.fuelLevelPercent > 0) {
+      final remainingL =
+          (_data.fuelLevelPercent / 100.0) * _vehicleProfile.fuelTankCapacityLiters;
+      final dte = _data.instantFuelL100km > 0.5
+          ? (remainingL / _data.instantFuelL100km) * 100.0
+          : (remainingL / 6.5) * 100.0;
+      _data = _data.copyWith(
+        remainingFuelLiters: remainingL,
+        estimatedRangeKm: dte,
+      );
+    }
+    _checkCoolantAlert(_data.coolantTemp);
+    notifyListeners();
+  }
+
   bool _isCoolantOverheating = false;
   bool get isCoolantOverheating => _isCoolantOverheating;
 
   void _checkCoolantAlert(int temp) {
-    if (!_isCoolantOverheating && temp > 102) {
+    final overheatThreshold = _vehicleProfile.coolantOverheatTempC;
+    final clearThreshold = overheatThreshold - 6;
+    if (!_isCoolantOverheating && temp > overheatThreshold) {
       _isCoolantOverheating = true;
       notifyListeners();
       try {
@@ -122,7 +145,7 @@ class ObdProvider extends ChangeNotifier {
           content: 'Coolant temperature is $temp°C! Reduce load immediately.',
         );
       } catch (_) {}
-    } else if (_isCoolantOverheating && temp < 96) {
+    } else if (_isCoolantOverheating && temp < clearThreshold) {
       _isCoolantOverheating = false;
       notifyListeners();
       try {
@@ -480,7 +503,7 @@ class ObdProvider extends ChangeNotifier {
 
       case PidKey.fuelTankLevel:
         final pct = update.value.toDouble().clamp(0.0, 100.0);
-        final remainingL = (pct / 100.0) * 45.0; // 45L tank for Suzuki Swift 3
+        final remainingL = (pct / 100.0) * _vehicleProfile.fuelTankCapacityLiters;
         final dte = _data.instantFuelL100km > 0.5
             ? (remainingL / _data.instantFuelL100km) * 100.0
             : (remainingL / 6.5) * 100.0;
@@ -498,13 +521,24 @@ class ObdProvider extends ChangeNotifier {
     }
 
     // Zero-Overhead Derived Metrics calculation
-    final relThrottle = ((_data.throttlePosition - 13.0) / (85.0 - 13.0) * 100.0).clamp(0.0, 100.0);
-    final hp = _data.maf > 0 ? (_data.maf * 1.25).clamp(0.0, 130.0) : 0.0;
+    final idleBase = _vehicleProfile.idleThrottleBaselinePercent;
+    final wotBase = _vehicleProfile.wotThrottleBaselinePercent > idleBase
+        ? _vehicleProfile.wotThrottleBaselinePercent
+        : 85.0;
+    final relThrottle =
+        ((_data.throttlePosition - idleBase) / (wotBase - idleBase) * 100.0)
+            .clamp(0.0, 100.0);
+    final hpClamp = _vehicleProfile.maxHorsepower > 102
+        ? (_vehicleProfile.maxHorsepower * 1.25)
+        : 130.0;
+    final hp = _data.maf > 0 ? (_data.maf * 1.25).clamp(0.0, hpClamp) : 0.0;
     final kw = hp * 0.7457;
     final torque = (_data.rpm > 500) ? ((kw * 9549.0) / _data.rpm).clamp(0.0, 180.0) : 0.0;
 
     final isThrottleClosed = _data.throttlePosition < 1.5 ||
         (_data.throttlePosition >= 10.0 && _data.throttlePosition <= 15.0) ||
+        (_data.throttlePosition >= (idleBase - 3.0) &&
+            _data.throttlePosition <= (idleBase + 2.0)) ||
         relThrottle <= 0.5;
     final isDfco = _data.speed > 20 &&
         _data.rpm > 1300 &&
