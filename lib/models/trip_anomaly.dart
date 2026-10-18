@@ -29,6 +29,9 @@ class TripAnomalyEpisode {
   final DateTime endTime;
   final Map<String, num> peakMetrics;
   final List<String> dtcCodes;
+  final double? latitude;
+  final double? longitude;
+  final double? elapsedSeconds;
 
   const TripAnomalyEpisode({
     required this.id,
@@ -40,6 +43,9 @@ class TripAnomalyEpisode {
     required this.endTime,
     this.peakMetrics = const {},
     this.dtcCodes = const [],
+    this.latitude,
+    this.longitude,
+    this.elapsedSeconds,
   });
 
   Duration get duration => endTime.difference(startTime);
@@ -54,6 +60,9 @@ class TripAnomalyEpisode {
     DateTime? endTime,
     Map<String, num>? peakMetrics,
     List<String>? dtcCodes,
+    double? latitude,
+    double? longitude,
+    double? elapsedSeconds,
   }) =>
       TripAnomalyEpisode(
         id: id ?? this.id,
@@ -65,6 +74,9 @@ class TripAnomalyEpisode {
         endTime: endTime ?? this.endTime,
         peakMetrics: peakMetrics ?? this.peakMetrics,
         dtcCodes: dtcCodes ?? this.dtcCodes,
+        latitude: latitude ?? this.latitude,
+        longitude: longitude ?? this.longitude,
+        elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
       );
 
   Map<String, dynamic> toJson() => {
@@ -77,6 +89,9 @@ class TripAnomalyEpisode {
         'endTime': endTime.toIso8601String(),
         'peakMetrics': peakMetrics,
         'dtcCodes': dtcCodes,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (elapsedSeconds != null) 'elapsedSeconds': elapsedSeconds,
       };
 
   factory TripAnomalyEpisode.fromJson(Map<String, dynamic> json) {
@@ -116,6 +131,18 @@ class TripAnomalyEpisode {
       }
     }
 
+    double? parseDoubleNullable(dynamic val) {
+      if (val == null) return null;
+      if (val is num) return val.toDouble();
+      return double.tryParse(val.toString());
+    }
+
+    final lat = parseDoubleNullable(json['latitude'] ?? json['lat']);
+    final lon = parseDoubleNullable(json['longitude'] ?? json['lon']);
+    final elapsed = parseDoubleNullable(
+      json['elapsedSeconds'] ?? json['elapsedSec'],
+    );
+
     final now = DateTime.now();
     return TripAnomalyEpisode(
       id: (json['id'] ?? '').toString(),
@@ -128,6 +155,9 @@ class TripAnomalyEpisode {
       endTime: DateTime.tryParse(json['endTime']?.toString() ?? '') ?? now,
       peakMetrics: parsedMetrics,
       dtcCodes: parsedDtcs,
+      latitude: lat,
+      longitude: lon,
+      elapsedSeconds: elapsed,
     );
   }
 
@@ -142,7 +172,10 @@ class TripAnomalyEpisode {
           title == other.title &&
           description == other.description &&
           startTime == other.startTime &&
-          endTime == other.endTime;
+          endTime == other.endTime &&
+          latitude == other.latitude &&
+          longitude == other.longitude &&
+          elapsedSeconds == other.elapsedSeconds;
 
   @override
   int get hashCode =>
@@ -152,5 +185,8 @@ class TripAnomalyEpisode {
       title.hashCode ^
       description.hashCode ^
       startTime.hashCode ^
-      endTime.hashCode;
+      endTime.hashCode ^
+      latitude.hashCode ^
+      longitude.hashCode ^
+      elapsedSeconds.hashCode;
 }

@@ -3,11 +3,14 @@ import 'package:flutter/foundation.dart';
 import 'package:redrive/models/dtc_code.dart';
 import 'package:redrive/models/trip.dart';
 import 'package:redrive/models/trip_anomaly.dart';
+import 'package:redrive/models/trip_route_point.dart';
 import 'package:redrive/models/vehicle_profile.dart';
 import 'package:redrive/obd/models/obd_data.dart';
 import 'package:redrive/providers/obd_provider.dart';
 import 'package:redrive/services/dtc/dtc_service.dart';
+import 'package:redrive/services/gps/gps_location_service.dart';
 import 'package:redrive/services/trip/fuel_calculator.dart';
+import 'package:redrive/services/trip/route_downsampler.dart';
 import 'package:redrive/services/trip/trip_anomaly_detector.dart';
 import 'package:redrive/services/trip/trip_history_service.dart';
 import 'package:redrive/services/trip/trip_timeseries_service.dart';
@@ -34,6 +37,7 @@ class ActiveTripState {
   final int suspicionCount;
   final List<TripAnomalyEpisode> anomalies;
   final List<String> recordedDtcs;
+  final List<TripRoutePoint> routePoints;
 
   const ActiveTripState({
     required this.isActive,
@@ -53,6 +57,7 @@ class ActiveTripState {
     this.suspicionCount = 0,
     this.anomalies = const [],
     this.recordedDtcs = const [],
+    this.routePoints = const [],
   });
 
   factory ActiveTripState.initial() => ActiveTripState(
@@ -73,22 +78,37 @@ class ActiveTripState {
         suspicionCount: 0,
         anomalies: const [],
         recordedDtcs: const [],
+        routePoints: const [],
       );
 }
 
 /// Provider managing real-time fuel consumption calculation, active trip accumulation,
-/// anomaly detection, timeseries recording, and past trip persistence.
+/// anomaly detection, timeseries recording, GPS route tracking, and past trip persistence.
 class TripProvider extends ChangeNotifier {
   final TripHistoryService _historyService;
   final TripTimeseriesService _timeseriesService;
   final TripAnomalyDetector _anomalyDetector;
   final DtcService _dtcService;
+  final GpsLocationService _gpsService;
+  final RouteDownsampler _routeDownsampler;
   FuelCalculator _fuelCalculator;
   DateTime Function() _clock;
 
   VehicleProfile _activeVehicleProfile = VehicleProfile.defaultSuzukiSwiftM15A();
   VehicleProfile get activeVehicleProfile => _activeVehicleProfile;
   FuelCalculator get fuelCalculator => _fuelCalculator;
+  GpsLocationService get gpsService => _gpsService;
+  GpsFix? _latestGpsFix;
+  GpsFix? get latestGpsFix => _latestGpsFix ?? _gpsService.lastFix;
+  List<TripRoutePoint> get activeRoutePoints => _routeDownsampler.points;
+  StreamSubscription<GpsFix>? _gpsSubscription;
+
+  /// Updates the latest GPS fix used for route downsampling, timeseries logging,
+  /// and anomaly coordinate tagging.
+  void updateGpsFix(GpsFix fix) {
+    _latestGpsFix = fix;
+    _gpsService.injectFix(fix);
+  }
 
   /// Updates the active vehicle profile used for fuel calculation, anomaly thresholds,
   /// and cumulative odometer tracking.
@@ -120,6 +140,7 @@ class TripProvider extends ChangeNotifier {
   int _sampleCount = 0;
   int _lastSpeed = 0;
   double? _lastFuelFlowLPerHour;
+  TripRoutePoint? _lastCandidateRoutePoint;
 
   StreamSubscription<ObdData>? _obdDataSubscription;
   ObdProvider? _boundObd;
@@ -143,6 +164,8 @@ class TripProvider extends ChangeNotifier {
     TripTimeseriesService? timeseriesService,
     TripAnomalyDetector? anomalyDetector,
     DtcService? dtcService,
+    GpsLocationService? gpsService,
+    RouteDownsampler? routeDownsampler,
     FuelCalculator? fuelCalculator,
     DateTime Function()? clock,
   })  : _historyService = historyService ?? TripHistoryService(),
@@ -153,9 +176,14 @@ class TripProvider extends ChangeNotifier {
             ),
         _anomalyDetector = anomalyDetector ?? TripAnomalyDetector(),
         _dtcService = dtcService ?? DtcService(),
+        _gpsService = gpsService ?? GpsLocationService(),
+        _routeDownsampler = routeDownsampler ?? RouteDownsampler(),
         _fuelCalculator =
             fuelCalculator ?? const FuelCalculator(displacementLiters: 1.5),
         _clock = clock ?? (() => DateTime.now()) {
+    _gpsSubscription = _gpsService.fixStream.listen((fix) {
+      _latestGpsFix = fix;
+    });
     _init();
     // Periodic ticker to smoothly update trip duration, active checkpointing, and auto-stop timeouts
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -198,6 +226,7 @@ class TripProvider extends ChangeNotifier {
             suspicionCount: _activeTrip.suspicionCount,
             anomalies: _activeTrip.anomalies,
             recordedDtcs: _activeTrip.recordedDtcs,
+            routePoints: _activeTrip.routePoints,
           );
         }
 
@@ -337,6 +366,18 @@ class TripProvider extends ChangeNotifier {
             }
           }
 
+          final parsedRoutePoints = <TripRoutePoint>[];
+          final rawRoutePoints = checkpoint['routePoints'];
+          if (rawRoutePoints is Iterable) {
+            for (final item in rawRoutePoints) {
+              if (item != null) {
+                try {
+                  parsedRoutePoints.add(TripRoutePoint.fromJson(item));
+                } catch (_) {}
+              }
+            }
+          }
+
           final recoveredTrip = Trip(
             id: recoveredId,
             startTime: startTime,
@@ -360,6 +401,7 @@ class TripProvider extends ChangeNotifier {
                     .length,
             anomalies: parsedAnomalies,
             recordedDtcs: parsedDtcs,
+            routePoints: parsedRoutePoints,
             hasTimeseries: hasTs,
           );
           await _historyService.saveTrip(recoveredTrip);
@@ -400,6 +442,7 @@ class TripProvider extends ChangeNotifier {
       'suspicionCount': _activeTrip.suspicionCount,
       'anomalies': _activeTrip.anomalies.map((a) => a.toJson()).toList(),
       'recordedDtcs': _activeTrip.recordedDtcs,
+      'routePoints': _routeDownsampler.points.map((p) => p.toJson()).toList(),
     };
     await _historyService.saveActiveCheckpoint(checkpointData);
   }
@@ -467,7 +510,20 @@ class TripProvider extends ChangeNotifier {
       }
 
       if (_activeTrip.isActive) {
-        processDataPoint(data);
+        GpsFix? demoFix;
+        if (obdProvider.mode == ObdMode.demo) {
+          final now = _clock();
+          final dt = _lastUpdateTime != null
+              ? (now.difference(_lastUpdateTime!).inMilliseconds / 1000.0)
+                  .clamp(0.1, 15.0)
+              : 1.0;
+          demoFix = _gpsService.advanceSimulatedRoute(
+            speedKmh: data.speed.toDouble(),
+            dtSeconds: dt,
+            timestamp: now,
+          );
+        }
+        processDataPoint(data, gpsFix: demoFix);
       }
     } else {
       if (_activeTrip.isActive) {
@@ -484,7 +540,10 @@ class TripProvider extends ChangeNotifier {
     _lastFuelFlowLPerHour = null;
     _rpmSum = 0;
     _sampleCount = 0;
+    _lastCandidateRoutePoint = null;
     _anomalyDetector.reset();
+    _routeDownsampler.reset();
+    _gpsService.startPlatformListening();
     _activeTripId = '${now.millisecondsSinceEpoch}';
 
     _activeTrip = ActiveTripState(
@@ -505,6 +564,7 @@ class TripProvider extends ChangeNotifier {
       suspicionCount: 0,
       anomalies: const [],
       recordedDtcs: const [],
+      routePoints: const [],
     );
 
     unawaited(_timeseriesService.startRecording(_activeTripId!, now));
@@ -512,19 +572,26 @@ class TripProvider extends ChangeNotifier {
 
     _updateNotificationInfo();
     LogService.i(
-      "Trip started. Tracking real-time fuel, distance, anomalies, and timeseries.",
+      "Trip started. Tracking real-time fuel, distance, anomalies, GPS route, and timeseries.",
       tag: 'Trip',
     );
     notifyListeners();
   }
 
   /// Processes an individual OBD data telemetry point into the active trip metrics.
-  /// Supports optional [timestamp] injection for deterministic simulated sequence testing.
-  void processDataPoint(ObdData data, {DateTime? timestamp}) {
+  /// Supports optional [timestamp] and [gpsFix] injection for deterministic simulated sequence testing.
+  void processDataPoint(
+    ObdData data, {
+    DateTime? timestamp,
+    GpsFix? gpsFix,
+  }) {
     if (timestamp != null) {
       _clock = () => timestamp;
     }
     final now = timestamp ?? _clock();
+    if (gpsFix != null) {
+      _latestGpsFix = gpsFix;
+    }
 
     // Initialize or align active trip start time on first sample or when inactive
     if (!_activeTrip.isActive) {
@@ -546,6 +613,7 @@ class TripProvider extends ChangeNotifier {
         maxRpm: 0,
         currentSpeed: 0,
         currentRpm: 0,
+        routePoints: const [],
       );
       _lastUpdateTime = timestamp;
     }
@@ -554,6 +622,10 @@ class TripProvider extends ChangeNotifier {
         ? (now.difference(_lastUpdateTime!).inMilliseconds / 1000.0).clamp(0.0, 15.0)
         : 1.0;
     _lastUpdateTime = now;
+
+    final rawDuration = now.difference(_activeTrip.startTime);
+    final duration = rawDuration.isNegative ? Duration.zero : rawDuration;
+    final elapsedSeconds = duration.inMicroseconds / 1000000.0;
 
     final speed = data.speed;
     final rpm = data.rpm;
@@ -601,7 +673,9 @@ class TripProvider extends ChangeNotifier {
     _sampleCount++;
     _rpmSum += rpm;
 
-    // Evaluate diagnostic anomalies & high-load power-loss rules
+    final activeFix = gpsFix ?? _latestGpsFix ?? _gpsService.lastFix;
+
+    // Evaluate diagnostic anomalies & high-load power-loss rules with GPS coordinate tagging
     final enrichedData = data.copyWith(
       instantFuelLPerHour: instantFuelLPerHour,
       instantFuelL100km: instantFuelL100km,
@@ -609,22 +683,46 @@ class TripProvider extends ChangeNotifier {
     final triggeredProblem = _anomalyDetector.evaluateSample(
       enrichedData,
       timestamp: now,
+      latitude: activeFix?.latitude,
+      longitude: activeFix?.longitude,
+      elapsedSeconds: elapsedSeconds,
     );
     if (triggeredProblem) {
       _triggerBackgroundDtcScanIfNeeded(now, isTripStart: false);
     }
 
-    // Record timeseries sample (coalescing rapid per-PID notifications within <350ms on live OBD)
+    // Record timeseries sample (with 1 Hz GPS coordinates when available)
     _timeseriesService.recordSample(
       enrichedData,
       timestamp: now,
       activeProblems: _anomalyDetector.activeProblems,
       activeSuspicions: _anomalyDetector.activeSuspicions,
       replaceLastIfWithinMs: timestamp == null ? 350 : null,
+      latitude: activeFix?.latitude,
+      longitude: activeFix?.longitude,
+      altitudeMeters: activeFix?.altitudeMeters,
+      gpsSpeedKmh: activeFix?.speedKmh,
     );
 
-    final rawDuration = now.difference(_activeTrip.startTime);
-    final duration = rawDuration.isNegative ? Duration.zero : rawDuration;
+    // Record lightweight route point (~1 pt / 5s or 25m) when GPS fix is available
+    if (activeFix != null) {
+      final candidatePoint = TripRoutePoint(
+        latitude: activeFix.latitude,
+        longitude: activeFix.longitude,
+        speedKmh: speed > 0 ? speed.toDouble() : (activeFix.speedKmh ?? 0.0),
+        rpm: rpm,
+        fuelRateLph: instantFuelLPerHour,
+        fuelL100km: instantFuelL100km,
+        engineLoadPercent: data.engineLoad,
+        coolantTempC: data.coolantTemp,
+        shortTermFuelTrim: data.shortTermFuelTrim,
+        longTermFuelTrim: data.longTermFuelTrim,
+        elapsedSeconds: elapsedSeconds,
+      );
+      _lastCandidateRoutePoint = candidatePoint;
+      _routeDownsampler.recordPoint(candidatePoint);
+    }
+
     final hours = duration.inMilliseconds / (3600.0 * 1000.0);
     final avgSpeed = hours > 0 ? newDistance / hours : speed.toDouble();
 
@@ -650,6 +748,7 @@ class TripProvider extends ChangeNotifier {
       suspicionCount: _anomalyDetector.suspicionCount,
       anomalies: _anomalyDetector.episodes,
       recordedDtcs: _anomalyDetector.recordedDtcs,
+      routePoints: _routeDownsampler.points,
     );
 
     notifyListeners();
@@ -660,13 +759,23 @@ class TripProvider extends ChangeNotifier {
     List<DtcCode> codes, {
     DateTime? timestamp,
     bool isTripStart = false,
+    GpsFix? gpsFix,
   }) {
     if (!_activeTrip.isActive) return;
     final now = timestamp ?? _clock();
+    if (gpsFix != null) {
+      _latestGpsFix = gpsFix;
+    }
+    final activeFix = gpsFix ?? _latestGpsFix ?? _gpsService.lastFix;
+    final rawElapsed = now.difference(_activeTrip.startTime).inMicroseconds / 1000000.0;
+    final elapsedSeconds = rawElapsed >= 0 ? rawElapsed : 0.0;
     _anomalyDetector.recordDtcs(
       codes,
       timestamp: now,
       isTripStart: isTripStart,
+      latitude: activeFix?.latitude,
+      longitude: activeFix?.longitude,
+      elapsedSeconds: elapsedSeconds,
     );
     _activeTrip = ActiveTripState(
       isActive: _activeTrip.isActive,
@@ -686,6 +795,7 @@ class TripProvider extends ChangeNotifier {
       suspicionCount: _anomalyDetector.suspicionCount,
       anomalies: _anomalyDetector.episodes,
       recordedDtcs: _anomalyDetector.recordedDtcs,
+      routePoints: _routeDownsampler.points,
     );
     notifyListeners();
   }
@@ -715,8 +825,12 @@ class TripProvider extends ChangeNotifier {
   }
 
   @visibleForTesting
-  void processDataPointForTesting(ObdData data, [DateTime? timestamp]) {
-    processDataPoint(data, timestamp: timestamp);
+  void processDataPointForTesting(
+    ObdData data, [
+    DateTime? timestamp,
+    GpsFix? gpsFix,
+  ]) {
+    processDataPoint(data, timestamp: timestamp, gpsFix: gpsFix);
   }
 
   Future<void> _finishTrip([DateTime? finishTime]) async {
@@ -724,6 +838,14 @@ class TripProvider extends ChangeNotifier {
     final duration = now.difference(_activeTrip.startTime);
     final tripId =
         _activeTripId ?? '${_activeTrip.startTime.millisecondsSinceEpoch}';
+
+    // Force-record the final route point if it differs from the last downsampled point
+    if (_lastCandidateRoutePoint != null) {
+      final pts = _routeDownsampler.points;
+      if (pts.isEmpty || pts.last != _lastCandidateRoutePoint) {
+        _routeDownsampler.recordPoint(_lastCandidateRoutePoint!, force: true);
+      }
+    }
 
     // Only save trip if distance traveled satisfies the configured minimum distance threshold (default 0.1 km)
     final meetsDistanceThreshold = _activeTrip.distanceKm >= _minTripDistanceKm;
@@ -753,6 +875,7 @@ class TripProvider extends ChangeNotifier {
         suspicionCount: _anomalyDetector.suspicionCount,
         anomalies: _anomalyDetector.episodes,
         recordedDtcs: _anomalyDetector.recordedDtcs,
+        routePoints: _routeDownsampler.points,
         hasTimeseries: hasTimeseries,
       );
 
@@ -761,6 +884,7 @@ class TripProvider extends ChangeNotifier {
       LogService.i(
         "Trip saved to history: ${trip.distanceKm.toStringAsFixed(2)} km, "
         "${trip.duration.inMinutes}m, avg fuel: ${trip.avgFuelConsumption.toStringAsFixed(1)} L/100km, "
+        "routePoints: ${trip.routePoints.length}, "
         "problems: ${trip.problemCount}, suspicions: ${trip.suspicionCount}",
         tag: 'Trip',
       );
@@ -780,9 +904,11 @@ class TripProvider extends ChangeNotifier {
     _lastDtcScanTime = null;
     _lastSpeed = 0;
     _lastFuelFlowLPerHour = null;
+    _lastCandidateRoutePoint = null;
     _engineOffTime = null;
     _disconnectTime = null;
     _anomalyDetector.reset();
+    _routeDownsampler.reset();
     _updateNotificationInfo();
     notifyListeners();
   }
@@ -848,6 +974,8 @@ class TripProvider extends ChangeNotifier {
     if (!_initCompleter.isCompleted) {
       _initCompleter.complete();
     }
+    _gpsSubscription?.cancel();
+    _gpsService.dispose();
     _obdDataSubscription?.cancel();
     _boundObd?.removeListener(_onObdProviderNotification);
     _ticker?.cancel();

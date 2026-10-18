@@ -4,11 +4,13 @@ import 'package:provider/provider.dart';
 import 'package:redrive/models/dtc_code.dart';
 import 'package:redrive/models/trip.dart';
 import 'package:redrive/models/trip_anomaly.dart';
+import 'package:redrive/models/trip_route_point.dart';
 import 'package:redrive/models/vehicle_profile.dart';
 import 'package:redrive/obd/models/obd_data.dart';
 import 'package:redrive/providers/obd_provider.dart';
 import 'package:redrive/providers/trip_provider.dart';
 import 'package:redrive/screens/trips_screen.dart';
+import 'package:redrive/services/gps/gps_location_service.dart';
 import 'package:redrive/services/trip/fuel_calculator.dart';
 import 'package:redrive/services/trip/trip_anomaly_detector.dart';
 import 'package:redrive/services/trip/trip_timeseries_service.dart';
@@ -36,6 +38,8 @@ class FakeTripProvider extends ChangeNotifier implements TripProvider {
   }) : activeTrip = activeTrip ?? ActiveTripState.initial();
 
   VehicleProfile _profile = VehicleProfile.defaultSuzukiSwiftM15A();
+  final GpsLocationService _gpsService = GpsLocationService();
+  GpsFix? _latestFix;
 
   @override
   VehicleProfile get activeVehicleProfile => _profile;
@@ -43,6 +47,20 @@ class FakeTripProvider extends ChangeNotifier implements TripProvider {
   @override
   FuelCalculator get fuelCalculator =>
       FuelCalculator.fromVehicleProfile(_profile);
+
+  @override
+  GpsLocationService get gpsService => _gpsService;
+
+  @override
+  GpsFix? get latestGpsFix => _latestFix;
+
+  @override
+  List<TripRoutePoint> get activeRoutePoints => activeTrip.routePoints;
+
+  @override
+  void updateGpsFix(GpsFix fix) {
+    _latestFix = fix;
+  }
 
   @override
   void applyVehicleProfile(VehicleProfile profile) {
@@ -97,16 +115,25 @@ class FakeTripProvider extends ChangeNotifier implements TripProvider {
   void updateFromObd(ObdProvider obdProvider) {}
 
   @override
-  void processDataPoint(ObdData data, {DateTime? timestamp}) {}
+  void processDataPoint(
+    ObdData data, {
+    DateTime? timestamp,
+    GpsFix? gpsFix,
+  }) {}
 
   @override
-  void processDataPointForTesting(ObdData data, [DateTime? timestamp]) {}
+  void processDataPointForTesting(
+    ObdData data, [
+    DateTime? timestamp,
+    GpsFix? gpsFix,
+  ]) {}
 
   @override
   void recordDtcCodes(
     List<DtcCode> codes, {
     DateTime? timestamp,
     bool isTripStart = false,
+    GpsFix? gpsFix,
   }) {}
 
   @override

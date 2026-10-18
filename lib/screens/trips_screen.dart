@@ -5,6 +5,7 @@ import 'package:redrive/models/trip.dart';
 import 'package:redrive/models/trip_anomaly.dart';
 import 'package:redrive/providers/trip_provider.dart';
 import 'package:redrive/services/trip/trip_timeseries_service.dart';
+import 'package:redrive/widget/trips/trip_route_inspector.dart';
 
 class TripsScreen extends StatelessWidget {
   const TripsScreen({super.key});
@@ -512,7 +513,9 @@ class _PastTripCardState extends State<_PastTripCard> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final trip = widget.trip;
-    final bool hasDetails = trip.anomalies.isNotEmpty || trip.recordedDtcs.isNotEmpty;
+    final bool hasDetails = trip.anomalies.isNotEmpty ||
+        trip.recordedDtcs.isNotEmpty ||
+        trip.hasRoute;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -581,6 +584,12 @@ class _PastTripCardState extends State<_PastTripCard> {
                           problemCount: trip.problemCount,
                           suspicionCount: trip.suspicionCount,
                         ),
+                        if (trip.hasRoute)
+                          _TimeseriesStatusBadge(
+                            label: 'GPS Route (${trip.routePoints.length} pts)',
+                            icon: Icons.map_rounded,
+                            color: Colors.lightBlueAccent,
+                          ),
                         if (trip.hasTimeseries)
                           const _TimeseriesStatusBadge(
                             label: 'Timeseries Recorded',
@@ -636,6 +645,10 @@ class _PastTripCardState extends State<_PastTripCard> {
                   color: Colors.white.withValues(alpha: 0.08),
                 ),
                 const SizedBox(height: 12),
+                if (trip.hasRoute) ...[
+                  TripRouteInspector(trip: trip),
+                  const SizedBox(height: 14),
+                ],
                 if (trip.recordedDtcs.isNotEmpty) ...[
                   Row(
                     children: [

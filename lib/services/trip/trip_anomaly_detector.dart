@@ -31,6 +31,10 @@ class TripAnomalyDetector {
   int _consecutiveTimingRetardUnderLoad = 0;
   int _episodeCounter = 0;
 
+  double? _lastLatitude;
+  double? _lastLongitude;
+  double? _lastElapsedSeconds;
+
   // Maps ruleKey -> index in _episodes for active/recent episode merging
   final Map<String, int> _lastEpisodeIndexByRule = {};
 
@@ -63,15 +67,27 @@ class TripAnomalyDetector {
     _consecutiveHighLoadShortfall = 0;
     _consecutiveTimingRetardUnderLoad = 0;
     _episodeCounter = 0;
+    _lastLatitude = null;
+    _lastLongitude = null;
+    _lastElapsedSeconds = null;
     _lastEpisodeIndexByRule.clear();
   }
 
   /// Evaluates a single [ObdData] sample at [timestamp].
   /// Returns `true` if a new [AnomalySeverity.problem] episode was created or
   /// upgraded from a suspicion on this sample.
-  bool evaluateSample(ObdData data, {required DateTime timestamp}) {
+  bool evaluateSample(
+    ObdData data, {
+    required DateTime timestamp,
+    double? latitude,
+    double? longitude,
+    double? elapsedSeconds,
+  }) {
     _activeProblems.clear();
     _activeSuspicions.clear();
+    _lastLatitude = latitude;
+    _lastLongitude = longitude;
+    _lastElapsedSeconds = elapsedSeconds;
     var triggeredNewProblem = false;
 
     final idleBase = _vehicleProfile.idleThrottleBaselinePercent;
@@ -423,7 +439,13 @@ class TripAnomalyDetector {
     List<DtcCode> dtcs, {
     required DateTime timestamp,
     bool isTripStart = false,
+    double? latitude,
+    double? longitude,
+    double? elapsedSeconds,
   }) {
+    final effLat = latitude ?? _lastLatitude;
+    final effLon = longitude ?? _lastLongitude;
+    final effElapsed = elapsedSeconds ?? _lastElapsedSeconds;
     for (final dtc in dtcs) {
       if (dtc.code.isEmpty) continue;
       final isAlreadyRecorded = _recordedDtcs.contains(dtc.code);
@@ -452,6 +474,9 @@ class TripAnomalyDetector {
           endTime: timestamp,
           peakMetrics: const {},
           dtcCodes: [dtc.code],
+          latitude: effLat,
+          longitude: effLon,
+          elapsedSeconds: effElapsed,
         ),
       );
     }
@@ -508,6 +533,9 @@ class TripAnomalyDetector {
               : existing.description,
           endTime: timestamp,
           peakMetrics: mergedMetrics,
+          latitude: existing.latitude ?? _lastLatitude,
+          longitude: existing.longitude ?? _lastLongitude,
+          elapsedSeconds: existing.elapsedSeconds ?? _lastElapsedSeconds,
         );
         return upgradedToProblem;
       }
@@ -523,6 +551,9 @@ class TripAnomalyDetector {
       startTime: timestamp,
       endTime: timestamp,
       peakMetrics: metrics,
+      latitude: _lastLatitude,
+      longitude: _lastLongitude,
+      elapsedSeconds: _lastElapsedSeconds,
     );
     _episodes.add(episode);
     _lastEpisodeIndexByRule[ruleKey] = _episodes.length - 1;

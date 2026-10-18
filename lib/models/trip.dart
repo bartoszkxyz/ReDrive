@@ -1,4 +1,5 @@
 import 'package:redrive/models/trip_anomaly.dart';
+import 'package:redrive/models/trip_route_point.dart';
 
 /// Represents a recorded driving trip with telemetry, fuel consumption history,
 /// diagnostic anomaly episodes, and timeseries recording metadata.
@@ -18,6 +19,7 @@ class Trip {
   final int suspicionCount;
   final List<TripAnomalyEpisode> anomalies;
   final List<String> recordedDtcs;
+  final List<TripRoutePoint> routePoints;
   final bool hasTimeseries;
   final bool isExported;
   final String? exportedPath;
@@ -38,10 +40,13 @@ class Trip {
     this.suspicionCount = 0,
     this.anomalies = const [],
     this.recordedDtcs = const [],
+    this.routePoints = const [],
     this.hasTimeseries = false,
     this.isExported = false,
     this.exportedPath,
   });
+
+  bool get hasRoute => routePoints.length >= 2;
 
   // Getter aliases for Requirement R2 compatibility
   double get averageSpeedKmH => avgSpeed;
@@ -65,6 +70,7 @@ class Trip {
     int? suspicionCount,
     List<TripAnomalyEpisode>? anomalies,
     List<String>? recordedDtcs,
+    List<TripRoutePoint>? routePoints,
     bool? hasTimeseries,
     bool? isExported,
     String? exportedPath,
@@ -85,6 +91,7 @@ class Trip {
         suspicionCount: suspicionCount ?? this.suspicionCount,
         anomalies: anomalies ?? this.anomalies,
         recordedDtcs: recordedDtcs ?? this.recordedDtcs,
+        routePoints: routePoints ?? this.routePoints,
         hasTimeseries: hasTimeseries ?? this.hasTimeseries,
         isExported: isExported ?? this.isExported,
         exportedPath: exportedPath ?? this.exportedPath,
@@ -106,6 +113,7 @@ class Trip {
         'suspicionCount': suspicionCount,
         'anomalies': anomalies.map((a) => a.toJson()).toList(),
         'recordedDtcs': recordedDtcs,
+        'routePoints': routePoints.map((p) => p.toJson()).toList(),
         'hasTimeseries': hasTimeseries,
         'isExported': isExported,
         'exportedPath': exportedPath,
@@ -155,6 +163,18 @@ class Trip {
       }
     }
 
+    final parsedRoutePoints = <TripRoutePoint>[];
+    final rawRoutePoints = json['routePoints'];
+    if (rawRoutePoints is Iterable) {
+      for (final item in rawRoutePoints) {
+        if (item != null) {
+          try {
+            parsedRoutePoints.add(TripRoutePoint.fromJson(item));
+          } catch (_) {}
+        }
+      }
+    }
+
     final defaultProblems = parsedAnomalies
         .where((a) => a.severity == AnomalySeverity.problem)
         .length;
@@ -188,6 +208,7 @@ class Trip {
           : defaultSuspicions,
       anomalies: parsedAnomalies,
       recordedDtcs: parsedDtcs,
+      routePoints: parsedRoutePoints,
       hasTimeseries: _toBool(json['hasTimeseries']),
       isExported: _toBool(json['isExported']),
       exportedPath: json['exportedPath']?.toString(),

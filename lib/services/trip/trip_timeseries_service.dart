@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:redrive/models/trip.dart';
-import 'package:redrive/obd/models/fuel_system_status.dart';
 import 'package:redrive/obd/models/obd_data.dart';
 
 /// Supported export formats for trip timeseries data.
@@ -23,6 +22,10 @@ class TripTimeseriesSample {
   final ObdData data;
   final List<String> activeProblems;
   final List<String> activeSuspicions;
+  final double? latitude;
+  final double? longitude;
+  final double? altitudeMeters;
+  final double? gpsSpeedKmh;
 
   const TripTimeseriesSample({
     required this.timestamp,
@@ -30,11 +33,19 @@ class TripTimeseriesSample {
     required this.data,
     this.activeProblems = const [],
     this.activeSuspicions = const [],
+    this.latitude,
+    this.longitude,
+    this.altitudeMeters,
+    this.gpsSpeedKmh,
   });
 
   Map<String, dynamic> toJson() => {
         'timestamp': timestamp.toIso8601String(),
         'elapsedSeconds': elapsedSeconds,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (altitudeMeters != null) 'altitudeMeters': altitudeMeters,
+        if (gpsSpeedKmh != null) 'gpsSpeedKmh': gpsSpeedKmh,
         'rpm': data.rpm,
         'speed': data.speed,
         'coolantTemp': data.coolantTemp,
@@ -93,6 +104,19 @@ class TripTimeseriesSample {
       estimatedRangeKm: _toDouble(json['estimatedRangeKm']),
     );
 
+    double? parseDoubleNullable(dynamic val) {
+      if (val == null) return null;
+      if (val is num) return val.toDouble();
+      return double.tryParse(val.toString());
+    }
+
+    final lat = parseDoubleNullable(json['latitude'] ?? json['lat']);
+    final lon = parseDoubleNullable(json['longitude'] ?? json['lon']);
+    final alt = parseDoubleNullable(
+      json['altitudeMeters'] ?? json['altitude'] ?? json['alt'],
+    );
+    final gpsSpd = parseDoubleNullable(json['gpsSpeedKmh'] ?? json['gpsSpeed']);
+
     return TripTimeseriesSample(
       timestamp: DateTime.tryParse(json['timestamp']?.toString() ?? '') ??
           DateTime.now(),
@@ -100,6 +124,10 @@ class TripTimeseriesSample {
       data: obdData,
       activeProblems: _toStringList(json['activeProblems']),
       activeSuspicions: _toStringList(json['activeSuspicions']),
+      latitude: lat,
+      longitude: lon,
+      altitudeMeters: alt,
+      gpsSpeedKmh: gpsSpd,
     );
   }
 
@@ -191,7 +219,11 @@ class TripTimeseriesSample {
           (elapsedSeconds - other.elapsedSeconds).abs() < 1e-6 &&
           _obdEquals(data, other.data) &&
           _listEquals(activeProblems, other.activeProblems) &&
-          _listEquals(activeSuspicions, other.activeSuspicions);
+          _listEquals(activeSuspicions, other.activeSuspicions) &&
+          latitude == other.latitude &&
+          longitude == other.longitude &&
+          altitudeMeters == other.altitudeMeters &&
+          gpsSpeedKmh == other.gpsSpeedKmh;
 
   @override
   int get hashCode => Object.hash(
@@ -203,6 +235,10 @@ class TripTimeseriesSample {
         data.coolantTemp,
         Object.hashAll(activeProblems),
         Object.hashAll(activeSuspicions),
+        latitude,
+        longitude,
+        altitudeMeters,
+        gpsSpeedKmh,
       );
 
   @override
@@ -304,7 +340,7 @@ class TripTimeseriesService {
           await file.parent.create(recursive: true);
         }
         final content =
-            prevBuffer.map((s) => jsonEncode(s.toJson())).join('\n') + '\n';
+            '${prevBuffer.map((s) => jsonEncode(s.toJson())).join('\n')}\n';
         await file.writeAsString(content, mode: FileMode.append, flush: true);
       });
     }
@@ -320,6 +356,10 @@ class TripTimeseriesService {
     List<String> activeProblems = const [],
     List<String> activeSuspicions = const [],
     int? replaceLastIfWithinMs,
+    double? latitude,
+    double? longitude,
+    double? altitudeMeters,
+    double? gpsSpeedKmh,
   }) {
     final now = timestamp ?? DateTime.now();
     final start = _activeTripStartTime ?? now;
@@ -333,6 +373,10 @@ class TripTimeseriesService {
       data: data,
       activeProblems: List.unmodifiable(activeProblems),
       activeSuspicions: List.unmodifiable(activeSuspicions),
+      latitude: latitude,
+      longitude: longitude,
+      altitudeMeters: altitudeMeters,
+      gpsSpeedKmh: gpsSpeedKmh,
     );
 
     if (replaceLastIfWithinMs != null && _buffer.isNotEmpty) {
@@ -359,7 +403,7 @@ class TripTimeseriesService {
       await file.parent.create(recursive: true);
     }
     final content =
-        _buffer.map((s) => jsonEncode(s.toJson())).join('\n') + '\n';
+        '${_buffer.map((s) => jsonEncode(s.toJson())).join('\n')}\n';
     await file.writeAsString(content, mode: FileMode.append, flush: true);
     _buffer.clear();
   }
@@ -456,13 +500,13 @@ class TripTimeseriesService {
     });
   }
 
-  /// Checks if <timeseriesDir>/trip_<tripId>.jsonl exists and has length > 0.
+  /// Checks if `<timeseriesDir>/trip_<tripId>.jsonl` exists and has length > 0.
   Future<bool> hasTimeseries(String tripId) async {
     final file = await _fileForTrip(tripId);
     return await file.exists() && (await file.length()) > 0;
   }
 
-  /// Reads <timeseriesDir>/trip_<tripId>.jsonl line-by-line, skipping blank or malformed lines gracefully.
+  /// Reads `<timeseriesDir>/trip_<tripId>.jsonl` line-by-line, skipping blank or malformed lines gracefully.
   Future<List<TripTimeseriesSample>> readSamples(String tripId) async {
     final file = await _fileForTrip(tripId);
     if (!await file.exists()) return [];
@@ -495,7 +539,7 @@ class TripTimeseriesService {
     return samples;
   }
 
-  /// Deletes trip_<tripId>.jsonl if it exists.
+  /// Deletes `trip_<tripId>.jsonl` if it exists.
   Future<void> deleteTimeseries(String tripId) async {
     final file = await _fileForTrip(tripId);
     if (await file.exists()) {
@@ -708,7 +752,7 @@ class TripTimeseriesService {
     final hh = dt.hour.toString().padLeft(2, '0');
     final mm = dt.minute.toString().padLeft(2, '0');
     final ss = dt.second.toString().padLeft(2, '0');
-    return '${y}${m}${d}_${hh}${mm}${ss}';
+    return '$y$m${d}_$hh$mm$ss';
   }
 
   static String _toCsvField(dynamic value) {
