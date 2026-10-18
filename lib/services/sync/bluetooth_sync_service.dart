@@ -115,6 +115,7 @@ class SyncDataDelegate {
     List<VehicleProfile> vehicles,
     String activeVehicleId,
   ) onGarageDataReceived;
+  final Future<void> Function(Map<String, dynamic> themePayload)? onThemeReceived;
 
   const SyncDataDelegate({
     required this.getLocalTrips,
@@ -127,6 +128,7 @@ class SyncDataDelegate {
     required this.onMechanicReportReceived,
     required this.getGarageData,
     required this.onGarageDataReceived,
+    this.onThemeReceived,
   });
 }
 
@@ -425,6 +427,9 @@ class BluetoothSyncService {
         case SyncFrameType.garageSync:
           await _handleGarageSyncFrame(frame);
           break;
+        case SyncFrameType.themeSync:
+          await _handleThemeSyncFrame(frame);
+          break;
         case SyncFrameType.syncAck:
           await _handleSyncAckFrame(frame);
           break;
@@ -449,6 +454,23 @@ class BluetoothSyncService {
       LogService.e('Error handling sync frame ${frame.type}: $e', tag: 'Sync');
       _lastError = e.toString();
       _setState(SyncConnectionState.error);
+    }
+  }
+
+  /// Pushes a custom dashboard theme JSON payload to the peer headunit.
+  Future<bool> pushCustomTheme(Map<String, dynamic> themePayload) async {
+    if (_transport == null || _state == SyncConnectionState.disconnected) {
+      _lastError = 'Cannot push theme: Bluetooth sync not connected';
+      return false;
+    }
+    _sendFrame(SyncFrame.themeSync(themePayload));
+    return true;
+  }
+
+  Future<void> _handleThemeSyncFrame(SyncFrame frame) async {
+    final payload = frame.payload;
+    if (payload.isNotEmpty) {
+      await _delegate?.onThemeReceived?.call(payload);
     }
   }
 

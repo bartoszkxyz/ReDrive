@@ -4,6 +4,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:redrive/core/theme/custom_dashboard_theme.dart';
+import 'package:redrive/core/theme/theme_engine.dart';
+import 'package:redrive/providers/sync_provider.dart';
 import 'package:redrive/l10n/app_localizations.dart';
 import 'package:redrive/providers/obd_provider.dart';
 import 'package:redrive/providers/trip_provider.dart';
@@ -235,6 +238,204 @@ class _SettingsSheetState extends State<SettingsSheet> {
     );
   }
 
+  void _showThemeManagementSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (modalContext) {
+        final colorScheme = Theme.of(context).colorScheme;
+        ThemeEngine? themeEngine;
+        SyncProvider? syncProvider;
+        try {
+          themeEngine = context.read<ThemeEngine>();
+        } catch (_) {}
+        try {
+          syncProvider = context.read<SyncProvider>();
+        } catch (_) {}
+
+        final activeTheme = themeEngine?.currentTheme ?? CustomDashboardTheme.defaultTheme();
+        final textController = TextEditingController();
+
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Container(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: colorScheme.onSurface.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Cockpit Theme Management',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(modalContext),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Active Theme: ${activeTheme.name} (${activeTheme.id})',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Preset Switcher
+                  Text(
+                    'Built-in Presets',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      ActionChip(
+                        label: const Text('Neon Lime (Default)'),
+                        onPressed: () async {
+                          await themeEngine?.resetToDefault();
+                          if (ctx.mounted) Navigator.pop(modalContext);
+                        },
+                      ),
+                      ActionChip(
+                        label: const Text('Suzuki Sport Red'),
+                        onPressed: () async {
+                          await themeEngine?.applyTheme(CustomDashboardTheme.sportRed());
+                          if (ctx.mounted) Navigator.pop(modalContext);
+                        },
+                      ),
+                      ActionChip(
+                        label: const Text('Stealth OLED'),
+                        onPressed: () async {
+                          await themeEngine?.applyTheme(CustomDashboardTheme.stealthOled());
+                          if (ctx.mounted) Navigator.pop(modalContext);
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Push theme over Bluetooth
+                  if (syncProvider != null) ...[
+                    ElevatedButton.icon(
+                      key: const Key('push_theme_to_headunit_btn'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: colorScheme.primary,
+                        foregroundColor: colorScheme.onPrimary,
+                        minimumSize: const Size.fromHeight(46),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: const Icon(Icons.bluetooth_searching_rounded),
+                      label: const Text('Push Active Theme to Headunit over BT'),
+                      onPressed: () async {
+                        final ok = await syncProvider!.pushCustomTheme(activeTheme);
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(ok
+                                  ? 'Custom theme successfully pushed to Headunit!'
+                                  : 'Could not push theme: verify Bluetooth connection'),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Paste Theme JSON
+                  Text(
+                    'Import Theme from JSON String',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    key: const Key('theme_json_input_field'),
+                    controller: textController,
+                    maxLines: 3,
+                    style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                    decoration: InputDecoration(
+                      hintText: 'Paste custom theme JSON here...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.all(12),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    key: const Key('import_theme_json_btn'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colorScheme.surfaceContainerHighest,
+                      foregroundColor: colorScheme.onSurface,
+                      minimumSize: const Size.fromHeight(42),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () async {
+                      final str = textController.text.trim();
+                      if (str.isEmpty) return;
+                      final ok = await themeEngine?.importThemeFromJsonString(str) ?? false;
+                      if (ctx.mounted) {
+                        Navigator.pop(modalContext);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(ok
+                                ? 'Theme imported and applied!'
+                                : 'Invalid theme JSON structure'),
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Apply Imported JSON'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -404,9 +605,22 @@ class _SettingsSheetState extends State<SettingsSheet> {
                         _SettingsTile(
                           icon: Icons.info_outline_rounded,
                           label: 'App Version',
-                          subtitle: 'ReDrive Telemetry & Diagnostics',
-                          trailingText: 'v1.2.0+6',
+                          subtitle: 'OBDrive Telemetry & Cockpit Launcher',
+                          trailingText: 'v2.0.0+7',
                           colorScheme: colorScheme,
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Cockpit Theme Management
+                        _SettingsTile(
+                          icon: Icons.palette_rounded,
+                          label: 'Cockpit Theme',
+                          subtitle: 'Custom styling • Tap to manage or push',
+                          trailingText: 'Manage',
+                          colorScheme: colorScheme,
+                          onTap: () {
+                            _showThemeManagementSheet(context);
+                          },
                         ),
                         const SizedBox(height: 10),
 

@@ -75,9 +75,20 @@ class HeadunitBootReceiver : BroadcastReceiver() {
         try {
             val serviceIntent = Intent(context, BackgroundService::class.java)
             ContextCompat.startForegroundService(context, serviceIntent)
-            Log.i(TAG, "ReDrive BackgroundService started from headunit wake event ($action)")
+            Log.i(TAG, "OBDrive BackgroundService started from headunit wake event ($action)")
         } catch (e: Exception) {
             Log.e(TAG, "Error starting background service on headunit wake", e)
+        }
+
+        // 3b. Auto-start HD DVR background recording service (com.ankai.cardvr)
+        try {
+            val dvrIntent = Intent().apply {
+                setClassName("com.ankai.cardvr", "com.ankai.cardvr.MainService")
+            }
+            context.startService(dvrIntent)
+            Log.i(TAG, "Triggered HD DVR background service start on wake")
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not auto-start HD DVR service: ${e.message}")
         }
 
         // 4. Auto-Startup: Start ReDrive (silently in background by default, or onto screen if user enabled auto-launch)

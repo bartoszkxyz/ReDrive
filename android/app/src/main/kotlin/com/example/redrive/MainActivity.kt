@@ -74,9 +74,152 @@ class MainActivity : FlutterActivity() {
                         }.start()
                     }
 
+                    "launchApp" -> {
+                        val packageName = call.argument<String>("packageName")
+                        val activityName = call.argument<String>("activityName")
+                        if (packageName.isNullOrBlank()) {
+                            result.error("INVALID_ARGS", "packageName is required", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            val success = launchApplication(packageName, activityName)
+                            result.success(success)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to launch $packageName", e)
+                            result.error("LAUNCH_FAILED", e.message, null)
+                        }
+                    }
+
+                    "getInstalledApps" -> {
+                        Thread {
+                            try {
+                                val apps = queryLaunchableApplications()
+                                runOnUiThread {
+                                    result.success(apps)
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to query launchable apps", e)
+                                runOnUiThread {
+                                    result.error("QUERY_FAILED", e.message, null)
+                                }
+                            }
+                        }.start()
+                    }
+
+                    "startDvrService" -> {
+                        try {
+                            val success = startDvrBackgroundService()
+                            result.success(success)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to start DVR background service", e)
+                            result.error("DVR_START_FAILED", e.message, null)
+                        }
+                    }
+
+                    "isDvrRunning" -> {
+                        try {
+                            val running = isDvrServiceRunning()
+                            result.success(running)
+                        } catch (e: Exception) {
+                            result.success(false)
+                        }
+                    }
+
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun launchApplication(packageName: String, activityName: String?): Boolean {
+        val pm = packageManager
+        val intent = if (!activityName.isNullOrBlank()) {
+            Intent(Intent.ACTION_MAIN).apply {
+                setClassName(packageName, activityName)
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+            }
+        } else {
+            pm.getLaunchIntentForPackage(packageName)?.apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+            }
+        }
+
+        if (intent != null) {
+            startActivity(intent)
+            return true
+        }
+        return false
+    }
+
+    private fun queryLaunchableApplications(): List<Map<String, Any?>> {
+        val pm = packageManager
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val resolveInfos = pm.queryIntentActivities(intent, 0)
+        val result = mutableListOf<Map<String, Any?>>()
+        val currentPkg = packageName
+
+        for (info in resolveInfos) {
+            val pkg = info.activityInfo.packageName
+            if (pkg == currentPkg) continue
+            val label = info.loadLabel(pm)?.toString() ?: pkg
+            val act = info.activityInfo.name
+            result.add(
+                mapOf(
+                    "packageName" to pkg,
+                    "activityName" to act,
+                    "label" to label
+                )
+            )
+        }
+        result.sortBy { it["label"] as? String ?: "" }
+        return result
+    }
+
+    private fun startDvrBackgroundService(): Boolean {
+        val candidates = listOf(
+            Pair("com.ankai.cardvr", "com.ankai.cardvr.MainService"),
+            Pair("com.ankai.cardvr", "git.my.camera.core.MobileCameraService"),
+            Pair("com.ankai.cardvr", "git.my.adas.service.AdasService")
+        )
+
+        var started = false
+        for ((pkg, srvName) in candidates) {
+            try {
+                val intent = Intent().apply {
+                    setClassName(pkg, srvName)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    try {
+                        startForegroundService(intent)
+                        started = true
+                        Log.i(TAG, "Started DVR foreground service $srvName")
+                    } catch (e: Exception) {
+                        startService(intent)
+                        started = true
+                        Log.i(TAG, "Started DVR service $srvName (standard)")
+                    }
+                } else {
+                    startService(intent)
+                    started = true
+                    Log.i(TAG, "Started DVR service $srvName")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not start service $srvName: ${e.message}")
+            }
+        }
+        return started
+    }
+
+    private fun isDvrServiceRunning(): Boolean {
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
+        val running = am.getRunningServices(Int.MAX_VALUE)
+        for (info in running) {
+            val pkg = info.service.packageName
+            if (pkg == "com.ankai.cardvr") {
+                return true
+            }
+        }
+        return false
     }
 
     private fun buildAndSaveHeadunitDump(flutterMetrics: Map<String, Any?>): Map<String, Any?> {

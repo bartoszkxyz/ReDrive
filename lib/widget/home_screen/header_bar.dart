@@ -14,7 +14,10 @@ class HeaderBar extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        _LogoSection(colorScheme: colorScheme),
+        Flexible(
+          child: _LogoSection(colorScheme: colorScheme),
+        ),
+        const SizedBox(width: 8),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -38,18 +41,19 @@ class _LogoSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         RichText(
           textScaler: TextScaler.noScaling,
           text: TextSpan(
             style: const TextStyle(
               fontFamily: 'Inter',
-              fontSize: 40,
+              fontSize: 32,
               fontWeight: FontWeight.w800,
             ),
             children: [
               TextSpan(
-                text: 'Re',
+                text: 'OB',
                 style: TextStyle(color: colorScheme.onSurface),
               ),
               TextSpan(
@@ -64,10 +68,10 @@ class _LogoSection extends StatelessWidget {
           textScaler: TextScaler.noScaling,
           style: TextStyle(
             fontFamily: 'Inter',
-            fontSize: 11,
+            fontSize: 10,
             fontWeight: FontWeight.w600,
             color: colorScheme.onSurface.withValues(alpha: 0.7),
-            letterSpacing: 5.1,
+            letterSpacing: 4.0,
           ),
         ),
       ],

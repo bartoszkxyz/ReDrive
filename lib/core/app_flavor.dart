@@ -39,7 +39,7 @@ class AppConfig {
       _instance ??
       const AppConfig(
         flavor: AppFlavor.headunit,
-        appTitle: 'ReDrive Headunit',
+        appTitle: 'OBDrive Headunit',
       );
 
   /// Initializes the singleton configuration.
@@ -49,7 +49,7 @@ class AppConfig {
   }) {
     _instance = AppConfig(
       flavor: flavor,
-      appTitle: appTitle ?? (flavor.isPhone ? 'ReDrive' : 'ReDrive Headunit'),
+      appTitle: appTitle ?? (flavor.isPhone ? 'OBDrive' : 'OBDrive Headunit'),
     );
   }
 

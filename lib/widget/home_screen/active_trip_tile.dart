@@ -79,7 +79,7 @@ class ActiveTripTile extends StatelessWidget {
                                 : null,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Text(
                           isActive ? 'ACTIVE TRIP' : 'CURRENT TRIP',
                           textScaler: TextScaler.noScaling,
@@ -87,13 +87,13 @@ class ActiveTripTile extends StatelessWidget {
                             color: isActive ? colorScheme.primary : Colors.white70,
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
-                            letterSpacing: 1.5,
+                            letterSpacing: isCompact ? 1.0 : 1.5,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Flexible(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: isActive
                                   ? colorScheme.primary.withValues(alpha: 0.15)

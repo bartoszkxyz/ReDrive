@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:redrive/core/theme/custom_dashboard_theme.dart';
+import 'package:redrive/core/theme/theme_engine.dart';
 import 'package:redrive/models/dtc_code.dart';
 import 'package:redrive/models/sync_models.dart';
 import 'package:redrive/models/trip.dart';
@@ -26,15 +28,17 @@ class SyncProvider extends ChangeNotifier {
   TripProvider? _tripProvider;
   GarageProvider? _garageProvider;
   ObdProvider? _obdProvider;
+  ThemeEngine? _themeEngine;
 
   bool _isDisposed = false;
 
-  SyncProvider({BluetoothSyncService? syncService})
+  SyncProvider({BluetoothSyncService? syncService, ThemeEngine? themeEngine})
       : _syncService = syncService ??
             BluetoothSyncService(
               deviceId: 'redrive_device_${DateTime.now().millisecondsSinceEpoch}',
               deviceRole: 'headunit',
-            ) {
+            ),
+        _themeEngine = themeEngine {
     _syncService.onStateChanged = _onServiceStateChanged;
     _init();
   }
@@ -55,13 +59,16 @@ class SyncProvider extends ChangeNotifier {
     required TripProvider tripProvider,
     required GarageProvider garageProvider,
     ObdProvider? obdProvider,
+    ThemeEngine? themeEngine,
   }) {
     if (_tripProvider != tripProvider ||
         _garageProvider != garageProvider ||
-        _obdProvider != obdProvider) {
+        _obdProvider != obdProvider ||
+        _themeEngine != themeEngine) {
       _tripProvider = tripProvider;
       _garageProvider = garageProvider;
       _obdProvider = obdProvider;
+      _themeEngine = themeEngine ?? _themeEngine;
 
       _setupDelegate();
       _listenToTripProvider(tripProvider);
@@ -125,8 +132,20 @@ class SyncProvider extends ChangeNotifier {
             }
           }
         },
+        onThemeReceived: (themePayload) async {
+          final te = _themeEngine;
+          if (te != null) {
+            final theme = CustomDashboardTheme.fromJson(themePayload);
+            await te.applyTheme(theme);
+          }
+        },
       ),
     );
+  }
+
+  /// Pushes a custom theme to the peer headunit over Bluetooth.
+  Future<bool> pushCustomTheme(CustomDashboardTheme theme) async {
+    return _syncService.pushCustomTheme(theme.toJson());
   }
 
   String? _lastTrackedTripId;

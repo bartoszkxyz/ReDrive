@@ -31,6 +31,9 @@ enum SyncFrameType {
   /// Vehicle profiles stored in the garage.
   garageSync,
 
+  /// Custom theme definition pushed from Phone to Headunit.
+  themeSync,
+
   /// Confirmation from receiver acknowledging successful persistence.
   syncAck,
 
@@ -188,6 +191,19 @@ class SyncFrame {
         'vehicles': vehicles.map((v) => v.toJson()).toList(),
         'activeVehicleId': activeVehicleId,
       },
+    );
+  }
+
+  /// Creates a [themeSync] frame carrying a custom dashboard theme JSON payload.
+  factory SyncFrame.themeSync(
+    Map<String, dynamic> themePayload, {
+    String? messageId,
+  }) {
+    return SyncFrame(
+      type: SyncFrameType.themeSync,
+      messageId: messageId ?? _generateMessageId('theme'),
+      timestamp: DateTime.now(),
+      payload: themePayload,
     );
   }
 

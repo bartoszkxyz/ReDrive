@@ -7,6 +7,9 @@ import 'package:redrive/screens/connection_screen.dart';
 import 'package:redrive/widget/bottom_bar/custom_bottom_bar.dart';
 import 'package:redrive/widget/common/reconnection_banner.dart';
 import 'package:redrive/screens/dashboard_screen.dart';
+import 'package:redrive/core/app_flavor.dart';
+import 'package:redrive/screens/headunit_launcher_screen.dart';
+import 'package:redrive/screens/settings_screen.dart';
 import 'home_screen.dart';
 import 'dart:async';
 
@@ -25,7 +28,14 @@ class _RootScreenState extends State<RootScreen> {
   StreamSubscription<Object>? _errorsSubscription;
 
   late final List<Widget> _screens = [
-    const HomeScreen(),
+    if (AppConfig.isHeadunit)
+      HeadunitLauncherScreen(
+        onOpenDashboard: () => setState(() => _currentIndex = 1),
+        onOpenTrips: () => setState(() => _currentIndex = 4),
+        onOpenSettings: () => showSettingsSheet(context),
+      )
+    else
+      const HomeScreen(),
     const DashboardScreen(),
     const ConnectionScreen(),
     const CarScreen(),
@@ -80,14 +90,16 @@ class _RootScreenState extends State<RootScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: CustomBottomBar(
-        currentIndex: _currentIndex,
-        onItemSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-      ),
+      bottomNavigationBar: (AppConfig.isHeadunit && _currentIndex == 0)
+          ? null
+          : CustomBottomBar(
+              currentIndex: _currentIndex,
+              onItemSelected: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+            ),
     );
   }
 

@@ -12,6 +12,7 @@ import 'providers/bluetooth_provider.dart';
 import 'providers/trip_provider.dart';
 import 'providers/sync_provider.dart';
 import 'services/sync/bluetooth_sync_service.dart';
+import 'core/theme/theme_engine.dart';
 import 'core/app_themes.dart';
 import 'screens/root_screen.dart';
 
@@ -25,7 +26,7 @@ void main() async {
   final flavor = AppFlavor.fromString(appFlavor);
   AppConfig.initialize(
     flavor: flavor,
-    appTitle: flavor.isPhone ? 'ReDrive' : 'ReDrive Headunit',
+    appTitle: flavor.isPhone ? 'OBDrive' : 'OBDrive Headunit',
   );
 
   if (flavor.isPhone) {
@@ -56,23 +57,27 @@ void main() async {
   obdProvider.attachConnection(
     BluetoothObdConnection(bluetoothProvider),
   );
+  final themeEngine = ThemeEngine();
   final tripProvider = TripProvider()..bindToObd(obdProvider);
   final garageProvider = GarageProvider()
     ..bindProviders(obdProvider: obdProvider, tripProvider: tripProvider);
   final syncProvider = SyncProvider(
     syncService: BluetoothSyncService(
-      deviceId: 'redrive_${flavor.name}_${DateTime.now().millisecondsSinceEpoch}',
+      deviceId: 'obdrive_${flavor.name}_${DateTime.now().millisecondsSinceEpoch}',
       deviceRole: flavor.name,
     ),
+    themeEngine: themeEngine,
   )..bindProviders(
       tripProvider: tripProvider,
       garageProvider: garageProvider,
       obdProvider: obdProvider,
+      themeEngine: themeEngine,
     );
 
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider.value(value: themeEngine),
         ChangeNotifierProvider.value(value: bluetoothProvider),
         ChangeNotifierProvider.value(value: obdProvider),
         ChangeNotifierProvider.value(value: tripProvider),
@@ -89,9 +94,15 @@ class RedriveApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    ThemeData activeTheme = AppThemes.darkTheme;
+    try {
+      activeTheme = context.watch<ThemeEngine>().materialTheme;
+    } catch (_) {}
+
     return MaterialApp(
       title: AppConfig.current.appTitle,
       debugShowCheckedModeBanner: false,
+      theme: activeTheme,
       localizationsDelegates: const [AppLocalizations.delegate],
       supportedLocales: AppLocalizations.supportedLocales,
       localeResolutionCallback: (locale, supported) {
@@ -108,7 +119,6 @@ class RedriveApp extends StatelessWidget {
         }
         return const Locale('en');
       },
-      theme: AppThemes.darkTheme,
       home: const RootScreen(),
     );
   }

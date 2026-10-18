@@ -42,7 +42,7 @@ void main() {
   group('AppConfig singleton and defaults', () {
     test('default current configuration without initialize returns headunit', () {
       expect(AppConfig.current.flavor, AppFlavor.headunit);
-      expect(AppConfig.current.appTitle, 'ReDrive Headunit');
+      expect(AppConfig.current.appTitle, 'OBDrive Headunit');
       expect(AppConfig.current.flavor.isHeadunit, isTrue);
       expect(AppConfig.current.flavor.isPhone, isFalse);
       expect(AppConfig.isHeadunit, isTrue);
@@ -53,7 +53,7 @@ void main() {
       AppConfig.initialize(flavor: AppFlavor.headunit);
 
       expect(AppConfig.current.flavor, AppFlavor.headunit);
-      expect(AppConfig.current.appTitle, 'ReDrive Headunit');
+      expect(AppConfig.current.appTitle, 'OBDrive Headunit');
       expect(AppConfig.isHeadunit, isTrue);
       expect(AppConfig.isPhone, isFalse);
     });
@@ -70,11 +70,11 @@ void main() {
       expect(AppConfig.isPhone, isFalse);
     });
 
-    test('initialize with phone and default title sets ReDrive', () {
+    test('initialize with phone and default title sets OBDrive', () {
       AppConfig.initialize(flavor: AppFlavor.phone);
 
       expect(AppConfig.current.flavor, AppFlavor.phone);
-      expect(AppConfig.current.appTitle, 'ReDrive');
+      expect(AppConfig.current.appTitle, 'OBDrive');
       expect(AppConfig.isHeadunit, isFalse);
       expect(AppConfig.isPhone, isTrue);
     });
@@ -82,11 +82,11 @@ void main() {
     test('initialize with phone and custom title sets custom title', () {
       AppConfig.initialize(
         flavor: AppFlavor.phone,
-        appTitle: 'ReDrive Companion App',
+        appTitle: 'OBDrive Companion App',
       );
 
       expect(AppConfig.current.flavor, AppFlavor.phone);
-      expect(AppConfig.current.appTitle, 'ReDrive Companion App');
+      expect(AppConfig.current.appTitle, 'OBDrive Companion App');
       expect(AppConfig.isHeadunit, isFalse);
       expect(AppConfig.isPhone, isTrue);
     });
@@ -101,7 +101,7 @@ void main() {
       AppConfig.reset();
 
       expect(AppConfig.current.flavor, AppFlavor.headunit);
-      expect(AppConfig.current.appTitle, 'ReDrive Headunit');
+      expect(AppConfig.current.appTitle, 'OBDrive Headunit');
       expect(AppConfig.isHeadunit, isTrue);
       expect(AppConfig.isPhone, isFalse);
     });

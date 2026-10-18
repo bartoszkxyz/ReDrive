@@ -55,7 +55,7 @@ class _HeadunitBackgroundSheetState extends State<HeadunitBackgroundSheet> {
     }
   }
 
-  Future<void> _exportHeadunitProfile(BuildContext context) async {
+  Future<void> _exportHeadunitProfile() async {
     if (_isDumping) return;
     final mq = MediaQuery.of(context);
     final flutterMetrics = <String, dynamic>{
@@ -91,7 +91,7 @@ class _HeadunitBackgroundSheetState extends State<HeadunitBackgroundSheet> {
             'Android $release (API $sdkInt) • $appsCount apps • $vendorCount vendor pkgs • $propsCount props';
       });
 
-      if (context.mounted && savedPath.isNotEmpty) {
+      if (mounted && savedPath.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Headunit dump saved:\n$savedPath'),
@@ -370,7 +370,7 @@ class _HeadunitBackgroundSheetState extends State<HeadunitBackgroundSheet> {
                             foregroundColor: Colors.cyanAccent,
                             side: BorderSide(color: Colors.cyanAccent.withValues(alpha: 0.5)),
                           ),
-                          onPressed: _isDumping ? null : () => _exportHeadunitProfile(context),
+                          onPressed: _isDumping ? null : _exportHeadunitProfile,
                           icon: _isDumping
                               ? const SizedBox(
                                   width: 16,
