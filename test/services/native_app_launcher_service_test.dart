@@ -329,6 +329,52 @@ void main() {
     });
   });
 
+  group('TS18 Hardware PIP Window Control', () {
+    test('setPipWindow invokes setPipWindow with correct arguments', () async {
+      mockResult = true;
+      final success = await launcherService.setPipWindow(
+        packageName: 'com.tw.radio',
+        activityName: 'com.tw.radio.RadioActivity',
+        x: 742,
+        y: 68,
+        width: 510,
+        height: 564,
+      );
+
+      expect(success, isTrue);
+      expect(methodCalls, hasLength(1));
+      expect(methodCalls.first.method, 'setPipWindow');
+      expect(methodCalls.first.arguments, {
+        'packageName': 'com.tw.radio',
+        'activityName': 'com.tw.radio.RadioActivity',
+        'x': 742,
+        'y': 68,
+        'width': 510,
+        'height': 564,
+      });
+    });
+
+    test('setPipWindow returns false on platform exception', () async {
+      mockException = PlatformException(code: 'PIP_FAILED', message: 'Failed to set PIP');
+      final success = await launcherService.setPipWindow(packageName: 'com.tw.radio');
+      expect(success, isFalse);
+    });
+
+    test('releasePipWindow invokes releasePipWindow on channel', () async {
+      mockResult = true;
+      final success = await launcherService.releasePipWindow();
+      expect(success, isTrue);
+      expect(methodCalls, hasLength(1));
+      expect(methodCalls.first.method, 'releasePipWindow');
+    });
+
+    test('releasePipWindow returns false on exception', () async {
+      mockException = PlatformException(code: 'ERR', message: 'Failed');
+      final success = await launcherService.releasePipWindow();
+      expect(success, isFalse);
+    });
+  });
+
   group('Custom Channel Injection', () {
     test('uses custom MethodChannel if provided in constructor', () async {
       const customChannelName = 'com.custom/channel';

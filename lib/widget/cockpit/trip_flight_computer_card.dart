@@ -2,18 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/custom_dashboard_theme.dart';
 import '../../core/theme/theme_engine.dart';
+import '../../providers/obd_provider.dart';
 import '../../providers/trip_provider.dart';
 import 'instant_fuel_flow_bar.dart';
 
-/// Flight Computer Cockpit Card displaying real-time trip accumulation statistics,
+/// Flight Computer Cockpit Card displaying real-time 6-tile telemetry grid
+/// (Trip Duration, Distance, Coolant Temp, Trip Avg Fuel, Fuel Used, Engine Load),
 /// a prominent digital timepiece header, and the instant fuel economy flow bar.
 class TripFlightComputerCard extends StatelessWidget {
   final ActiveTripState? activeTrip;
+  final int? coolantTemp;
+  final double? engineLoad;
   final DateTime Function()? nowProvider;
 
   const TripFlightComputerCard({
     super.key,
     this.activeTrip,
+    this.coolantTemp,
+    this.engineLoad,
     this.nowProvider,
   });
 
@@ -62,13 +68,42 @@ class TripFlightComputerCard extends StatelessWidget {
     }
   }
 
+  ({String label, Color color}) _getCoolantStatus(int temp, CustomThemeColors colors) {
+    if (temp < 70) {
+      return (label: 'Warming Up', color: colors.secondaryAccent);
+    } else if (temp <= 96) {
+      return (label: 'Optimal Working Zone', color: colors.coolantNormal);
+    } else if (temp <= 101) {
+      return (label: 'Elevated Temp', color: colors.coolantWarning);
+    } else {
+      return (label: 'OVERHEAT ALERT', color: colors.coolantOverheat);
+    }
+  }
+
+  ({String label, Color color}) _getLoadStatus(double load, CustomThemeColors colors) {
+    if (load < 30.0) {
+      return (label: 'Idle / Decel', color: colors.engineLoadLow);
+    } else if (load <= 65.0) {
+      return (label: 'Cruising / Closed Loop', color: colors.engineLoadMedium);
+    } else {
+      return (label: 'High Acceleration / Power', color: colors.engineLoadHigh);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final tripProvider = context.watch<TripProvider?>();
+    final obdProvider = context.watch<ObdProvider?>();
     final themeEngine = context.watch<ThemeEngine?>();
 
     final colors = themeEngine?.colors ?? const CustomThemeColors();
     final trip = activeTrip ?? tripProvider?.activeTrip ?? ActiveTripState.initial();
+
+    final effectiveTemp = coolantTemp ?? obdProvider?.data.coolantTemp ?? 0;
+    final effectiveLoad = engineLoad ?? obdProvider?.data.engineLoad ?? 0.0;
+
+    final coolantStatus = _getCoolantStatus(effectiveTemp, colors);
+    final loadStatus = _getLoadStatus(effectiveLoad, colors);
 
     final now = nowProvider != null ? nowProvider!() : DateTime.now();
     final dateHeader = _formatDateHeader(now);
@@ -151,11 +186,11 @@ class TripFlightComputerCard extends StatelessWidget {
 
           const SizedBox(height: 10),
 
-          // 4-Metric Flight Grid
+          // 6-Metric Flight & Telemetry Grid (3 Columns x 2 Rows)
           Expanded(
             child: Column(
               children: [
-                // Row 1: Duration & Distance
+                // Row 1: Duration, Distance, Coolant Temp
                 Expanded(
                   child: Row(
                     children: [
@@ -168,7 +203,7 @@ class TripFlightComputerCard extends StatelessWidget {
                             key: const Key('flight_trip_duration'),
                             style: TextStyle(
                               fontFamily: 'Inter',
-                              fontSize: 24,
+                              fontSize: 22,
                               fontWeight: FontWeight.w800,
                               color: colors.textMain,
                             ),
@@ -177,7 +212,7 @@ class TripFlightComputerCard extends StatelessWidget {
                           colors: colors,
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: _MetricTile(
                           icon: Icons.alt_route_rounded,
@@ -187,7 +222,7 @@ class TripFlightComputerCard extends StatelessWidget {
                             key: const Key('flight_trip_distance'),
                             style: TextStyle(
                               fontFamily: 'Inter',
-                              fontSize: 24,
+                              fontSize: 22,
                               fontWeight: FontWeight.w800,
                               color: colors.textMain,
                             ),
@@ -196,11 +231,32 @@ class TripFlightComputerCard extends StatelessWidget {
                           colors: colors,
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _MetricTile(
+                          key: const Key('cockpit_coolant_card'),
+                          icon: Icons.thermostat_rounded,
+                          label: 'COOLANT TEMP',
+                          valueWidget: Text(
+                            '$effectiveTemp °C',
+                            key: const Key('cockpit_coolant_value'),
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: coolantStatus.color,
+                            ),
+                          ),
+                          unit: coolantStatus.label,
+                          unitKey: const Key('cockpit_coolant_status'),
+                          colors: colors,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 10),
-                // Row 2: Average Fuel & Total Fuel Used
+                const SizedBox(height: 8),
+                // Row 2: Average Fuel, Fuel Used, Engine Load
                 Expanded(
                   child: Row(
                     children: [
@@ -213,7 +269,7 @@ class TripFlightComputerCard extends StatelessWidget {
                             key: const Key('flight_trip_avg_fuel'),
                             style: TextStyle(
                               fontFamily: 'Inter',
-                              fontSize: 24,
+                              fontSize: 22,
                               fontWeight: FontWeight.w800,
                               color: colors.primaryAccent,
                             ),
@@ -222,7 +278,7 @@ class TripFlightComputerCard extends StatelessWidget {
                           colors: colors,
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: _MetricTile(
                           icon: Icons.science_outlined,
@@ -232,12 +288,33 @@ class TripFlightComputerCard extends StatelessWidget {
                             key: const Key('flight_trip_fuel_used'),
                             style: TextStyle(
                               fontFamily: 'Inter',
-                              fontSize: 24,
+                              fontSize: 22,
                               fontWeight: FontWeight.w800,
                               color: colors.textMain,
                             ),
                           ),
                           unit: 'Total Consumed',
+                          colors: colors,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _MetricTile(
+                          key: const Key('cockpit_engine_load_card'),
+                          icon: Icons.speed_rounded,
+                          label: 'ENGINE LOAD',
+                          valueWidget: Text(
+                            '${effectiveLoad.toStringAsFixed(0)} %',
+                            key: const Key('cockpit_load_value'),
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: loadStatus.color,
+                            ),
+                          ),
+                          unit: loadStatus.label,
+                          unitKey: const Key('cockpit_load_status'),
                           colors: colors,
                         ),
                       ),
@@ -266,13 +343,16 @@ class _MetricTile extends StatelessWidget {
   final String label;
   final Widget valueWidget;
   final String unit;
+  final Key? unitKey;
   final CustomThemeColors colors;
 
   const _MetricTile({
+    super.key,
     required this.icon,
     required this.label,
     required this.valueWidget,
     required this.unit,
+    this.unitKey,
     required this.colors,
   });
 
@@ -319,6 +399,7 @@ class _MetricTile extends StatelessWidget {
           ),
           Text(
             unit,
+            key: unitKey,
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 10,

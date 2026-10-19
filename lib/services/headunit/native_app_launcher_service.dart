@@ -141,4 +141,38 @@ class NativeAppLauncherService {
       return const [];
     }
   }
+
+  /// Sets the Topway TS18 native hardware PIP window for a target application.
+  Future<bool> setPipWindow({
+    required String packageName,
+    String? activityName,
+    int x = 740,
+    int y = 68,
+    int width = 510,
+    int height = 564,
+  }) async {
+    try {
+      final result = await channel.invokeMethod<bool>('setPipWindow', {
+        'packageName': packageName,
+        'activityName': activityName,
+        'x': x,
+        'y': y,
+        'width': width,
+        'height': height,
+      });
+      return result ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Releases the Topway TS18 hardware PIP window.
+  Future<bool> releasePipWindow() async {
+    try {
+      final result = await channel.invokeMethod<bool>('releasePipWindow');
+      return result ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
 }

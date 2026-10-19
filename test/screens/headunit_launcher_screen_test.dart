@@ -473,37 +473,31 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Card is mounted
-      expect(find.byKey(const Key('engine_vitals_card')), findsOneWidget);
+      // PipApplicationBay is mounted
+      expect(find.byKey(const Key('pip_application_bay')), findsOneWidget);
 
-      // Coolant
+      // Coolant in 6-tile grid
       expect(find.byKey(const Key('cockpit_coolant_card')), findsOneWidget);
       expect(find.text('85 °C'), findsOneWidget);
       expect(find.text('Optimal Working Zone'), findsOneWidget);
 
-      // Engine Load
+      // Engine Load in 6-tile grid
       expect(find.byKey(const Key('cockpit_engine_load_card')), findsOneWidget);
       expect(find.text('38 %'), findsOneWidget);
       expect(find.text('Cruising / Closed Loop'), findsOneWidget);
 
-      // Portal Buttons
-      final dashBtn = find.byKey(const Key('open_full_dashboard_button'));
+      // Header Bar Portal Buttons
+      final dashBtn = find.byKey(const Key('header_open_dashboard'));
       expect(dashBtn, findsOneWidget);
       await tester.tap(dashBtn);
       await tester.pump();
       expect(dashboardOpened, isTrue);
 
-      final tripsBtn = find.byKey(const Key('open_trip_history_button'));
+      final tripsBtn = find.byKey(const Key('header_open_trips'));
       expect(tripsBtn, findsOneWidget);
       await tester.tap(tripsBtn);
       await tester.pump();
       expect(tripsOpened, isTrue);
-
-      final connBtn = find.byKey(const Key('open_connections_button'));
-      expect(connBtn, findsOneWidget);
-      await tester.tap(connBtn);
-      await tester.pump();
-      expect(connectionsOpened, isTrue);
 
       // Also verify Header Bar Bluetooth badge opens connections
       connectionsOpened = false;
@@ -621,7 +615,13 @@ void main() {
 
       // Verify discovered apps are shown
       expect(find.text('Spotify'), findsOneWidget);
-      expect(find.text('Radio'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('app_drawer_sheet')),
+          matching: find.text('Radio'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('TLINK5'), findsWidgets);
 
       // Tap Spotify

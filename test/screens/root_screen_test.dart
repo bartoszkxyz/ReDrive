@@ -275,8 +275,20 @@ void main() {
     expect(find.byType(CustomBottomBar), findsNothing);
 
     // Verify tactile launcher dock is visible
-    expect(find.text('TLINK5'), findsOneWidget);
-    expect(find.text('RADIO'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('tactile_launcher_dock')),
+        matching: find.text('TLINK5'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('tactile_launcher_dock')),
+        matching: find.text('RADIO'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('ALL APPS'), findsOneWidget);
   });
 
@@ -289,8 +301,8 @@ void main() {
     await tester.pumpWidget(buildRootWidget(flavor: AppFlavor.headunit));
     await tester.pump();
 
-    // Tap on Full Dashboard button
-    final dashboardBtn = find.text('Full Dashboard');
+    // Tap on Full Dashboard button in header bar
+    final dashboardBtn = find.byKey(const Key('header_open_dashboard'));
     expect(dashboardBtn, findsOneWidget);
     await tester.tap(dashboardBtn);
     await tester.pump();
@@ -318,7 +330,7 @@ void main() {
     await tester.pumpWidget(buildRootWidget(flavor: AppFlavor.headunit));
     await tester.pump();
 
-    final tripsBtn = find.text('Trip History');
+    final tripsBtn = find.byKey(const Key('header_open_trips'));
     expect(tripsBtn, findsOneWidget);
     await tester.tap(tripsBtn);
     await tester.pump();
@@ -336,7 +348,7 @@ void main() {
     await tester.pumpWidget(buildRootWidget(flavor: AppFlavor.headunit));
     await tester.pump();
 
-    final connBtn = find.byKey(const Key('open_connections_button'));
+    final connBtn = find.byKey(const Key('bt_status_badge'));
     expect(connBtn, findsOneWidget);
     await tester.tap(connBtn);
     await tester.pump();

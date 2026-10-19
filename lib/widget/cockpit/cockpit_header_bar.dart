@@ -14,6 +14,8 @@ class CockpitHeaderBar extends StatefulWidget {
   final NativeAppLauncherService? launcherService;
   final VoidCallback? onOpenSettings;
   final VoidCallback? onOpenConnections;
+  final VoidCallback? onOpenDashboard;
+  final VoidCallback? onOpenTrips;
   final bool? isBtConnected;
   final bool? isDvrRecording;
   final DateTime Function()? nowProvider;
@@ -25,6 +27,8 @@ class CockpitHeaderBar extends StatefulWidget {
     this.launcherService,
     this.onOpenSettings,
     this.onOpenConnections,
+    this.onOpenDashboard,
+    this.onOpenTrips,
     this.isBtConnected,
     this.isDvrRecording,
     this.nowProvider,
@@ -159,6 +163,30 @@ class _CockpitHeaderBarState extends State<CockpitHeaderBar>
                   letterSpacing: 0.5,
                   color: colors.textMain,
                 ),
+              ),
+            ],
+          ),
+
+          // Center: OBDrive Portal Controls
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildHeaderPortalButton(
+                key: const Key('header_open_dashboard'),
+                icon: Icons.speed_rounded,
+                label: 'FULL DASHBOARD',
+                accentColor: colors.primaryAccent,
+                colors: colors,
+                onTap: widget.onOpenDashboard,
+              ),
+              const SizedBox(width: 10),
+              _buildHeaderPortalButton(
+                key: const Key('header_open_trips'),
+                icon: Icons.history_rounded,
+                label: 'TRIP HISTORY',
+                accentColor: colors.secondaryAccent,
+                colors: colors,
+                onTap: widget.onOpenTrips,
               ),
             ],
           ),
@@ -334,5 +362,51 @@ class _CockpitHeaderBarState extends State<CockpitHeaderBar>
     }
 
     return dot;
+  }
+
+  Widget _buildHeaderPortalButton({
+    required Key key,
+    required IconData icon,
+    required String label,
+    required Color accentColor,
+    required CustomThemeColors colors,
+    required VoidCallback? onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: key,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: accentColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: accentColor.withValues(alpha: 0.4),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: accentColor),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: colors.textMain,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -125,9 +125,60 @@ class MainActivity : FlutterActivity() {
                         }
                     }
 
+                    "setPipWindow" -> {
+                        val packageName = call.argument<String>("packageName")
+                        val activityName = call.argument<String>("activityName")
+                        val x = call.argument<Int>("x") ?: 740
+                        val y = call.argument<Int>("y") ?: 68
+                        val width = call.argument<Int>("width") ?: 510
+                        val height = call.argument<Int>("height") ?: 564
+                        if (packageName.isNullOrBlank()) {
+                            result.error("INVALID_ARGS", "packageName is required", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            setSystemProperty("sys.tw.forcepip.x", x.toString())
+                            setSystemProperty("sys.tw.forcepip.y", y.toString())
+                            setSystemProperty("sys.tw.forcepip.w", width.toString())
+                            setSystemProperty("sys.tw.forcepip.h", height.toString())
+                            setSystemProperty("persist.tw.pip.corner", "10")
+                            setSystemProperty("sys.tw.forcepip", "1")
+                            val launched = launchApplication(packageName, activityName)
+                            result.success(launched)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to set PIP window for $packageName", e)
+                            result.error("PIP_FAILED", e.message, null)
+                        }
+                    }
+
+                    "releasePipWindow" -> {
+                        try {
+                            setSystemProperty("sys.tw.forcepip", "0")
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.success(false)
+                        }
+                    }
+
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun setSystemProperty(key: String, value: String): Boolean {
+        try {
+            val spClass = Class.forName("android.os.SystemProperties")
+            val setMethod = spClass.getMethod("set", String::class.java, String::class.java)
+            setMethod.invoke(null, key, value)
+            return true
+        } catch (_: Exception) {}
+        try {
+            val process = Runtime.getRuntime().exec(arrayOf("setprop", key, value))
+            process.waitFor()
+            return process.exitValue() == 0
+        } catch (_: Exception) {
+            return false
+        }
     }
 
     private fun launchApplication(packageName: String, activityName: String?): Boolean {

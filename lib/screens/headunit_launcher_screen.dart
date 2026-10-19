@@ -7,17 +7,17 @@ import '../obd/polling/polling_controller.dart';
 import '../providers/obd_provider.dart';
 import '../services/headunit/native_app_launcher_service.dart';
 import '../widget/cockpit/cockpit_header_bar.dart';
-import '../widget/cockpit/engine_vitals_card.dart';
+import '../widget/cockpit/pip_application_bay.dart';
 import '../widget/cockpit/tactile_launcher_dock.dart';
 import '../widget/cockpit/trip_flight_computer_card.dart';
 
-/// Topway TS18 Headunit Cockpit Launcher Screen (Layout A - 1280 × 720 Landscape).
+/// Topway TS18 Headunit Cockpit Launcher Screen (v2 - 1280 × 720 Landscape).
 ///
 /// Integrates:
-/// 1. [CockpitHeaderBar]: digital clock, DVR recording status, Bluetooth state, settings.
-/// 2. [TripFlightComputerCard]: large date/timepiece, 4-metric trip grid, instant fuel flow bar.
-/// 3. [EngineVitalsCard]: coolant temperature, engine load, and OBDrive portals.
-/// 4. [TactileLauncherDock]: automotive shortcuts (TLINK5, Radio, DSP, DVR, App Drawer).
+/// 1. [CockpitHeaderBar]: digital clock, central portal chips (Dashboard, Trips), DVR/BT status.
+/// 2. [TripFlightComputerCard]: 6-tile telemetry grid (Trip Time, Dist, Coolant, Avg Fuel, Used, Load) + fuel flow bar.
+/// 3. [PipApplicationBay]: native TS18 hardware PIP window (Radio, DVR, TLINK5, customizable apps).
+/// 4. [TactileLauncherDock]: compact 68 dp automotive dock (TLINK5, Radio, DSP, DVR, App Drawer).
 class HeadunitLauncherScreen extends StatefulWidget {
   final NativeAppLauncherService? launcherService;
   final VoidCallback? onOpenDashboard;
@@ -73,6 +73,12 @@ class _HeadunitLauncherScreenState extends State<HeadunitLauncherScreen> {
   }
 
   @override
+  void dispose() {
+    _launcherService.releasePipWindow();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final themeEngine = context.watch<ThemeEngine?>();
     final colors = themeEngine?.colors ?? const CustomThemeColors();
@@ -90,13 +96,15 @@ class _HeadunitLauncherScreenState extends State<HeadunitLauncherScreen> {
                 launcherService: _launcherService,
                 onOpenSettings: widget.onOpenSettings,
                 onOpenConnections: widget.onOpenConnections,
+                onOpenDashboard: widget.onOpenDashboard,
+                onOpenTrips: widget.onOpenTrips,
                 nowProvider: widget.nowProvider,
                 enablePeriodicTimers: widget.enablePeriodicTimers,
               ),
 
               const SizedBox(height: 10),
 
-              // Center Section: Flight Computer (Flex 6) + Engine Vitals (Flex 4)
+              // Center Section: 6-Tile Telemetry & Flight Computer (Flex 6) + TS18 PIP Bay (Flex 4)
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -110,10 +118,8 @@ class _HeadunitLauncherScreenState extends State<HeadunitLauncherScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       flex: 4,
-                      child: EngineVitalsCard(
-                        onOpenDashboard: widget.onOpenDashboard,
-                        onOpenTrips: widget.onOpenTrips,
-                        onOpenConnections: widget.onOpenConnections,
+                      child: PipApplicationBay(
+                        launcherService: _launcherService,
                       ),
                     ),
                   ],
@@ -122,7 +128,7 @@ class _HeadunitLauncherScreenState extends State<HeadunitLauncherScreen> {
 
               const SizedBox(height: 10),
 
-              // Bottom Automotive Launcher Dock
+              // Bottom Automotive Launcher Dock (Compact 68 dp)
               TactileLauncherDock(
                 launcherService: _launcherService,
               ),
