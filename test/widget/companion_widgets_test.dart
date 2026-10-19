@@ -255,16 +255,23 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: MechanicReportSheet(report: testReport),
+            body: MechanicReportSheet(
+              report: testReport,
+              initialLanguage: 'en',
+            ),
           ),
         ),
       );
 
-      // Title & Header info
+      // Title & Header info in English
       expect(find.byKey(const Key('mechanic_report_title')), findsOneWidget);
+      expect(find.text('Mechanic Diagnostic Report'), findsOneWidget);
       expect(find.textContaining('Suzuki Swift 3'), findsOneWidget);
       expect(find.textContaining('TS18VIN987654321'), findsOneWidget);
       expect(find.textContaining('154210.0 km'), findsOneWidget);
+      expect(find.text('Stored DTCs'), findsOneWidget);
+      expect(find.text('Pending DTCs'), findsOneWidget);
+      expect(find.text('Anomalies'), findsOneWidget);
 
       // Stored DTC item
       expect(find.text('P0300'), findsOneWidget);
@@ -278,28 +285,98 @@ void main() {
       expect(find.text('Severe Engine Misfire'), findsOneWidget);
       expect(find.text('RPM stutter under heavy load'), findsOneWidget);
 
-      // Share Button
+      // Share Button in English
       final shareBtn = find.byKey(const Key('mechanic_report_share_button'));
       expect(shareBtn, findsOneWidget);
+      expect(find.text('Share Diagnostic Report'), findsOneWidget);
 
       // Tap Share Button
       await tester.tap(shareBtn);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      // Verify snackbar is shown
+      // Verify snackbar is shown in English
       expect(find.text('Report copied to clipboard'), findsOneWidget);
 
       // Verify clipboard received the formatted summary
       expect(clipboardText, isNotNull);
-      expect(clipboardText, equals(testReport.toFormattedTextSummary()));
+      expect(clipboardText, equals(testReport.toFormattedTextSummary(language: 'en')));
       expect(clipboardText, contains('TS18VIN987654321'));
       expect(clipboardText, contains('P0300'));
 
-      // Dismiss snackbars to ensure no lingering timers
+      // Dismiss snackbars
       ScaffoldMessenger.of(tester.element(find.byType(Scaffold)))
           .clearSnackBars();
       await tester.pump();
+
+      // Language Toggle exists
+      final toggle = find.byKey(const Key('mechanic_report_language_toggle'));
+      expect(toggle, findsOneWidget);
+
+      // Switch language to Polish (PL)
+      await tester.tap(find.text('PL'));
+      await tester.pumpAndSettle();
+
+      // Verify UI changes to Polish
+      expect(find.text('Raport Diagnostyczny Pojazdu'), findsOneWidget);
+      expect(find.text('Zapisane DTC'), findsOneWidget);
+      expect(find.text('Oczekujące DTC'), findsOneWidget);
+      expect(find.text('Anomalie'), findsOneWidget);
+      expect(find.text('Przebieg całkowity'), findsOneWidget);
+      expect(find.text('Rodzaj paliwa'), findsOneWidget);
+      expect(find.text('Udostępnij raport diagnostyczny'), findsOneWidget);
+      expect(find.text('Potwierdzone kody błędów (Tryb 03)'), findsOneWidget);
+      expect(find.text('Oczekujące kody błędów (Tryb 07)'), findsOneWidget);
+      expect(find.text('Ostatnie wykryte anomalie'), findsOneWidget);
+      expect(find.text('Krytyczny'), findsOneWidget);
+      expect(find.text('Ostrzeżenie'), findsOneWidget);
+
+      // Tap Share Button in Polish
+      await tester.tap(shareBtn);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // Verify Polish snackbar and clipboard
+      expect(find.text('Skopiowano raport do schowka'), findsOneWidget);
+      expect(clipboardText, equals(testReport.toFormattedTextSummary(language: 'pl')));
+      expect(clipboardText, contains('RAPORT DIAGNOSTYCZNY OBDRIVE'));
+      expect(clipboardText, contains('Przebieg całkowity: 154210.0 km'));
+
+      ScaffoldMessenger.of(tester.element(find.byType(Scaffold)))
+          .clearSnackBars();
+      await tester.pump();
+
+      // Switch back to English (EN)
+      await tester.tap(find.text('EN'));
+      await tester.pumpAndSettle();
+      expect(find.text('Mechanic Diagnostic Report'), findsOneWidget);
+      expect(find.text('Stored DTCs'), findsOneWidget);
+      expect(find.text('Share Diagnostic Report'), findsOneWidget);
+    });
+
+    testWidgets(
+        'initialLanguage: pl initializes MechanicReportSheet directly in Polish',
+        (tester) async {
+      tester.view.physicalSize = const Size(1000, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: MechanicReportSheet(
+              report: testReport,
+              initialLanguage: 'pl',
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Raport Diagnostyczny Pojazdu'), findsOneWidget);
+      expect(find.text('Zapisane DTC'), findsOneWidget);
+      expect(find.text('Przebieg całkowity'), findsOneWidget);
+      expect(find.text('Rodzaj paliwa'), findsOneWidget);
+      expect(find.text('Udostępnij raport diagnostyczny'), findsOneWidget);
     });
   });
 

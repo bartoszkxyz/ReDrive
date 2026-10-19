@@ -70,11 +70,11 @@ void main() {
       expect(AppConfig.isPhone, isFalse);
     });
 
-    test('initialize with phone and default title sets OBDrive', () {
+    test('initialize with phone and default title sets OBDrive Companion', () {
       AppConfig.initialize(flavor: AppFlavor.phone);
 
       expect(AppConfig.current.flavor, AppFlavor.phone);
-      expect(AppConfig.current.appTitle, 'OBDrive');
+      expect(AppConfig.current.appTitle, 'OBDrive Companion');
       expect(AppConfig.isHeadunit, isFalse);
       expect(AppConfig.isPhone, isTrue);
     });

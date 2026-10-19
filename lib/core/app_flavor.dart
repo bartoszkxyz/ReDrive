@@ -49,7 +49,7 @@ class AppConfig {
   }) {
     _instance = AppConfig(
       flavor: flavor,
-      appTitle: appTitle ?? (flavor.isPhone ? 'OBDrive' : 'OBDrive Headunit'),
+      appTitle: appTitle ?? (flavor.isPhone ? 'OBDrive Companion' : 'OBDrive Headunit'),
     );
   }
 

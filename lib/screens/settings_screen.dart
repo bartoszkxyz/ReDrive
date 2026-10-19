@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:redrive/core/app_flavor.dart';
 import 'package:redrive/core/theme/custom_dashboard_theme.dart';
 import 'package:redrive/core/theme/theme_engine.dart';
 import 'package:redrive/providers/sync_provider.dart';
@@ -605,7 +606,9 @@ class _SettingsSheetState extends State<SettingsSheet> {
                         _SettingsTile(
                           icon: Icons.info_outline_rounded,
                           label: 'App Version',
-                          subtitle: 'OBDrive Telemetry & Cockpit Launcher',
+                          subtitle: AppConfig.isPhone
+                              ? 'OBDrive Companion & Telemetry'
+                              : 'OBDrive Telemetry & Cockpit Launcher',
                           trailingText: 'v2.0.0+7',
                           colorScheme: colorScheme,
                         ),

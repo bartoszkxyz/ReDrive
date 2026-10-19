@@ -29,7 +29,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        manifestPlaceholders["appLabel"] = "ReDrive"
+        manifestPlaceholders["appLabel"] = "OBDrive"
     }
 
     flavorDimensions += "default"
@@ -38,12 +38,12 @@ android {
         create("headunit") {
             dimension = "default"
             applicationIdSuffix = ".headunit"
-            manifestPlaceholders["appLabel"] = "ReDrive Headunit"
+            manifestPlaceholders["appLabel"] = "OBDrive Headunit"
         }
         create("phone") {
             dimension = "default"
             applicationIdSuffix = ".phone"
-            manifestPlaceholders["appLabel"] = "ReDrive Companion"
+            manifestPlaceholders["appLabel"] = "OBDrive Companion"
         }
     }
 
@@ -69,9 +69,11 @@ tasks.matching { it.name.matches(Regex("assemble.*Release")) }.configureEach {
             val flutterSrc = File(flutterApkDir, "app-$flavor-release.apk")
             val src = if (gradleSrc.exists()) gradleSrc else flutterSrc
             if (src.exists()) {
-                val dest = File(flutterApkDir, "redrive-$flavor-v${flutter.versionName}+${flutter.versionCode}-release.apk")
-                src.copyTo(dest, overwrite = true)
-                logger.lifecycle("✓ Generated versioned release APK: ${dest.name} (${dest.length()} bytes)")
+                val obdriveDest = File(flutterApkDir, "obdrive-$flavor-v${flutter.versionName}+${flutter.versionCode}-release.apk")
+                src.copyTo(obdriveDest, overwrite = true)
+                val redriveDest = File(flutterApkDir, "redrive-$flavor-v${flutter.versionName}+${flutter.versionCode}-release.apk")
+                src.copyTo(redriveDest, overwrite = true)
+                logger.lifecycle("✓ Generated versioned release APK: ${obdriveDest.name} (${obdriveDest.length()} bytes)")
             }
         }
         val gradleApkDir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
@@ -79,9 +81,11 @@ tasks.matching { it.name.matches(Regex("assemble.*Release")) }.configureEach {
         val fallbackSrc = File(flutterApkDir, "app-release.apk")
         val src = if (gradleSrc.exists()) gradleSrc else fallbackSrc
         if (src.exists()) {
-            val dest = File(flutterApkDir, "redrive-v${flutter.versionName}+${flutter.versionCode}-release.apk")
-            src.copyTo(dest, overwrite = true)
-            logger.lifecycle("✓ Generated versioned release APK: ${dest.name} (${dest.length()} bytes)")
+            val obdriveDest = File(flutterApkDir, "obdrive-v${flutter.versionName}+${flutter.versionCode}-release.apk")
+            src.copyTo(obdriveDest, overwrite = true)
+            val redriveDest = File(flutterApkDir, "redrive-v${flutter.versionName}+${flutter.versionCode}-release.apk")
+            src.copyTo(redriveDest, overwrite = true)
+            logger.lifecycle("✓ Generated versioned release APK: ${obdriveDest.name} (${obdriveDest.length()} bytes)")
         }
     }
 }

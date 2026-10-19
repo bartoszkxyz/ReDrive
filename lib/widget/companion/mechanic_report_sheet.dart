@@ -6,29 +6,55 @@ import 'package:redrive/models/trip_anomaly.dart';
 
 /// Modal bottom sheet displaying a comprehensive mechanic diagnostic report
 /// including confirmed/pending DTCs, recent anomaly episodes, and vehicle telemetry.
-class MechanicReportSheet extends StatelessWidget {
+class MechanicReportSheet extends StatefulWidget {
   final MechanicDiagnosticReport report;
+  final String? initialLanguage;
 
   const MechanicReportSheet({
     super.key,
     required this.report,
+    this.initialLanguage,
   });
 
   /// Displays the [MechanicReportSheet] in a modal bottom sheet.
   static Future<void> show(
     BuildContext context, {
     required MechanicDiagnosticReport report,
+    String? initialLanguage,
   }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => MechanicReportSheet(report: report),
+      builder: (ctx) => MechanicReportSheet(
+        report: report,
+        initialLanguage: initialLanguage,
+      ),
     );
   }
 
-  static String _formatDate(DateTime dt) {
-    final months = [
+  @override
+  State<MechanicReportSheet> createState() => _MechanicReportSheetState();
+}
+
+class _MechanicReportSheetState extends State<MechanicReportSheet> {
+  late String _selectedLanguage;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedLanguage = widget.initialLanguage ??
+        (WidgetsBinding.instance.platformDispatcher.locale.languageCode
+                    .toLowerCase() ==
+                'pl'
+            ? 'pl'
+            : 'en');
+  }
+
+  bool get _isPl => _selectedLanguage == 'pl';
+
+  static String _formatDate(DateTime dt, {bool isPl = false}) {
+    final enMonths = [
       'Jan',
       'Feb',
       'Mar',
@@ -42,6 +68,21 @@ class MechanicReportSheet extends StatelessWidget {
       'Nov',
       'Dec'
     ];
+    final plMonths = [
+      'sty',
+      'lut',
+      'mar',
+      'kwi',
+      'maj',
+      'cze',
+      'lip',
+      'sie',
+      'wrz',
+      'paź',
+      'lis',
+      'gru'
+    ];
+    final months = isPl ? plMonths : enMonths;
     final month = (dt.month >= 1 && dt.month <= 12) ? months[dt.month - 1] : '';
     final h = dt.hour.toString().padLeft(2, '0');
     final m = dt.minute.toString().padLeft(2, '0');
@@ -49,11 +90,16 @@ class MechanicReportSheet extends StatelessWidget {
   }
 
   Future<void> _handleShare(BuildContext context) async {
-    final summaryText = report.toFormattedTextSummary();
+    final summaryText =
+        widget.report.toFormattedTextSummary(language: _selectedLanguage);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Report copied to clipboard'),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: Text(
+          _isPl
+              ? 'Skopiowano raport do schowka'
+              : 'Report copied to clipboard',
+        ),
+        duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -104,7 +150,9 @@ class MechanicReportSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Mechanic Diagnostic Report',
+                        _isPl
+                            ? 'Raport Diagnostyczny Pojazdu'
+                            : 'Mechanic Diagnostic Report',
                         key: const Key('mechanic_report_title'),
                         style: TextStyle(
                           color: colorScheme.onSurface,
@@ -114,7 +162,7 @@ class MechanicReportSheet extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${report.vehicle.name} • VIN: ${report.vehicle.vin ?? "N/A"} • ${_formatDate(report.generatedAt)}',
+                        '${widget.report.vehicle.name} • VIN: ${widget.report.vehicle.vin ?? (_isPl ? "Brak danych" : "N/A")} • ${_formatDate(widget.report.generatedAt, isPl: _isPl)}',
                         style: TextStyle(
                           color: colorScheme.onSurfaceVariant,
                           fontSize: 12,
@@ -124,10 +172,54 @@ class MechanicReportSheet extends StatelessWidget {
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  color: colorScheme.onSurfaceVariant,
-                  onPressed: () => Navigator.of(context).pop(),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SegmentedButton<String>(
+                      key: const Key('mechanic_report_language_toggle'),
+                      showSelectedIcon: false,
+                      style: const ButtonStyle(
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      segments: const [
+                        ButtonSegment<String>(
+                          value: 'en',
+                          label: Text(
+                            'EN',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        ButtonSegment<String>(
+                          value: 'pl',
+                          label: Text(
+                            'PL',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                      selected: {_selectedLanguage},
+                      onSelectionChanged: (newSelection) {
+                        if (newSelection.isNotEmpty) {
+                          setState(() {
+                            _selectedLanguage = newSelection.first;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      color: colorScheme.onSurfaceVariant,
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -145,9 +237,9 @@ class MechanicReportSheet extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _buildSummaryBadge(
-                        label: 'Stored DTCs',
-                        count: report.storedDtcs.length,
-                        color: report.storedDtcs.isNotEmpty
+                        label: _isPl ? 'Zapisane DTC' : 'Stored DTCs',
+                        count: widget.report.storedDtcs.length,
+                        color: widget.report.storedDtcs.isNotEmpty
                             ? Colors.redAccent
                             : Colors.greenAccent,
                         colorScheme: colorScheme,
@@ -156,9 +248,9 @@ class MechanicReportSheet extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: _buildSummaryBadge(
-                        label: 'Pending DTCs',
-                        count: report.pendingDtcs.length,
-                        color: report.pendingDtcs.isNotEmpty
+                        label: _isPl ? 'Oczekujące DTC' : 'Pending DTCs',
+                        count: widget.report.pendingDtcs.length,
+                        color: widget.report.pendingDtcs.isNotEmpty
                             ? Colors.orangeAccent
                             : Colors.greenAccent,
                         colorScheme: colorScheme,
@@ -167,9 +259,9 @@ class MechanicReportSheet extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: _buildSummaryBadge(
-                        label: 'Anomalies',
-                        count: report.recentAnomalies.length,
-                        color: report.recentAnomalies.isNotEmpty
+                        label: _isPl ? 'Anomalie' : 'Anomalies',
+                        count: widget.report.recentAnomalies.length,
+                        color: widget.report.recentAnomalies.isNotEmpty
                             ? Colors.amberAccent
                             : Colors.greenAccent,
                         colorScheme: colorScheme,
@@ -194,7 +286,7 @@ class MechanicReportSheet extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Current Odometer',
+                            _isPl ? 'Przebieg całkowity' : 'Current Odometer',
                             style: TextStyle(
                               color: colorScheme.onSurfaceVariant,
                               fontSize: 11,
@@ -202,7 +294,7 @@ class MechanicReportSheet extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '${report.currentOdometerKm.toStringAsFixed(1)} km',
+                            '${widget.report.currentOdometerKm.toStringAsFixed(1)} km',
                             style: TextStyle(
                               color: colorScheme.onSurface,
                               fontSize: 15,
@@ -215,7 +307,7 @@ class MechanicReportSheet extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            'Fuel Type',
+                            _isPl ? 'Rodzaj paliwa' : 'Fuel Type',
                             style: TextStyle(
                               color: colorScheme.onSurfaceVariant,
                               fontSize: 11,
@@ -223,7 +315,10 @@ class MechanicReportSheet extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            report.vehicle.fuelType.label,
+                            _isPl
+                                ? MechanicDiagnosticReport.fuelTypeToPl(
+                                    widget.report.vehicle.fuelType)
+                                : widget.report.vehicle.fuelType.label,
                             style: TextStyle(
                               color: colorScheme.onSurface,
                               fontSize: 15,
@@ -239,54 +334,82 @@ class MechanicReportSheet extends StatelessWidget {
 
                 // Stored DTCs Section
                 _buildSectionTitle(
-                  title: 'Confirmed Trouble Codes (Mode 03)',
-                  count: report.storedDtcs.length,
+                  title: _isPl
+                      ? 'Potwierdzone kody błędów (Tryb 03)'
+                      : 'Confirmed Trouble Codes (Mode 03)',
+                  count: widget.report.storedDtcs.length,
                   colorScheme: colorScheme,
                 ),
                 const SizedBox(height: 8),
-                if (report.storedDtcs.isEmpty)
-                  _buildEmptyState('No stored DTCs detected.', colorScheme)
+                if (widget.report.storedDtcs.isEmpty)
+                  _buildEmptyState(
+                    _isPl
+                        ? 'Brak zapisanych kodów DTC.'
+                        : 'No stored DTCs detected.',
+                    colorScheme,
+                  )
                 else
-                  ...report.storedDtcs.map((dtc) => _buildDtcItem(dtc, colorScheme)),
+                  ...widget.report.storedDtcs
+                      .map((dtc) => _buildDtcItem(dtc, colorScheme)),
 
                 const SizedBox(height: 20),
 
                 // Pending DTCs Section
                 _buildSectionTitle(
-                  title: 'Pending Trouble Codes (Mode 07)',
-                  count: report.pendingDtcs.length,
+                  title: _isPl
+                      ? 'Oczekujące kody błędów (Tryb 07)'
+                      : 'Pending Trouble Codes (Mode 07)',
+                  count: widget.report.pendingDtcs.length,
                   colorScheme: colorScheme,
                 ),
                 const SizedBox(height: 8),
-                if (report.pendingDtcs.isEmpty)
-                  _buildEmptyState('No pending DTCs detected.', colorScheme)
+                if (widget.report.pendingDtcs.isEmpty)
+                  _buildEmptyState(
+                    _isPl
+                        ? 'Brak oczekujących kodów DTC.'
+                        : 'No pending DTCs detected.',
+                    colorScheme,
+                  )
                 else
-                  ...report.pendingDtcs.map((dtc) => _buildDtcItem(dtc, colorScheme)),
+                  ...widget.report.pendingDtcs
+                      .map((dtc) => _buildDtcItem(dtc, colorScheme)),
 
                 const SizedBox(height: 20),
 
                 // Anomaly Episodes Section
                 _buildSectionTitle(
-                  title: 'Recent Anomaly Episodes',
-                  count: report.recentAnomalies.length,
+                  title: _isPl
+                      ? 'Ostatnie wykryte anomalie'
+                      : 'Recent Anomaly Episodes',
+                  count: widget.report.recentAnomalies.length,
                   colorScheme: colorScheme,
                 ),
                 const SizedBox(height: 8),
-                if (report.recentAnomalies.isEmpty)
-                  _buildEmptyState('No anomalies detected.', colorScheme)
+                if (widget.report.recentAnomalies.isEmpty)
+                  _buildEmptyState(
+                    _isPl
+                        ? 'Brak wykrytych anomalii.'
+                        : 'No anomalies detected.',
+                    colorScheme,
+                  )
                 else
-                  ...report.recentAnomalies
+                  ...widget.report.recentAnomalies
                       .map((anom) => _buildAnomalyItem(anom, colorScheme)),
 
                 // Latest Parked Telemetry (if available)
-                if (report.latestSnapshot != null) ...[
+                if (widget.report.latestSnapshot != null) ...[
                   const SizedBox(height: 20),
                   _buildSectionTitle(
-                    title: 'Latest Parked Telemetry',
+                    title: _isPl
+                        ? 'Ostatnia telemetria postoju'
+                        : 'Latest Parked Telemetry',
                     colorScheme: colorScheme,
                   ),
                   const SizedBox(height: 8),
-                  _buildSnapshotInfo(report.latestSnapshot!, colorScheme),
+                  _buildSnapshotInfo(
+                    widget.report.latestSnapshot!,
+                    colorScheme,
+                  ),
                 ],
               ],
             ),
@@ -308,7 +431,11 @@ class MechanicReportSheet extends StatelessWidget {
               child: ElevatedButton.icon(
                 key: const Key('mechanic_report_share_button'),
                 icon: const Icon(Icons.share_rounded, size: 20),
-                label: const Text('Share Diagnostic Report'),
+                label: Text(
+                  _isPl
+                      ? 'Udostępnij raport diagnostyczny'
+                      : 'Share Diagnostic Report',
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colorScheme.primary,
                   foregroundColor: colorScheme.onPrimary,
@@ -461,7 +588,9 @@ class MechanicReportSheet extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  dtc.severity,
+                  _isPl
+                      ? MechanicDiagnosticReport.severityToPl(dtc.severity)
+                      : dtc.severity,
                   style: TextStyle(
                     color: dtc.severity.toLowerCase() == 'critical'
                         ? Colors.redAccent
@@ -484,7 +613,9 @@ class MechanicReportSheet extends StatelessWidget {
           if (dtc.possibleCauses.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              'Possible Causes: ${dtc.possibleCauses}',
+              _isPl
+                  ? 'Możliwe przyczyny / zalecane kroki: ${dtc.possibleCauses}'
+                  : 'Possible Causes: ${dtc.possibleCauses}',
               style: TextStyle(
                 color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                 fontSize: 11,
@@ -534,7 +665,10 @@ class MechanicReportSheet extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  anom.severity.name.toUpperCase(),
+                  _isPl
+                      ? MechanicDiagnosticReport.severityToPl(anom.severity.name)
+                          .toUpperCase()
+                      : anom.severity.name.toUpperCase(),
                   style: TextStyle(
                     color: severityColor,
                     fontSize: 10,
@@ -574,7 +708,9 @@ class MechanicReportSheet extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Battery Voltage: ${snapshot.batteryVoltage.toStringAsFixed(2)} V',
+                _isPl
+                    ? 'Napięcie akumulatora: ${snapshot.batteryVoltage.toStringAsFixed(2)} V'
+                    : 'Battery Voltage: ${snapshot.batteryVoltage.toStringAsFixed(2)} V',
                 style: TextStyle(
                   color: colorScheme.onSurface,
                   fontSize: 12,
@@ -582,7 +718,9 @@ class MechanicReportSheet extends StatelessWidget {
                 ),
               ),
               Text(
-                'Fuel: ${snapshot.remainingFuelLiters.toStringAsFixed(1)} L (${snapshot.fuelLevelPercent.toStringAsFixed(0)}%)',
+                _isPl
+                    ? 'Pozostałe paliwo: ${snapshot.remainingFuelLiters.toStringAsFixed(1)} L (${snapshot.fuelLevelPercent.toStringAsFixed(0)}%)'
+                    : 'Fuel: ${snapshot.remainingFuelLiters.toStringAsFixed(1)} L (${snapshot.fuelLevelPercent.toStringAsFixed(0)}%)',
                 style: TextStyle(
                   color: colorScheme.onSurface,
                   fontSize: 12,
@@ -596,7 +734,9 @@ class MechanicReportSheet extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Est. Range: ~${snapshot.estimatedRangeKm.toStringAsFixed(0)} km',
+                _isPl
+                    ? 'Szacowany zasięg: ~${snapshot.estimatedRangeKm.toStringAsFixed(0)} km'
+                    : 'Est. Range: ~${snapshot.estimatedRangeKm.toStringAsFixed(0)} km',
                 style: TextStyle(
                   color: colorScheme.onSurface,
                   fontSize: 12,
@@ -605,7 +745,9 @@ class MechanicReportSheet extends StatelessWidget {
               ),
               if (snapshot.hasCoordinates)
                 Text(
-                  'GPS: ${snapshot.latitude!.toStringAsFixed(4)}, ${snapshot.longitude!.toStringAsFixed(4)}',
+                  _isPl
+                      ? 'Pozycja GPS: ${snapshot.latitude!.toStringAsFixed(4)}, ${snapshot.longitude!.toStringAsFixed(4)}'
+                      : 'GPS: ${snapshot.latitude!.toStringAsFixed(4)}, ${snapshot.longitude!.toStringAsFixed(4)}',
                   style: TextStyle(
                     color: colorScheme.onSurfaceVariant,
                     fontSize: 11,

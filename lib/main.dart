@@ -26,7 +26,7 @@ Future<void> runRedriveApp(AppFlavor flavor) async {
 
   AppConfig.initialize(
     flavor: flavor,
-    appTitle: flavor.isPhone ? 'OBDrive' : 'OBDrive Headunit',
+    appTitle: flavor.isPhone ? 'OBDrive Companion' : 'OBDrive Headunit',
   );
 
   if (flavor.isPhone) {
@@ -126,6 +126,9 @@ class RedriveApp extends StatelessWidget {
             return Locale('zh', region.isEmpty ? 'TW' : region);
           }
           return const Locale('zh', 'CN');
+        }
+        if (locale?.languageCode.toLowerCase() == 'pl') {
+          return const Locale('pl');
         }
         return const Locale('en');
       },

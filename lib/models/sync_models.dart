@@ -207,6 +207,10 @@ class MechanicDiagnosticReport {
       pendingDtcs.isNotEmpty ||
       recentAnomalies.isNotEmpty;
 
+  static String severityToPl(String severity) => _severityPl(severity);
+  static String fuelTypeToPl(FuelType ft) => _fuelTypePl(ft);
+  static String systemToPl(String system) => _systemPl(system);
+
   MechanicDiagnosticReport copyWith({
     String? reportId,
     DateTime? generatedAt,
@@ -321,10 +325,99 @@ class MechanicDiagnosticReport {
 
   /// Formats the report into a clear, printable text summary suitable for sharing
   /// with a professional mechanic or service department.
-  String toFormattedTextSummary() {
+  String toFormattedTextSummary({String language = 'en'}) {
+    final isPl = language.toLowerCase() == 'pl';
     final buffer = StringBuffer();
+
+    if (isPl) {
+      buffer.writeln('========================================');
+      buffer.writeln('     RAPORT DIAGNOSTYCZNY OBDRIVE       ');
+      buffer.writeln('========================================');
+      buffer.writeln('Identyfikator raportu: $reportId');
+      buffer.writeln('Wygenerowano: ${generatedAt.toIso8601String()}');
+      buffer.writeln();
+      buffer.writeln('--- INFORMACJE O POJEŹDZIE ---');
+      buffer.writeln('Pojazd: ${vehicle.name}');
+      buffer.writeln('VIN: ${vehicle.vin ?? "Brak danych"}');
+      buffer.writeln('Rodzaj paliwa: ${_fuelTypePl(vehicle.fuelType)}');
+      buffer.writeln('Przebieg całkowity: ${currentOdometerKm.toStringAsFixed(1)} km');
+      if (attachedTripId != null) {
+        buffer.writeln(
+            'Załączona trasa: $attachedTripId ($attachedSampleCount próbek)');
+      }
+      buffer.writeln();
+
+      buffer.writeln('--- ZAPISANE KODY BŁĘDÓW (TRYB 03) ---');
+      if (storedDtcs.isEmpty) {
+        buffer.writeln('Brak zapisanych kodów DTC.');
+      } else {
+        for (final dtc in storedDtcs) {
+          buffer.writeln('[${dtc.code}] (${_severityPl(dtc.severity)}) ${dtc.title}');
+          buffer.writeln('  Układ: ${_systemPl(dtc.system)}');
+          buffer.writeln('  Opis: ${dtc.description}');
+          buffer.writeln(
+              '  Możliwe przyczyny / zalecane kroki: ${dtc.possibleCauses}');
+        }
+      }
+      buffer.writeln();
+
+      buffer.writeln('--- OCZEKUJĄCE KODY BŁĘDÓW (TRYB 07) ---');
+      if (pendingDtcs.isEmpty) {
+        buffer.writeln('Brak oczekujących kodów DTC.');
+      } else {
+        for (final dtc in pendingDtcs) {
+          buffer.writeln('[${dtc.code}] (${_severityPl(dtc.severity)}) ${dtc.title}');
+          buffer.writeln('  Układ: ${_systemPl(dtc.system)}');
+          buffer.writeln('  Opis: ${dtc.description}');
+          buffer.writeln(
+              '  Możliwe przyczyny / zalecane kroki: ${dtc.possibleCauses}');
+        }
+      }
+      buffer.writeln();
+
+      buffer.writeln('--- OSTATNIE WYKRYTE ANOMALIE ---');
+      if (recentAnomalies.isEmpty) {
+        buffer.writeln('Brak wykrytych anomalii.');
+      } else {
+        for (final anomaly in recentAnomalies) {
+          buffer.writeln(
+              '• ${anomaly.title} [${_severityPl(anomaly.severity.name).toUpperCase()}]');
+          buffer.writeln('  Czas: ${anomaly.startTime.toIso8601String()}');
+          if (anomaly.latitude != null && anomaly.longitude != null) {
+            buffer.writeln(
+                '  Pozycja GPS: ${anomaly.latitude}, ${anomaly.longitude}');
+          }
+          buffer.writeln('  Opis: ${anomaly.description}');
+          if (anomaly.dtcCodes.isNotEmpty) {
+            buffer.writeln('  Powiązane kody DTC: ${anomaly.dtcCodes.join(', ')}');
+          }
+        }
+      }
+      buffer.writeln();
+
+      buffer.writeln('--- OSTATNIA TELEMETRIA POSTOJU ---');
+      if (latestSnapshot != null) {
+        final snap = latestSnapshot!;
+        buffer.writeln(
+            'Napięcie akumulatora: ${snap.batteryVoltage.toStringAsFixed(2)} V');
+        buffer.writeln(
+            'Temperatura płynu chłodzącego: ${snap.coolantTempC.toStringAsFixed(1)} °C');
+        buffer.writeln(
+            'Pozostałe paliwo: ${snap.remainingFuelLiters.toStringAsFixed(1)} L (${snap.fuelLevelPercent.toStringAsFixed(1)}%)');
+        buffer.writeln(
+            'Szacowany zasięg: ${snap.estimatedRangeKm.toStringAsFixed(1)} km');
+        if (snap.hasCoordinates) {
+          buffer.writeln('Pozycja GPS: ${snap.latitude}, ${snap.longitude}');
+        }
+      } else {
+        buffer.writeln('Brak danych telemetrycznych postoju.');
+      }
+      buffer.writeln('========================================');
+      return buffer.toString();
+    }
+
     buffer.writeln('========================================');
-    buffer.writeln('      REDRIVE DIAGNOSTIC REPORT         ');
+    buffer.writeln('      OBDRIVE DIAGNOSTIC REPORT         ');
     buffer.writeln('========================================');
     buffer.writeln('Report ID: $reportId');
     buffer.writeln('Generated: ${generatedAt.toIso8601String()}');
@@ -636,3 +729,48 @@ int _toInt(dynamic val, [int defaultValue = 0]) {
   if (val is num) return val.toInt();
   return int.tryParse(val.toString()) ?? defaultValue;
 }
+
+String _fuelTypePl(FuelType ft) {
+  switch (ft) {
+    case FuelType.gasoline:
+      return 'Benzyna';
+    case FuelType.lpg:
+      return 'LPG';
+    case FuelType.diesel:
+      return 'Diesel';
+    case FuelType.hybrid:
+      return 'Hybryda';
+  }
+}
+
+String _severityPl(String severity) {
+  switch (severity.toLowerCase()) {
+    case 'critical':
+      return 'Krytyczny';
+    case 'warning':
+      return 'Ostrzeżenie';
+    case 'problem':
+      return 'Problem';
+    case 'info':
+    case 'information':
+      return 'Informacja';
+    default:
+      return severity;
+  }
+}
+
+String _systemPl(String system) {
+  switch (system.toLowerCase()) {
+    case 'powertrain':
+      return 'Układ napędowy';
+    case 'chassis':
+      return 'Podwozie';
+    case 'body':
+      return 'Nadwozie';
+    case 'network':
+      return 'Sieć / Komunikacja';
+    default:
+      return system;
+  }
+}
+
