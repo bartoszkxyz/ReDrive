@@ -7,7 +7,9 @@ import 'package:redrive/screens/companion/companion_settings_sheet.dart';
 import 'package:redrive/screens/companion/companion_status_tab.dart';
 import 'package:redrive/screens/diagnostics_screen.dart';
 import 'package:redrive/screens/trips_screen.dart';
+import 'package:redrive/services/sync/bluetooth_sync_service.dart';
 import 'package:redrive/widget/companion/sync_status_pill.dart';
+import 'package:redrive/widget/companion/vehicle_link_modal_sheet.dart';
 
 /// Primary container screen for the OBDrive Phone Companion application.
 /// Provides a 4-tab workflow: Status, Trips, Garage, and Diagnostics,
@@ -19,8 +21,43 @@ class PhoneCompanionScreen extends StatefulWidget {
   State<PhoneCompanionScreen> createState() => _PhoneCompanionScreenState();
 }
 
-class _PhoneCompanionScreenState extends State<PhoneCompanionScreen> {
+class _PhoneCompanionScreenState extends State<PhoneCompanionScreen>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndAutoSync();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkAndAutoSync();
+    }
+  }
+
+  void _checkAndAutoSync() async {
+    if (!mounted) return;
+    final syncProvider = context.read<SyncProvider>();
+    if (syncProvider.connectionState == SyncConnectionState.disconnected ||
+        syncProvider.connectionState == SyncConnectionState.error) {
+      final isSubnet = await syncProvider.isAndroidAutoSubnetActive();
+      if (isSubnet && mounted) {
+        syncProvider.smartSyncWithHeadunit();
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -157,7 +194,8 @@ class _PhoneCompanionScreenState extends State<PhoneCompanionScreen> {
                         key: const Key('companion_sync_pill'),
                         connectionState: syncProvider.connectionState,
                         lastSyncTime: syncProvider.lastSyncTime,
-                        onTap: () => syncProvider.startSyncSession(),
+                        onTap: () => VehicleLinkModalSheet.show(context),
+                        onDoubleTap: () => syncProvider.smartSyncWithHeadunit(),
                       ),
                       const SizedBox(width: 4),
                       IconButton(

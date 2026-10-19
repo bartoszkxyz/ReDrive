@@ -64,6 +64,55 @@ class SocketSyncTransport implements SyncTransport {
   }
 }
 
+/// Individual verification steps for the 4-step link self-test.
+enum LinkSelfTestStep {
+  wifiEnabled,
+  androidAutoSubnet,
+  headunitSocketPing,
+  protocolHandshake,
+}
+
+/// Status of an individual self-test check.
+enum LinkStepStatus {
+  pending,
+  running,
+  passed,
+  failed,
+  warning,
+}
+
+/// Result of an individual self-test verification step.
+class LinkStepResult {
+  final LinkSelfTestStep step;
+  final LinkStepStatus status;
+  final String title;
+  final String details;
+  final int? pingMs;
+
+  const LinkStepResult({
+    required this.step,
+    required this.status,
+    required this.title,
+    required this.details,
+    this.pingMs,
+  });
+}
+
+/// Comprehensive report containing all 4 self-test results and an actionable diagnostic tip.
+class LinkSelfTestReport {
+  final List<LinkStepResult> steps;
+  final DateTime timestamp;
+  final bool overallSuccess;
+  final String? diagnosticTip;
+
+  const LinkSelfTestReport({
+    required this.steps,
+    required this.timestamp,
+    required this.overallSuccess,
+    this.diagnosticTip,
+  });
+}
+
 /// Orchestrates local TCP network synchronization between the Headunit server
 /// and Phone Companion client.
 class NetworkSyncManager extends ChangeNotifier {
@@ -229,6 +278,205 @@ class NetworkSyncManager extends ChangeNotifier {
     } catch (_) {
       return [];
     }
+  }
+
+  /// Checks whether any local IPv4 network interface is in the Android Auto hotspot subnet (192.168.43.x).
+  Future<bool> isAndroidAutoSubnetActive() async {
+    try {
+      final interfaces = await NetworkInterface.list(
+        includeLoopback: false,
+        type: InternetAddressType.IPv4,
+      );
+      for (final iface in interfaces) {
+        for (final addr in iface.addresses) {
+          if (addr.address.startsWith('192.168.43.')) {
+            return true;
+          }
+        }
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Probes TCP reachability of the Headunit server without keeping a socket open.
+  /// Returns ping latency in milliseconds, or null if unreachable.
+  Future<int?> pingHeadunit({
+    String host = defaultAndroidAutoGateway,
+    int port = defaultPort,
+    Duration timeout = const Duration(milliseconds: 1500),
+  }) async {
+    final sw = Stopwatch()..start();
+    try {
+      final s = await Socket.connect(host, port, timeout: timeout);
+      sw.stop();
+      s.destroy();
+      return sw.elapsedMilliseconds;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Runs the 4-step link self-test from the Phone Companion perspective:
+  /// 1. Phone Wi-Fi enabled check
+  /// 2. In-car Android Auto subnet check (192.168.43.x)
+  /// 3. Headunit Socket Ping (port 7355)
+  /// 4. Protocol handshake & Headunit status
+  Future<LinkSelfTestReport> runLinkSelfTest({
+    String host = defaultAndroidAutoGateway,
+    int port = defaultPort,
+  }) async {
+    final results = <LinkStepResult>[];
+    String? diagnosticTip;
+
+    // 1. Phone Wi-Fi / Local Interface check
+    List<NetworkInterface> interfaces = [];
+    try {
+      interfaces = await NetworkInterface.list(
+        includeLoopback: false,
+        type: InternetAddressType.IPv4,
+      );
+    } catch (_) {}
+
+    if (interfaces.isEmpty) {
+      results.add(const LinkStepResult(
+        step: LinkSelfTestStep.wifiEnabled,
+        status: LinkStepStatus.failed,
+        title: 'Phone Wi-Fi State',
+        details: 'No active local network interfaces found. Wi-Fi may be disabled.',
+      ));
+      diagnosticTip = 'Enable Wi-Fi on your phone and connect to Android Auto or your car hotspot.';
+      return LinkSelfTestReport(
+        steps: results,
+        timestamp: DateTime.now(),
+        overallSuccess: false,
+        diagnosticTip: diagnosticTip,
+      );
+    }
+
+    final localIps = interfaces
+        .expand((i) => i.addresses.map((a) => '${a.address} (${i.name})'))
+        .toList();
+    results.add(LinkStepResult(
+      step: LinkSelfTestStep.wifiEnabled,
+      status: LinkStepStatus.passed,
+      title: 'Phone Wi-Fi State',
+      details: 'Active interface(s): ${localIps.join(", ")}',
+    ));
+
+    // 2. Android Auto Subnet check
+    final hasSubnet = localIps.any((ip) => ip.startsWith('192.168.43.'));
+    if (hasSubnet) {
+      results.add(const LinkStepResult(
+        step: LinkSelfTestStep.androidAutoSubnet,
+        status: LinkStepStatus.passed,
+        title: 'Android Auto Subnet',
+        details: 'Connected to in-car Android Auto hotspot subnet (192.168.43.x).',
+      ));
+    } else {
+      results.add(LinkStepResult(
+        step: LinkSelfTestStep.androidAutoSubnet,
+        status: LinkStepStatus.warning,
+        title: 'Android Auto Subnet',
+        details: 'Phone is not on 192.168.43.x (Current: ${localIps.first}). Targeting gateway $host.',
+      ));
+    }
+
+    // 3. Headunit Socket Ping
+    final ping = await pingHeadunit(host: host, port: port);
+    if (ping != null) {
+      results.add(LinkStepResult(
+        step: LinkSelfTestStep.headunitSocketPing,
+        status: LinkStepStatus.passed,
+        title: 'Headunit Socket Ping',
+        details: 'Headunit server at $host:$port responded in ${ping}ms.',
+        pingMs: ping,
+      ));
+    } else {
+      results.add(LinkStepResult(
+        step: LinkSelfTestStep.headunitSocketPing,
+        status: LinkStepStatus.failed,
+        title: 'Headunit Socket Ping',
+        details: 'Cannot reach Headunit server at $host:$port. Socket connection timed out.',
+      ));
+      diagnosticTip = 'Headunit ReDrive service may be asleep (ignition off) or Android Auto Wi-Fi disconnected.';
+      return LinkSelfTestReport(
+        steps: results,
+        timestamp: DateTime.now(),
+        overallSuccess: false,
+        diagnosticTip: diagnosticTip,
+      );
+    }
+
+    // 4. Protocol Handshake & State
+    final connected = await connectToHeadunit(host: host, port: port);
+    if (connected) {
+      results.add(const LinkStepResult(
+        step: LinkSelfTestStep.protocolHandshake,
+        status: LinkStepStatus.passed,
+        title: 'Protocol Handshake & Status',
+        details: 'ReDrive v2 frame handshake verified. Headunit is awake and synchronized.',
+      ));
+    } else {
+      results.add(LinkStepResult(
+        step: LinkSelfTestStep.protocolHandshake,
+        status: LinkStepStatus.failed,
+        title: 'Protocol Handshake & Status',
+        details: 'Failed to complete protocol handshake: ${_lastError ?? "Unknown error"}',
+      ));
+      diagnosticTip = 'Handshake failed. Check if another client is connected or restart Headunit ReDrive.';
+      return LinkSelfTestReport(
+        steps: results,
+        timestamp: DateTime.now(),
+        overallSuccess: false,
+        diagnosticTip: diagnosticTip,
+      );
+    }
+
+    return LinkSelfTestReport(
+      steps: results,
+      timestamp: DateTime.now(),
+      overallSuccess: true,
+      diagnosticTip: 'All checks passed! Direct Android Auto link is operational.',
+    );
+  }
+
+  /// Connects and triggers sync with 15s total budget and a single 2s retry.
+  Future<bool> smartSyncWithHeadunit({
+    String host = defaultAndroidAutoGateway,
+    int port = defaultPort,
+    Duration retryDelay = const Duration(seconds: 2),
+  }) async {
+    // If transport is already active and healthy, trigger sync directly
+    if (syncService.state == SyncConnectionState.connected ||
+        syncService.state == SyncConnectionState.synced) {
+      await syncService.startSyncSession();
+      return true;
+    }
+
+    // Attempt 1: Connect to Headunit
+    bool connected = await connectToHeadunit(
+      host: host,
+      port: port,
+      timeout: const Duration(seconds: 3),
+    );
+
+    if (!connected) {
+      // Retry once after 2-second boot delay in case headunit service was starting
+      await Future.delayed(retryDelay);
+      connected = await connectToHeadunit(
+        host: host,
+        port: port,
+        timeout: const Duration(seconds: 4),
+      );
+    }
+
+    if (connected) {
+      await syncService.startSyncSession();
+      return true;
+    }
+    return false;
   }
 
   @override

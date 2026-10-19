@@ -190,7 +190,7 @@ class _CompanionSettingsSheetState extends State<CompanionSettingsSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // ==========================================
-                    // 1. Bluetooth Sync Card
+                    // 1. Vehicle Link & Sync Card
                     // ==========================================
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -208,18 +208,18 @@ class _CompanionSettingsSheetState extends State<CompanionSettingsSheet> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Expanded(
+                              Expanded(
                                 child: Row(
                                   children: [
-                                    Icon(
-                                      Icons.bluetooth_connected_rounded,
+                                    const Icon(
+                                      Icons.wifi_tethering_rounded,
                                       size: 18,
                                       color: Colors.lightBlueAccent,
                                     ),
-                                    SizedBox(width: 8),
-                                    Flexible(
+                                    const SizedBox(width: 8),
+                                    const Expanded(
                                       child: Text(
-                                        'Bluetooth Sync',
+                                        'Vehicle Link (Android Auto)',
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
                                           fontSize: 15,
@@ -258,6 +258,27 @@ class _CompanionSettingsSheetState extends State<CompanionSettingsSheet> {
                             ],
                           ),
                           const SizedBox(height: 12),
+                          const Row(
+                            children: [
+                              Icon(
+                                Icons.router_rounded,
+                                size: 14,
+                                color: Colors.white54,
+                              ),
+                              SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Target: 192.168.43.1:7355',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
                           Row(
                             children: [
                               const Icon(
@@ -266,11 +287,14 @@ class _CompanionSettingsSheetState extends State<CompanionSettingsSheet> {
                                 color: Colors.white54,
                               ),
                               const SizedBox(width: 6),
-                              Text(
-                                'Last Sync: ${_formatSyncTime(syncProvider.lastSyncTime)}',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.white70,
+                              Expanded(
+                                child: Text(
+                                  'Last Sync: ${_formatSyncTime(syncProvider.lastSyncTime)}',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white70,
+                                  ),
                                 ),
                               ),
                             ],
@@ -288,7 +312,7 @@ class _CompanionSettingsSheetState extends State<CompanionSettingsSheet> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              onPressed: () => syncProvider.startSyncSession(),
+                              onPressed: () => syncProvider.smartSyncWithHeadunit(),
                               icon: const Icon(Icons.sync_rounded, size: 18),
                               label: const Text(
                                 'Sync Now',
@@ -298,6 +322,125 @@ class _CompanionSettingsSheetState extends State<CompanionSettingsSheet> {
                                 ),
                               ),
                             ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // ==========================================
+                    // 2. Storage & Retention Policy
+                    // ==========================================
+                    const Text(
+                      'Storage & Blackbox Retention',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Configure retention duration for high-frequency blackbox data and driving records.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1B222C),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white12,
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Raw 1 Hz Blackbox Logs (.jsonl)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              (14, '14 Days'),
+                              (30, '30 Days'),
+                              (90, '90 Days'),
+                              (0, 'Keep Forever'),
+                            ].map((entry) {
+                              final isSelected = syncProvider.rawBlackboxRetentionDays == entry.$1;
+                              return ChoiceChip(
+                                label: Text(entry.$2),
+                                selected: isSelected,
+                                selectedColor: colorScheme.primary.withValues(alpha: 0.25),
+                                backgroundColor: const Color(0xFF13171F),
+                                onSelected: (selected) {
+                                  if (selected) {
+                                    syncProvider.updateRetentionSettings(rawBlackboxDays: entry.$1);
+                                  }
+                                },
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 14),
+                          const Divider(color: Colors.white10),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Trip Summaries & Routes (History)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              (365, '1 Year'),
+                              (730, '2 Years'),
+                              (0, 'Keep Forever'),
+                            ].map((entry) {
+                              final isSelected = syncProvider.tripSummaryRetentionDays == entry.$1;
+                              return ChoiceChip(
+                                label: Text(entry.$2),
+                                selected: isSelected,
+                                selectedColor: colorScheme.primary.withValues(alpha: 0.25),
+                                backgroundColor: const Color(0xFF13171F),
+                                onSelected: (selected) {
+                                  if (selected) {
+                                    syncProvider.updateRetentionSettings(tripSummaryDays: entry.$1);
+                                  }
+                                },
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              const Icon(Icons.info_outline_rounded, size: 14, color: Colors.white54),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Trip summaries average ~4 KB/drive (~1.4 MB for 6 months).',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.white54,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

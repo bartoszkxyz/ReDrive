@@ -13,6 +13,7 @@ import 'package:redrive/providers/trip_provider.dart';
 import 'package:redrive/core/app_flavor.dart';
 import 'package:redrive/services/sync/bluetooth_sync_service.dart';
 import 'package:redrive/services/sync/network_sync_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Presentation and state management provider coordinating Bluetooth synchronization,
 /// parked car snapshot tracking, and DTC mechanic diagnostic report generation.
@@ -62,6 +63,7 @@ class SyncProvider extends ChangeNotifier {
   Future<void> _init() async {
     try {
       await _syncService.loadPersistedState();
+      await loadRetentionSettings();
       _setupDelegate();
     } finally {
       if (!_initCompleter.isCompleted) {
@@ -351,12 +353,95 @@ class SyncProvider extends ChangeNotifier {
     return _networkSyncManager.stopServer();
   }
 
+  static const String prefRawBlackboxDaysKey = 'sync_pref_raw_blackbox_retention_days';
+  static const String prefTripSummaryDaysKey = 'sync_pref_trip_summary_retention_days';
+
+  int _rawBlackboxRetentionDays = 30; // 0 = keep forever
+  int get rawBlackboxRetentionDays => _rawBlackboxRetentionDays;
+
+  int _tripSummaryRetentionDays = 0; // 0 = keep forever
+  int get tripSummaryRetentionDays => _tripSummaryRetentionDays;
+
+  /// Loads retention preferences from [SharedPreferences].
+  Future<void> loadRetentionSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _rawBlackboxRetentionDays = prefs.getInt(prefRawBlackboxDaysKey) ?? 30;
+      _tripSummaryRetentionDays = prefs.getInt(prefTripSummaryDaysKey) ?? 0;
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// Updates and persists configurable storage retention thresholds.
+  Future<void> updateRetentionSettings({
+    int? rawBlackboxDays,
+    int? tripSummaryDays,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (rawBlackboxDays != null) {
+      _rawBlackboxRetentionDays = rawBlackboxDays;
+      await prefs.setInt(prefRawBlackboxDaysKey, rawBlackboxDays);
+    }
+    if (tripSummaryDays != null) {
+      _tripSummaryRetentionDays = tripSummaryDays;
+      await prefs.setInt(prefTripSummaryDaysKey, tripSummaryDays);
+    }
+    notifyListeners();
+  }
+
   /// Connects to the Headunit TCP Sync Server from Phone Companion.
   Future<bool> connectNetworkSync({
     String host = NetworkSyncManager.defaultAndroidAutoGateway,
     int port = NetworkSyncManager.defaultPort,
   }) {
     return _networkSyncManager.connectToHeadunit(host: host, port: port);
+  }
+
+  LinkSelfTestReport? _overrideSelfTestReport;
+  @visibleForTesting
+  set overrideSelfTestReport(LinkSelfTestReport? report) {
+    _overrideSelfTestReport = report;
+  }
+
+  int? _overridePingLatency;
+  @visibleForTesting
+  set overridePingLatency(int? ping) {
+    _overridePingLatency = ping;
+  }
+
+  /// Runs the comprehensive 4-step link self-test from the Phone Companion perspective.
+  Future<LinkSelfTestReport> runLinkSelfTest({
+    String host = NetworkSyncManager.defaultAndroidAutoGateway,
+    int port = NetworkSyncManager.defaultPort,
+  }) {
+    if (_overrideSelfTestReport != null) {
+      return Future.value(_overrideSelfTestReport!);
+    }
+    return _networkSyncManager.runLinkSelfTest(host: host, port: port);
+  }
+
+  /// Probes TCP reachability and ping latency to the Headunit server without keeping a socket open.
+  Future<int?> pingHeadunit({
+    String host = NetworkSyncManager.defaultAndroidAutoGateway,
+    int port = NetworkSyncManager.defaultPort,
+  }) {
+    if (_overridePingLatency != null) {
+      return Future.value(_overridePingLatency);
+    }
+    return _networkSyncManager.pingHeadunit(host: host, port: port);
+  }
+
+  /// Checks whether phone is connected to the in-car Android Auto subnet (192.168.43.x).
+  Future<bool> isAndroidAutoSubnetActive() {
+    return _networkSyncManager.isAndroidAutoSubnetActive();
+  }
+
+  /// Connects and triggers sync with 15s budget and a single 2s boot retry.
+  Future<bool> smartSyncWithHeadunit({
+    String host = NetworkSyncManager.defaultAndroidAutoGateway,
+    int port = NetworkSyncManager.defaultPort,
+  }) {
+    return _networkSyncManager.smartSyncWithHeadunit(host: host, port: port);
   }
 
   @override

@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:redrive/services/sync/bluetooth_sync_service.dart';
 
-/// Compact indicator pill showing Bluetooth RFCOMM synchronization state between
+/// Compact indicator pill showing Bluetooth / Wi-Fi synchronization state between
 /// the Headunit and Phone companion.
+/// Single-tap opens the Vehicle Link Modal; double-tap triggers haptic link test & sync.
 class SyncStatusPill extends StatelessWidget {
   final SyncConnectionState connectionState;
   final VoidCallback? onTap;
+  final VoidCallback? onDoubleTap;
   final DateTime? lastSyncTime;
 
   const SyncStatusPill({
     super.key,
     required this.connectionState,
     this.onTap,
+    this.onDoubleTap,
     this.lastSyncTime,
   });
 
@@ -62,10 +66,18 @@ class SyncStatusPill extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        key: const Key('sync_status_pill'),
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+      child: Tooltip(
+        message: 'Tap to view connection status, double-tap to sync',
+        child: InkWell(
+          key: const Key('sync_status_pill'),
+          onTap: onTap,
+          onDoubleTap: onDoubleTap != null
+              ? () {
+                  HapticFeedback.lightImpact();
+                  onDoubleTap!();
+                }
+              : null,
+          borderRadius: BorderRadius.circular(20),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
@@ -111,6 +123,8 @@ class SyncStatusPill extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
+}
+

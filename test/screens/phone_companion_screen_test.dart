@@ -415,5 +415,29 @@ void main() {
 
       expect(garageProvider.activeProfile.id, equals('miata_nd'));
     });
+
+    testWidgets('tapping sync status pill opens VehicleLinkModalSheet', (tester) async {
+      tester.view.physicalSize = const Size(412, 915);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(createPhoneCompanionWidget(
+        syncProvider: syncProvider,
+        garageProvider: garageProvider,
+        tripProvider: tripProvider,
+        obdProvider: obdProvider,
+        themeEngine: themeEngine,
+      ));
+      await tester.pumpAndSettle();
+
+      final pill = find.byKey(const Key('companion_sync_pill'));
+      expect(pill, findsOneWidget);
+      await tester.tap(pill);
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Vehicle Link & Diagnostics'), findsOneWidget);
+      expect(find.byKey(const Key('run_self_test_button')), findsOneWidget);
+    });
   });
 }
