@@ -32,6 +32,7 @@ class _RootScreenState extends State<RootScreen> {
       HeadunitLauncherScreen(
         onOpenDashboard: () => setState(() => _currentIndex = 1),
         onOpenTrips: () => setState(() => _currentIndex = 4),
+        onOpenConnections: () => setState(() => _currentIndex = 2),
         onOpenSettings: () => showSettingsSheet(context),
       )
     else

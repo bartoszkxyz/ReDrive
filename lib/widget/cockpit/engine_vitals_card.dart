@@ -13,6 +13,7 @@ class EngineVitalsCard extends StatelessWidget {
   final double? engineLoad;
   final VoidCallback? onOpenDashboard;
   final VoidCallback? onOpenTrips;
+  final VoidCallback? onOpenConnections;
 
   const EngineVitalsCard({
     super.key,
@@ -20,6 +21,7 @@ class EngineVitalsCard extends StatelessWidget {
     this.engineLoad,
     this.onOpenDashboard,
     this.onOpenTrips,
+    this.onOpenConnections,
   });
 
   ({String label, Color color}) _getCoolantStatus(int temp, CustomThemeColors colors) {
@@ -367,6 +369,48 @@ class EngineVitalsCard extends StatelessWidget {
                               const SizedBox(height: 3),
                               Text(
                                 'Trip History',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: colors.textMain,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        key: const Key('open_connections_button'),
+                        onTap: onOpenConnections,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00E676).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFF00E676).withValues(alpha: 0.4),
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.settings_input_component_rounded,
+                                size: 18,
+                                color: Color(0xFF00E676),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Connections',
                                 style: TextStyle(
                                   fontFamily: 'Inter',
                                   fontSize: 11,

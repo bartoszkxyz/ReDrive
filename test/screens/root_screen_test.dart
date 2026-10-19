@@ -16,6 +16,7 @@ import 'package:redrive/providers/garage_provider.dart';
 import 'package:redrive/providers/obd_provider.dart';
 import 'package:redrive/providers/sync_provider.dart';
 import 'package:redrive/providers/trip_provider.dart';
+import 'package:redrive/screens/connection_screen.dart';
 import 'package:redrive/screens/dashboard_screen.dart';
 import 'package:redrive/screens/headunit_launcher_screen.dart';
 import 'package:redrive/screens/home_screen.dart';
@@ -323,6 +324,24 @@ void main() {
     await tester.pump();
 
     expect(find.byType(TripsScreen), findsOneWidget);
+    expect(find.byType(CustomBottomBar), findsOneWidget);
+  });
+
+  testWidgets('Headunit navigation: opening Connections shows ConnectionScreen',
+      (tester) async {
+    tester.view.physicalSize = const Size(1280, 720);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    await tester.pumpWidget(buildRootWidget(flavor: AppFlavor.headunit));
+    await tester.pump();
+
+    final connBtn = find.byKey(const Key('open_connections_button'));
+    expect(connBtn, findsOneWidget);
+    await tester.tap(connBtn);
+    await tester.pump();
+
+    expect(find.byType(ConnectionScreen), findsOneWidget);
     expect(find.byType(CustomBottomBar), findsOneWidget);
   });
 

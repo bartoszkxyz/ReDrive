@@ -13,6 +13,7 @@ import '../../services/headunit/native_app_launcher_service.dart';
 class CockpitHeaderBar extends StatefulWidget {
   final NativeAppLauncherService? launcherService;
   final VoidCallback? onOpenSettings;
+  final VoidCallback? onOpenConnections;
   final bool? isBtConnected;
   final bool? isDvrRecording;
   final DateTime Function()? nowProvider;
@@ -23,6 +24,7 @@ class CockpitHeaderBar extends StatefulWidget {
     super.key,
     this.launcherService,
     this.onOpenSettings,
+    this.onOpenConnections,
     this.isBtConnected,
     this.isDvrRecording,
     this.nowProvider,
@@ -207,46 +209,53 @@ class _CockpitHeaderBarState extends State<CockpitHeaderBar>
               ),
               const SizedBox(width: 12),
 
-              // BT Status Badge
-              Container(
-                key: const Key('bt_status_badge'),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: isBtConnected
-                      ? colors.secondaryAccent.withValues(alpha: 0.15)
-                      : Colors.white.withValues(alpha: 0.05),
+              // BT Status Badge (Tap to open Connections Center)
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  key: const Key('bt_status_badge'),
+                  onTap: widget.onOpenConnections,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: isBtConnected
-                        ? colors.secondaryAccent.withValues(alpha: 0.6)
-                        : colors.textMuted.withValues(alpha: 0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.bluetooth,
-                      size: 15,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
                       color: isBtConnected
-                          ? colors.secondaryAccent
-                          : colors.textMuted,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      isBtConnected ? 'BT: Connected' : 'BT: Disconnected',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                          ? colors.secondaryAccent.withValues(alpha: 0.15)
+                          : Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
                         color: isBtConnected
-                            ? colors.secondaryAccent
-                            : colors.textMuted,
-                        letterSpacing: 0.4,
+                            ? colors.secondaryAccent.withValues(alpha: 0.6)
+                            : colors.textMuted.withValues(alpha: 0.3),
+                        width: 1,
                       ),
                     ),
-                  ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.bluetooth,
+                          size: 15,
+                          color: isBtConnected
+                              ? colors.secondaryAccent
+                              : colors.textMuted,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isBtConnected ? 'BT: Connected' : 'BT: Disconnected',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isBtConnected
+                                ? colors.secondaryAccent
+                                : colors.textMuted,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),

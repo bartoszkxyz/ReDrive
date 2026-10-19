@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'l10n/app_localizations.dart';
 
 import 'package:flutter/material.dart';
@@ -75,6 +77,10 @@ Future<void> runRedriveApp(AppFlavor flavor) async {
       obdProvider: obdProvider,
       themeEngine: themeEngine,
     );
+
+  if (flavor.isHeadunit) {
+    unawaited(syncProvider.startNetworkSyncServer());
+  }
 
   runApp(
     MultiProvider(

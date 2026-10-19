@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:redrive/l10n/app_localizations.dart';
 
-enum ConnectionTab { bluetooth, wifi, usb }
+enum ConnectionTab { obd, sync, wifi, troubleshoot }
 
 class CustomTabBar extends StatelessWidget {
   final ConnectionTab selectedTab;
@@ -15,60 +14,52 @@ class CustomTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
       height: 52,
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(26),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.2),
+          width: 1,
+        ),
       ),
-      child: Stack(
+      child: Row(
         children: [
-          AnimatedAlign(
-            duration: const Duration(milliseconds: 100),
-            curve: Curves.easeInOut,
-            alignment: Alignment(
-              selectedTab == ConnectionTab.bluetooth
-                  ? -1.0
-                  : (selectedTab == ConnectionTab.wifi ? 0.0 : 1.0),
-              0,
-            ),
-            child: FractionallySizedBox(
-              widthFactor: 1 / 3,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: colorScheme.primary,
-                  borderRadius: BorderRadius.circular(50),
-                ),
-              ),
-            ),
+          _TabItem(
+            key: const Key('tab_obd'),
+            tab: ConnectionTab.obd,
+            icon: Icons.directions_car_rounded,
+            label: 'OBD (ELM327)',
+            currentTab: selectedTab,
+            onTap: onTabSelected,
           ),
-          Row(
-            children: [
-              _TabItem(
-                tab: ConnectionTab.bluetooth,
-                icon: Icons.bluetooth,
-                label: l.bluetooth,
-                currentTab: selectedTab,
-                onTap: onTabSelected,
-              ),
-              _TabItem(
-                tab: ConnectionTab.wifi,
-                icon: Icons.wifi,
-                label: l.wifi,
-                currentTab: selectedTab,
-                onTap: onTabSelected,
-              ),
-              _TabItem(
-                tab: ConnectionTab.usb,
-                icon: Icons.usb,
-                label: l.usb,
-                currentTab: selectedTab,
-                onTap: onTabSelected,
-              ),
-            ],
+          _TabItem(
+            key: const Key('tab_sync'),
+            tab: ConnectionTab.sync,
+            icon: Icons.sync_rounded,
+            label: 'Phone Sync',
+            currentTab: selectedTab,
+            onTap: onTabSelected,
+          ),
+          _TabItem(
+            key: const Key('tab_wifi'),
+            tab: ConnectionTab.wifi,
+            icon: Icons.wifi_rounded,
+            label: 'Wi-Fi / TCP',
+            currentTab: selectedTab,
+            onTap: onTabSelected,
+          ),
+          _TabItem(
+            key: const Key('tab_troubleshoot'),
+            tab: ConnectionTab.troubleshoot,
+            icon: Icons.build_circle_rounded,
+            label: 'Diagnostics',
+            currentTab: selectedTab,
+            onTap: onTabSelected,
           ),
         ],
       ),
@@ -84,6 +75,7 @@ class _TabItem extends StatelessWidget {
   final ValueChanged<ConnectionTab> onTap;
 
   const _TabItem({
+    super.key,
     required this.tab,
     required this.currentTab,
     required this.icon,
@@ -97,26 +89,36 @@ class _TabItem extends StatelessWidget {
     final isActive = currentTab == tab;
     final contentColor = isActive
         ? colorScheme.onPrimary
-        : colorScheme.onSurface.withValues(alpha: 0.4);
+        : colorScheme.onSurface.withValues(alpha: 0.6);
 
     return Expanded(
       child: GestureDetector(
         onTap: () => onTap(tab),
         behavior: HitTestBehavior.opaque,
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeInOut,
           alignment: Alignment.center,
-          color: Colors.transparent,
+          decoration: BoxDecoration(
+            color: isActive ? colorScheme.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(22),
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: contentColor, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: contentColor,
-                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
-                  fontSize: 15,
+              Icon(icon, color: contentColor, size: 18),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: contentColor,
+                    fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ],

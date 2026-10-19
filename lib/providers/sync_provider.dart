@@ -12,6 +12,7 @@ import 'package:redrive/providers/obd_provider.dart';
 import 'package:redrive/providers/trip_provider.dart';
 import 'package:redrive/core/app_flavor.dart';
 import 'package:redrive/services/sync/bluetooth_sync_service.dart';
+import 'package:redrive/services/sync/network_sync_manager.dart';
 
 /// Presentation and state management provider coordinating Bluetooth synchronization,
 /// parked car snapshot tracking, and DTC mechanic diagnostic report generation.
@@ -19,9 +20,12 @@ class SyncProvider extends ChangeNotifier {
   final BluetoothSyncService _syncService;
   BluetoothSyncService get syncService => _syncService;
 
+  late final NetworkSyncManager _networkSyncManager;
+  NetworkSyncManager get networkSyncManager => _networkSyncManager;
+
   SyncConnectionState get connectionState => _syncService.state;
   DateTime? get lastSyncTime => _syncService.lastSyncTime;
-  String? get lastError => _syncService.lastError;
+  String? get lastError => _syncService.lastError ?? _networkSyncManager.lastError;
   ParkedCarSnapshot? get latestSnapshot => _syncService.latestSnapshot;
   MechanicDiagnosticReport? get latestMechanicReport =>
       _syncService.latestMechanicReport;
@@ -35,13 +39,22 @@ class SyncProvider extends ChangeNotifier {
   final Completer<void> _initCompleter = Completer<void>();
   Future<void> get initialized => _initCompleter.future;
 
-  SyncProvider({BluetoothSyncService? syncService, ThemeEngine? themeEngine})
-      : _syncService = syncService ??
+  SyncProvider({
+    BluetoothSyncService? syncService,
+    ThemeEngine? themeEngine,
+    NetworkSyncManager? networkSyncManager,
+  })  : _syncService = syncService ??
             BluetoothSyncService(
               deviceId: 'redrive_device_${DateTime.now().millisecondsSinceEpoch}',
               deviceRole: 'headunit',
             ),
         _themeEngine = themeEngine {
+    _networkSyncManager = networkSyncManager ??
+        NetworkSyncManager(
+          syncService: _syncService,
+          isHeadunit: _syncService.deviceRole == 'headunit',
+        );
+    _networkSyncManager.addListener(_onServiceStateChanged);
     _syncService.onStateChanged = _onServiceStateChanged;
     _init();
   }
@@ -328,9 +341,29 @@ class SyncProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Starts the Headunit TCP Sync Server.
+  Future<bool> startNetworkSyncServer({int port = NetworkSyncManager.defaultPort}) {
+    return _networkSyncManager.startServer(port: port);
+  }
+
+  /// Stops the Headunit TCP Sync Server.
+  Future<void> stopNetworkSyncServer() {
+    return _networkSyncManager.stopServer();
+  }
+
+  /// Connects to the Headunit TCP Sync Server from Phone Companion.
+  Future<bool> connectNetworkSync({
+    String host = NetworkSyncManager.defaultAndroidAutoGateway,
+    int port = NetworkSyncManager.defaultPort,
+  }) {
+    return _networkSyncManager.connectToHeadunit(host: host, port: port);
+  }
+
   @override
   void dispose() {
     _isDisposed = true;
+    _networkSyncManager.removeListener(_onServiceStateChanged);
+    _networkSyncManager.dispose();
     _syncService.dispose();
     super.dispose();
   }

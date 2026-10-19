@@ -229,6 +229,7 @@ void main() {
     required SyncProvider syncProvider,
     VoidCallback? onOpenDashboard,
     VoidCallback? onOpenTrips,
+    VoidCallback? onOpenConnections,
     VoidCallback? onOpenSettings,
     DateTime Function()? nowProvider,
   }) {
@@ -243,6 +244,7 @@ void main() {
         home: HeadunitLauncherScreen(
           onOpenDashboard: onOpenDashboard,
           onOpenTrips: onOpenTrips,
+          onOpenConnections: onOpenConnections,
           onOpenSettings: onOpenSettings,
           nowProvider: nowProvider,
           enablePeriodicTimers: false,
@@ -456,6 +458,7 @@ void main() {
 
       bool dashboardOpened = false;
       bool tripsOpened = false;
+      bool connectionsOpened = false;
 
       await tester.pumpWidget(
         buildLauncherHarness(
@@ -465,6 +468,7 @@ void main() {
           syncProvider: syncProvider,
           onOpenDashboard: () => dashboardOpened = true,
           onOpenTrips: () => tripsOpened = true,
+          onOpenConnections: () => connectionsOpened = true,
         ),
       );
       await tester.pumpAndSettle();
@@ -494,6 +498,20 @@ void main() {
       await tester.tap(tripsBtn);
       await tester.pump();
       expect(tripsOpened, isTrue);
+
+      final connBtn = find.byKey(const Key('open_connections_button'));
+      expect(connBtn, findsOneWidget);
+      await tester.tap(connBtn);
+      await tester.pump();
+      expect(connectionsOpened, isTrue);
+
+      // Also verify Header Bar Bluetooth badge opens connections
+      connectionsOpened = false;
+      final btBadge = find.byKey(const Key('bt_status_badge'));
+      expect(btBadge, findsOneWidget);
+      await tester.tap(btBadge);
+      await tester.pump();
+      expect(connectionsOpened, isTrue);
     });
 
     testWidgets('TactileLauncherDock one-tap launches TLINK5, Radio, DSP, and HD DVR',

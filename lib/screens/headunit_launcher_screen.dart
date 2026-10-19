@@ -22,6 +22,7 @@ class HeadunitLauncherScreen extends StatefulWidget {
   final NativeAppLauncherService? launcherService;
   final VoidCallback? onOpenDashboard;
   final VoidCallback? onOpenTrips;
+  final VoidCallback? onOpenConnections;
   final VoidCallback? onOpenSettings;
   final DateTime Function()? nowProvider;
   final bool enablePeriodicTimers;
@@ -31,6 +32,7 @@ class HeadunitLauncherScreen extends StatefulWidget {
     this.launcherService,
     this.onOpenDashboard,
     this.onOpenTrips,
+    this.onOpenConnections,
     this.onOpenSettings,
     this.nowProvider,
     this.enablePeriodicTimers = true,
@@ -87,6 +89,7 @@ class _HeadunitLauncherScreenState extends State<HeadunitLauncherScreen> {
               CockpitHeaderBar(
                 launcherService: _launcherService,
                 onOpenSettings: widget.onOpenSettings,
+                onOpenConnections: widget.onOpenConnections,
                 nowProvider: widget.nowProvider,
                 enablePeriodicTimers: widget.enablePeriodicTimers,
               ),
@@ -110,6 +113,7 @@ class _HeadunitLauncherScreenState extends State<HeadunitLauncherScreen> {
                       child: EngineVitalsCard(
                         onOpenDashboard: widget.onOpenDashboard,
                         onOpenTrips: widget.onOpenTrips,
+                        onOpenConnections: widget.onOpenConnections,
                       ),
                     ),
                   ],
