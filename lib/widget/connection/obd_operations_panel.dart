@@ -6,6 +6,7 @@ import 'package:redrive/l10n/app_localizations.dart';
 import 'package:redrive/obd/source/obd_source_state.dart';
 import 'package:redrive/providers/bluetooth_provider.dart';
 import 'package:redrive/providers/obd_provider.dart';
+import 'package:redrive/services/settings/app_preferences.dart';
 import 'package:redrive/widget/connection/bluetooth/bluetooth_tab.dart';
 import 'package:redrive/widget/settings/obd_adapter_test_sheet.dart';
 
@@ -26,6 +27,20 @@ class ObdOperationsPanel extends StatefulWidget {
 
 class _ObdOperationsPanelState extends State<ObdOperationsPanel> {
   bool _isConnectingManual = false;
+  bool _isAutoConnectEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAutoConnectPref();
+  }
+
+  Future<void> _loadAutoConnectPref() async {
+    final enabled = await AppPreferences.isAutoConnectEnabled();
+    if (mounted) {
+      setState(() => _isAutoConnectEnabled = enabled);
+    }
+  }
 
   Future<void> _handleManualConnect(
     BuildContext context,
@@ -364,6 +379,58 @@ class _ObdOperationsPanelState extends State<ObdOperationsPanel> {
                   ],
                 ),
               ),
+              // Auto-Connect Toggle Pill
+              InkWell(
+                key: const Key('auto_connect_toggle_pill'),
+                onTap: () async {
+                  HapticFeedback.lightImpact();
+                  final newVal = !_isAutoConnectEnabled;
+                  await AppPreferences.setAutoConnectEnabled(newVal);
+                  if (mounted) {
+                    setState(() => _isAutoConnectEnabled = newVal);
+                  }
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _isAutoConnectEnabled
+                        ? const Color(0xFF00E676).withValues(alpha: 0.15)
+                        : Colors.white10,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _isAutoConnectEnabled
+                          ? const Color(0xFF00E676).withValues(alpha: 0.4)
+                          : Colors.white24,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _isAutoConnectEnabled
+                            ? Icons.bolt_rounded
+                            : Icons.flash_off_rounded,
+                        size: 14,
+                        color: _isAutoConnectEnabled
+                            ? const Color(0xFF00E676)
+                            : Colors.white54,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _isAutoConnectEnabled ? 'Auto-Connect: ON' : 'Auto-Connect: OFF',
+                        style: TextStyle(
+                          color: _isAutoConnectEnabled
+                              ? const Color(0xFF00E676)
+                              : Colors.white60,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
 
@@ -474,6 +541,33 @@ class _ObdOperationsPanelState extends State<ObdOperationsPanel> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Footnote clarifying auto-connect vs manual override
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 13,
+                color: Colors.white.withValues(alpha: 0.4),
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  _isAutoConnectEnabled
+                      ? 'Auto-connect is active on ignition. Manual buttons are optional overrides.'
+                      : 'Auto-connect is paused. Use manual connect to start session.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.white.withValues(alpha: 0.45),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),

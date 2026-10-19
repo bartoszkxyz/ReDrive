@@ -9,8 +9,12 @@ import 'package:redrive/providers/sync_provider.dart';
 import 'package:redrive/screens/connection_screen.dart';
 import 'package:redrive/services/sync/bluetooth_sync_service.dart';
 import 'package:redrive/widget/settings/obd_adapter_test_sheet.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
   Widget buildConnectionScreenHarness({
     required BluetoothProvider bluetoothProvider,
     required ObdProvider obdProvider,
@@ -66,7 +70,15 @@ void main() {
       expect(find.byKey(const Key('tab_wifi')), findsOneWidget);
       expect(find.byKey(const Key('tab_troubleshoot')), findsOneWidget);
 
-      // Hero manual buttons
+      // Auto-connect toggle pill & hero manual buttons
+      final autoPill = find.byKey(const Key('auto_connect_toggle_pill'));
+      expect(autoPill, findsOneWidget);
+      expect(find.text('Auto-Connect: ON'), findsOneWidget);
+
+      await tester.tap(autoPill);
+      await tester.pumpAndSettle();
+      expect(find.text('Auto-Connect: OFF'), findsOneWidget);
+
       expect(find.byKey(const Key('manual_obd_connect_button')), findsOneWidget);
       expect(find.text('CONNECT TO OBD'), findsOneWidget);
 
