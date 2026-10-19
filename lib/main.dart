@@ -20,10 +20,9 @@ import 'package:redrive/services/background_service.dart';
 import 'package:redrive/services/obd_background_proxy.dart';
 import 'package:redrive/services/logging/log_service.dart';
 
-void main() async {
+Future<void> runRedriveApp(AppFlavor flavor) async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final flavor = AppFlavor.fromString(appFlavor);
   AppConfig.initialize(
     flavor: flavor,
     appTitle: flavor.isPhone ? 'OBDrive' : 'OBDrive Headunit',
@@ -43,7 +42,7 @@ void main() async {
 
   await LogService.init();
   LogService.i(
-    'ReDrive application starting up (flavor: ${flavor.name})',
+    'OBDrive application starting up (flavor: ${flavor.name})',
     tag: 'App',
   );
 
@@ -87,6 +86,14 @@ void main() async {
       child: const RedriveApp(),
     ),
   );
+}
+
+void main() async {
+  const envFlavor = String.fromEnvironment('FLAVOR');
+  final flavor = envFlavor.isNotEmpty
+      ? AppFlavor.fromString(envFlavor)
+      : AppFlavor.fromString(appFlavor);
+  await runRedriveApp(flavor);
 }
 
 class RedriveApp extends StatelessWidget {
