@@ -33,6 +33,12 @@ class _MockTripProvider extends ChangeNotifier implements TripProvider {
   final GpsLocationService _gpsService = GpsLocationService();
 
   @override
+  Future<void> Function(Trip trip)? onTripFinished;
+
+  @override
+  Future<void> Function()? onSpeedZeroStandstill;
+
+  @override
   VehicleProfile get activeVehicleProfile => _profile;
 
   @override

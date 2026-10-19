@@ -47,6 +47,43 @@ void main() {
     });
   });
 
+  group('FuelLevelSource enum', () {
+    test('provides accurate labels for all fuel level sources', () {
+      expect(FuelLevelSource.obdPid.label, 'OBD-II Sensor (PID 2F)');
+      expect(FuelLevelSource.virtualTank.label, 'Virtual Fuel Tank');
+      expect(FuelLevelSource.none.label, 'Disabled / None');
+    });
+
+    test('fromString parses case-insensitively and maps synonyms', () {
+      expect(FuelLevelSource.fromString('obdpid'), FuelLevelSource.obdPid);
+      expect(FuelLevelSource.fromString('obd_pid'), FuelLevelSource.obdPid);
+      expect(FuelLevelSource.fromString('obd'), FuelLevelSource.obdPid);
+      expect(FuelLevelSource.fromString('OBDPID'), FuelLevelSource.obdPid);
+      expect(FuelLevelSource.fromString('OBD_PID'), FuelLevelSource.obdPid);
+      expect(FuelLevelSource.fromString('OBD'), FuelLevelSource.obdPid);
+      expect(FuelLevelSource.fromString('  obd_pid  '), FuelLevelSource.obdPid);
+
+      expect(FuelLevelSource.fromString('virtualtank'), FuelLevelSource.virtualTank);
+      expect(FuelLevelSource.fromString('virtual_tank'), FuelLevelSource.virtualTank);
+      expect(FuelLevelSource.fromString('virtual'), FuelLevelSource.virtualTank);
+      expect(FuelLevelSource.fromString('VIRTUALTANK'), FuelLevelSource.virtualTank);
+      expect(FuelLevelSource.fromString('VIRTUAL_TANK'), FuelLevelSource.virtualTank);
+      expect(FuelLevelSource.fromString('VIRTUAL'), FuelLevelSource.virtualTank);
+      expect(FuelLevelSource.fromString('  virtual_tank  '), FuelLevelSource.virtualTank);
+
+      expect(FuelLevelSource.fromString('none'), FuelLevelSource.none);
+      expect(FuelLevelSource.fromString('disabled'), FuelLevelSource.none);
+      expect(FuelLevelSource.fromString('NONE'), FuelLevelSource.none);
+      expect(FuelLevelSource.fromString('DISABLED'), FuelLevelSource.none);
+      expect(FuelLevelSource.fromString('  disabled  '), FuelLevelSource.none);
+
+      // Unknown or null defaults to virtualTank
+      expect(FuelLevelSource.fromString(null), FuelLevelSource.virtualTank);
+      expect(FuelLevelSource.fromString(''), FuelLevelSource.virtualTank);
+      expect(FuelLevelSource.fromString('unknown_source'), FuelLevelSource.virtualTank);
+    });
+  });
+
   group('MaintenanceItem model', () {
     final baseDate = DateTime(2026, 1, 15, 10, 0);
 
@@ -220,6 +257,9 @@ void main() {
       expect(profile.baseOdometerKm, 0.0);
       expect(profile.sourceAutoDataUrl, isNull);
       expect(profile.maintenanceItems, isEmpty);
+      expect(profile.fuelLevelSource, FuelLevelSource.virtualTank);
+      expect(profile.virtualTankCurrentLiters, isNull);
+      expect(profile.lastRefuelDate, isNull);
     });
 
     test('effectiveOdometerKm adds cumulative trip distance to base odometer', () {
@@ -278,14 +318,146 @@ void main() {
       expect(swift.baseOdometerKm, 150000.0);
       expect(swift.maintenanceItems, hasLength(4));
       expect(swift.maintenanceItems.first.lastServiceOdometerKm, 150000.0);
+      expect(swift.fuelLevelSource, FuelLevelSource.virtualTank);
+      expect(swift.virtualTankCurrentLiters, 45.0);
+      expect(swift.lastRefuelDate, isNull);
+    });
+
+    test('refuelFull fills virtual tank to capacity and records timestamp', () {
+      final refuelDate = DateTime(2026, 4, 1, 10, 30);
+      const profile = VehicleProfile(
+        id: 'car1',
+        name: 'Car 1',
+        fuelTankCapacityLiters: 45.0,
+        virtualTankCurrentLiters: 12.0,
+      );
+
+      final fullExplicit = profile.refuelFull(atDate: refuelDate);
+      expect(fullExplicit.virtualTankCurrentLiters, 45.0);
+      expect(fullExplicit.lastRefuelDate, refuelDate);
+
+      final before = DateTime.now().subtract(const Duration(seconds: 1));
+      final fullImplicit = profile.refuelFull();
+      final after = DateTime.now().add(const Duration(seconds: 1));
+      expect(fullImplicit.virtualTankCurrentLiters, 45.0);
+      expect(fullImplicit.lastRefuelDate, isNotNull);
+      expect(fullImplicit.lastRefuelDate!.isAfter(before), isTrue);
+      expect(fullImplicit.lastRefuelDate!.isBefore(after), isTrue);
+    });
+
+    test('refuelAmount adds liters and clamps between 0.0 and capacity', () {
+      final refuelDate = DateTime(2026, 4, 2, 11, 0);
+      const untracked = VehicleProfile(
+        id: 'car1',
+        name: 'Car 1',
+        fuelTankCapacityLiters: 50.0,
+      );
+
+      // Starting from null treats current as 0.0
+      final initial = untracked.refuelAmount(20.0, atDate: refuelDate);
+      expect(initial.virtualTankCurrentLiters, 20.0);
+      expect(initial.lastRefuelDate, refuelDate);
+
+      // Adding to existing fuel
+      final topUp = initial.refuelAmount(15.0);
+      expect(topUp.virtualTankCurrentLiters, 35.0);
+
+      // Overflow clamped to capacity
+      final overflow = topUp.refuelAmount(25.0);
+      expect(overflow.virtualTankCurrentLiters, 50.0);
+
+      // Negative value clamped to 0.0
+      final negative = initial.refuelAmount(-30.0);
+      expect(negative.virtualTankCurrentLiters, 0.0);
+    });
+
+    test('deductFuel reduces fuel clamped to capacity or returns unmodified if untracked', () {
+      const untracked = VehicleProfile(
+        id: 'car_untracked',
+        name: 'Untracked',
+        fuelTankCapacityLiters: 45.0,
+      );
+      // Untracked profile is unchanged
+      final afterBurnUntracked = untracked.deductFuel(5.0);
+      expect(afterBurnUntracked.virtualTankCurrentLiters, isNull);
+
+      const tracked = VehicleProfile(
+        id: 'car_tracked',
+        name: 'Tracked',
+        fuelTankCapacityLiters: 45.0,
+        virtualTankCurrentLiters: 20.0,
+      );
+      final burned = tracked.deductFuel(5.5);
+      expect(burned.virtualTankCurrentLiters, 14.5);
+
+      // Burning more than remaining clamps to 0.0
+      final empty = tracked.deductFuel(25.0);
+      expect(empty.virtualTankCurrentLiters, 0.0);
+
+      // Burning negative fuel (fuel added) clamps to tank capacity
+      final excess = tracked.deductFuel(-35.0);
+      expect(excess.virtualTankCurrentLiters, 45.0);
+    });
+
+    test('virtualFuelPercent calculates clamped percentage or null when invalid', () {
+      const untracked = VehicleProfile(
+        id: 'car',
+        name: 'Car',
+        fuelTankCapacityLiters: 50.0,
+      );
+      expect(untracked.virtualFuelPercent, isNull);
+
+      const zeroCapacity = VehicleProfile(
+        id: 'car',
+        name: 'Car',
+        fuelTankCapacityLiters: 0.0,
+        virtualTankCurrentLiters: 10.0,
+      );
+      expect(zeroCapacity.virtualFuelPercent, isNull);
+
+      const half = VehicleProfile(
+        id: 'car',
+        name: 'Car',
+        fuelTankCapacityLiters: 50.0,
+        virtualTankCurrentLiters: 25.0,
+      );
+      expect(half.virtualFuelPercent, 50.0);
+
+      const full = VehicleProfile(
+        id: 'car',
+        name: 'Car',
+        fuelTankCapacityLiters: 50.0,
+        virtualTankCurrentLiters: 50.0,
+      );
+      expect(full.virtualFuelPercent, 100.0);
+
+      const overfilled = VehicleProfile(
+        id: 'car',
+        name: 'Car',
+        fuelTankCapacityLiters: 50.0,
+        virtualTankCurrentLiters: 60.0,
+      );
+      expect(overfilled.virtualFuelPercent, 100.0);
+
+      const negative = VehicleProfile(
+        id: 'car',
+        name: 'Car',
+        fuelTankCapacityLiters: 50.0,
+        virtualTankCurrentLiters: -5.0,
+      );
+      expect(negative.virtualFuelPercent, 0.0);
     });
 
     test('copyWith creates modified instance with field overrides', () {
       final swift = VehicleProfile.defaultSuzukiSwiftM15A();
+      final refuelDate = DateTime(2026, 4, 15, 9, 0);
       final modified = swift.copyWith(
         fuelType: FuelType.lpg,
         baseOdometerKm: 165000.0,
         vin: 'TSMZC21S000123456',
+        fuelLevelSource: FuelLevelSource.obdPid,
+        virtualTankCurrentLiters: 38.0,
+        lastRefuelDate: refuelDate,
       );
 
       expect(modified.id, swift.id);
@@ -294,6 +466,9 @@ void main() {
       expect(modified.vin, 'TSMZC21S000123456');
       expect(modified.displacementLiters, 1.5);
       expect(modified.redlineRpm, 6500);
+      expect(modified.fuelLevelSource, FuelLevelSource.obdPid);
+      expect(modified.virtualTankCurrentLiters, 38.0);
+      expect(modified.lastRefuelDate, refuelDate);
     });
 
     test('JSON serialization and deserialization produces identical model', () {
@@ -315,12 +490,35 @@ void main() {
       expect(json['maxHorsepower'], 102);
       expect(json['curbWeightKg'], 1015);
       expect(json['baseOdometerKm'], 150000.0);
+      expect(json['fuelLevelSource'], 'virtualTank');
+      expect(json['virtualTankCurrentLiters'], 45.0);
+      expect(json.containsKey('lastRefuelDate'), isFalse);
       expect(json['maintenanceItems'], isA<List>());
       expect((json['maintenanceItems'] as List).length, 4);
 
       final restored = VehicleProfile.fromJson(json);
       expect(restored, equals(swift));
       expect(restored.hashCode, equals(swift.hashCode));
+    });
+
+    test('JSON roundtrip preserves custom fuel level source and lastRefuelDate', () {
+      final refuelDate = DateTime(2026, 4, 10, 15, 30);
+      final profile = VehicleProfile.defaultSuzukiSwiftM15A().copyWith(
+        fuelLevelSource: FuelLevelSource.none,
+        virtualTankCurrentLiters: 22.5,
+        lastRefuelDate: refuelDate,
+      );
+
+      final json = profile.toJson();
+      expect(json['fuelLevelSource'], 'none');
+      expect(json['virtualTankCurrentLiters'], 22.5);
+      expect(json['lastRefuelDate'], refuelDate.toIso8601String());
+
+      final restored = VehicleProfile.fromJson(json);
+      expect(restored, equals(profile));
+      expect(restored.fuelLevelSource, FuelLevelSource.none);
+      expect(restored.virtualTankCurrentLiters, 22.5);
+      expect(restored.lastRefuelDate, refuelDate);
     });
 
     test('JSON deserialization handles missing or malformed fields safely', () {
@@ -338,17 +536,30 @@ void main() {
       expect(profile.redlineRpm, 6500);
       expect(profile.curbWeightKg, 1015);
       expect(profile.maintenanceItems, isEmpty);
+      expect(profile.fuelLevelSource, FuelLevelSource.virtualTank);
+      expect(profile.virtualTankCurrentLiters, isNull);
+      expect(profile.lastRefuelDate, isNull);
     });
 
     test('equality and hashCode semantics', () {
       final a = VehicleProfile.defaultSuzukiSwiftM15A();
       final b = VehicleProfile.defaultSuzukiSwiftM15A();
       final c = a.copyWith(maxHorsepower: 125);
+      final d = a.copyWith(virtualTankCurrentLiters: 20.0);
+      final e = a.copyWith(fuelLevelSource: FuelLevelSource.obdPid);
+      final f = a.copyWith(lastRefuelDate: DateTime(2026, 5, 1));
 
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
       expect(a, isNot(equals(c)));
+      expect(a, isNot(equals(d)));
+      expect(a, isNot(equals(e)));
+      expect(a, isNot(equals(f)));
+      expect(a.hashCode, isNot(equals(d.hashCode)));
+      expect(a.hashCode, isNot(equals(e.hashCode)));
+      expect(a.hashCode, isNot(equals(f.hashCode)));
       expect(a.toString(), contains('Suzuki Swift 3'));
+      expect(a.toString(), contains('virtualTank: 45.0L'));
     });
   });
 }

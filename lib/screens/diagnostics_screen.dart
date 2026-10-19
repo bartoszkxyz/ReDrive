@@ -462,31 +462,34 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Diagnostics',
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 32,
-                            fontWeight: FontWeight.w800,
-                            color: colorScheme.onSurface,
-                            letterSpacing: -0.8,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Diagnostics',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: colorScheme.onSurface,
+                              letterSpacing: -0.8,
+                            ),
                           ),
-                        ),
-                        Text(
-                          'ECU CODES & LIVE SENSORS',
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: colorScheme.onSurface.withValues(alpha: 0.5),
-                            letterSpacing: 1.5,
+                          Text(
+                            'ECU CODES & LIVE SENSORS',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.onSurface.withValues(alpha: 0.5),
+                              letterSpacing: 1.2,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
@@ -548,20 +551,24 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                               children: [
                                 Icon(
                                   Icons.warning_amber_rounded,
-                                  size: 18,
+                                  size: 16,
                                   color: _mode == DiagnosticTabMode.dtc
                                       ? colorScheme.onPrimary
                                       : Colors.white70,
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Fault Codes (DTC)',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13,
-                                    color: _mode == DiagnosticTabMode.dtc
-                                        ? colorScheme.onPrimary
-                                        : Colors.white70,
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    'Fault Codes (DTC)',
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                      color: _mode == DiagnosticTabMode.dtc
+                                          ? colorScheme.onPrimary
+                                          : Colors.white70,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -587,20 +594,24 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                               children: [
                                 Icon(
                                   Icons.insights_rounded,
-                                  size: 18,
+                                  size: 16,
                                   color: _mode == DiagnosticTabMode.liveSensors
                                       ? colorScheme.onPrimary
                                       : Colors.white70,
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Live Sensors',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13,
-                                    color: _mode == DiagnosticTabMode.liveSensors
-                                        ? colorScheme.onPrimary
-                                        : Colors.white70,
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    'Live Sensors',
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                      color: _mode == DiagnosticTabMode.liveSensors
+                                          ? colorScheme.onPrimary
+                                          : Colors.white70,
+                                    ),
                                   ),
                                 ),
                               ],

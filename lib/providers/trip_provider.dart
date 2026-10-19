@@ -151,6 +151,12 @@ class TripProvider extends ChangeNotifier {
   bool _autoTripEnabled = true;
   bool get autoTripEnabled => _autoTripEnabled;
 
+  /// Optional callback invoked when a completed trip is saved to history.
+  Future<void> Function(Trip trip)? onTripFinished;
+
+  /// Optional callback invoked when vehicle transitions to a standstill (0 km/h).
+  Future<void> Function()? onSpeedZeroStandstill;
+
   Timer? _ticker;
 
   final Completer<void> _initCompleter = Completer<void>();
@@ -632,6 +638,9 @@ class TripProvider extends ChangeNotifier {
 
     // Trapezoidal numerical integration for distance
     final avgSpeedForSlice = (_lastSpeed + speed) / 2.0;
+    if (speed == 0 && _lastSpeed > 0) {
+      onSpeedZeroStandstill?.call();
+    }
     _lastSpeed = speed;
 
     // Calculate instantaneous fuel flow (L/h) with STFT & LTFT fuel trim correction
@@ -881,6 +890,7 @@ class TripProvider extends ChangeNotifier {
 
       await _historyService.saveTrip(trip);
       await _loadHistory();
+      onTripFinished?.call(trip);
       LogService.i(
         "Trip saved to history: ${trip.distanceKm.toStringAsFixed(2)} km, "
         "${trip.duration.inMinutes}m, avg fuel: ${trip.avgFuelConsumption.toStringAsFixed(1)} L/100km, "

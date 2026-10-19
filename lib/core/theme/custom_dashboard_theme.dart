@@ -327,6 +327,127 @@ class CustomDashboardTheme {
     ),
   );
 
+  /// Amber Glow preset (Warm classic amber gauges inspired by BMW/Porsche cockpit backlighting).
+  factory CustomDashboardTheme.amberGlow() => const CustomDashboardTheme(
+    id: 'amber_glow',
+    name: 'Amber Glow',
+    author: 'ReDrive',
+    version: '1.0',
+    colors: CustomThemeColors(
+      background: Color(0xFF090602),
+      surfaceCard: Color(0xFF191208),
+      primaryAccent: Color(0xFFFF9E0B),
+      secondaryAccent: Color(0xFFFFD166),
+      coolantNormal: Color(0xFFFF9E0B),
+      coolantWarning: Color(0xFFFF5400),
+      coolantOverheat: Color(0xFFFF0055),
+      engineLoadLow: Color(0xFFFFB703),
+      engineLoadMedium: Color(0xFFFB8500),
+      engineLoadHigh: Color(0xFFE63946),
+      fuelFlowBarStart: Color(0xFFFF9E0B),
+      fuelFlowBarEnd: Color(0xFFFF3333),
+    ),
+    gaugeStyle: CustomGaugeStyle(
+      needleStyle: GaugeNeedleStyle.solidBlade,
+      arcThickness: 8.0,
+      glowIntensity: 0.35,
+      showTicks: true,
+    ),
+  );
+
+  /// Cyan Cyber preset (Futuristic synthwave electric cyan and deep violet accents).
+  factory CustomDashboardTheme.cyanCyber() => const CustomDashboardTheme(
+    id: 'cyan_cyber',
+    name: 'Cyan Cyber',
+    author: 'ReDrive',
+    version: '1.0',
+    colors: CustomThemeColors(
+      background: Color(0xFF040A10),
+      surfaceCard: Color(0xFF0B1724),
+      primaryAccent: Color(0xFF00E5FF),
+      secondaryAccent: Color(0xFF7C4DFF),
+      coolantNormal: Color(0xFF00E5FF),
+      coolantWarning: Color(0xFFFFD600),
+      coolantOverheat: Color(0xFFFF1744),
+      engineLoadLow: Color(0xFF00E5FF),
+      engineLoadMedium: Color(0xFF7C4DFF),
+      engineLoadHigh: Color(0xFFFF1744),
+      fuelFlowBarStart: Color(0xFF00E5FF),
+      fuelFlowBarEnd: Color(0xFFFF1744),
+    ),
+    gaugeStyle: CustomGaugeStyle(
+      needleStyle: GaugeNeedleStyle.sweepingLine,
+      arcThickness: 8.0,
+      glowIntensity: 0.45,
+      showTicks: true,
+    ),
+  );
+
+  /// Emerald Drive preset (British Racing Green and vibrant neon emerald accents).
+  factory CustomDashboardTheme.emeraldDrive() => const CustomDashboardTheme(
+    id: 'emerald_drive',
+    name: 'Emerald Drive',
+    author: 'ReDrive',
+    version: '1.0',
+    colors: CustomThemeColors(
+      background: Color(0xFF030D07),
+      surfaceCard: Color(0xFF081C10),
+      primaryAccent: Color(0xFF00E676),
+      secondaryAccent: Color(0xFF00B0FF),
+      coolantNormal: Color(0xFF00E676),
+      coolantWarning: Color(0xFFFFC400),
+      coolantOverheat: Color(0xFFFF3D00),
+      engineLoadLow: Color(0xFF00E676),
+      engineLoadMedium: Color(0xFFFFC400),
+      engineLoadHigh: Color(0xFFFF3D00),
+      fuelFlowBarStart: Color(0xFF00E676),
+      fuelFlowBarEnd: Color(0xFFFF3D00),
+    ),
+    gaugeStyle: CustomGaugeStyle(
+      needleStyle: GaugeNeedleStyle.solidBlade,
+      arcThickness: 8.0,
+      glowIntensity: 0.35,
+      showTicks: true,
+    ),
+  );
+
+  /// Monochrome Dark preset (Clean stark grayscale and bright silver high-contrast accents).
+  factory CustomDashboardTheme.monochromeDark() => const CustomDashboardTheme(
+    id: 'monochrome_dark',
+    name: 'Monochrome Dark',
+    author: 'ReDrive',
+    version: '1.0',
+    colors: CustomThemeColors(
+      background: Color(0xFF000000),
+      surfaceCard: Color(0xFF121417),
+      primaryAccent: Color(0xFFECEFF1),
+      secondaryAccent: Color(0xFF90A4AE),
+      textMain: Color(0xFFFFFFFF),
+      textMuted: Color(0xFF78909C),
+      coolantNormal: Color(0xFFB0BEC5),
+      coolantWarning: Color(0xFFFFB74D),
+      coolantOverheat: Color(0xFFEF5350),
+      engineLoadLow: Color(0xFFB0BEC5),
+      engineLoadMedium: Color(0xFFFFB74D),
+      engineLoadHigh: Color(0xFFEF5350),
+      fuelFlowBarStart: Color(0xFFECEFF1),
+      fuelFlowBarEnd: Color(0xFFEF5350),
+    ),
+    gaugeStyle: CustomGaugeStyle(
+      needleStyle: GaugeNeedleStyle.digitalArcOnly,
+      arcThickness: 6.0,
+      glowIntensity: 0.1,
+      showTicks: false,
+    ),
+  );
+
+  static List<CustomDashboardTheme> get companionPresets => [
+    CustomDashboardTheme.amberGlow(),
+    CustomDashboardTheme.cyanCyber(),
+    CustomDashboardTheme.emeraldDrive(),
+    CustomDashboardTheme.monochromeDark(),
+  ];
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,

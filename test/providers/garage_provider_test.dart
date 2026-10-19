@@ -291,4 +291,56 @@ void main() {
       expect(garageProvider.isParsingUrl, isFalse);
     });
   });
+
+  group('GarageProvider Virtual Tank Operations', () {
+    test('refuelFull resets virtual tank to capacity and updates lastRefuelDate', () async {
+      // Partially drain the tank first
+      await garageProvider.deductFuel(20.0);
+      expect(garageProvider.activeProfile.virtualTankCurrentLiters, equals(25.0));
+
+      final refuelDate = DateTime(2026, 10, 19, 12, 0);
+      await garageProvider.refuelFull(atDate: refuelDate);
+
+      expect(garageProvider.activeProfile.virtualTankCurrentLiters, equals(45.0));
+      expect(garageProvider.activeProfile.lastRefuelDate, equals(refuelDate));
+      expect(garageProvider.activeProfile.virtualFuelPercent, equals(100.0));
+    });
+
+    test('refuelAmount increments fuel level clamped at tank capacity', () async {
+      await garageProvider.deductFuel(30.0); // 15L remaining
+      expect(garageProvider.activeProfile.virtualTankCurrentLiters, equals(15.0));
+
+      await garageProvider.refuelAmount(10.0);
+      expect(garageProvider.activeProfile.virtualTankCurrentLiters, equals(25.0));
+
+      // Overfilling clamps to 45.0
+      await garageProvider.refuelAmount(50.0);
+      expect(garageProvider.activeProfile.virtualTankCurrentLiters, equals(45.0));
+    });
+
+    test('deductFuel subtracts fuel burned clamped at 0.0', () async {
+      await garageProvider.deductFuel(15.0);
+      expect(garageProvider.activeProfile.virtualTankCurrentLiters, equals(30.0));
+
+      // Subtraction exceeding current liters clamps to 0.0
+      await garageProvider.deductFuel(50.0);
+      expect(garageProvider.activeProfile.virtualTankCurrentLiters, equals(0.0));
+      expect(garageProvider.activeProfile.virtualFuelPercent, equals(0.0));
+    });
+
+    test('setFuelLevelSource switches between virtualTank, obdPid, and none', () async {
+      expect(garageProvider.activeProfile.fuelLevelSource, equals(FuelLevelSource.virtualTank));
+
+      await garageProvider.setFuelLevelSource(FuelLevelSource.obdPid);
+      expect(garageProvider.activeProfile.fuelLevelSource, equals(FuelLevelSource.obdPid));
+
+      // In obdPid mode, deductFuel is ignored
+      await garageProvider.deductFuel(10.0);
+      expect(garageProvider.activeProfile.fuelLevelSource, equals(FuelLevelSource.obdPid));
+
+      await garageProvider.setFuelLevelSource(FuelLevelSource.none);
+      expect(garageProvider.activeProfile.fuelLevelSource, equals(FuelLevelSource.none));
+    });
+  });
 }
+

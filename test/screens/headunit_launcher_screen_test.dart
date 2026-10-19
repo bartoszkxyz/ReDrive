@@ -160,6 +160,12 @@ class FakeTripProvider extends ChangeNotifier implements TripProvider {
   }) async {}
 
   @override
+  Future<void> Function(Trip trip)? onTripFinished;
+
+  @override
+  Future<void> Function()? onSpeedZeroStandstill;
+
+  @override
   Future<void> clearHistory() async {
     pastTrips = [];
     notifyListeners();

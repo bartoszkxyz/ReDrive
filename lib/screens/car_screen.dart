@@ -691,14 +691,18 @@ class _MaintenanceCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${remaining.toStringAsFixed(0)} km remaining',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface.withValues(alpha: 0.7),
+              Flexible(
+                child: Text(
+                  '${remaining.toStringAsFixed(0)} km remaining',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               ElevatedButton.icon(
                 key: Key('service_done_${item.id}'),
                 onPressed: onServiceDone,
@@ -708,9 +712,10 @@ class _MaintenanceCard extends StatelessWidget {
                   backgroundColor: colorScheme.surface,
                   foregroundColor: colorScheme.onSurface,
                   side: BorderSide(color: colorScheme.outlineVariant),
+                  visualDensity: VisualDensity.compact,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
+                    horizontal: 10,
+                    vertical: 6,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(100),

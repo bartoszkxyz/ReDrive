@@ -14,6 +14,7 @@ import 'providers/sync_provider.dart';
 import 'services/sync/bluetooth_sync_service.dart';
 import 'core/theme/theme_engine.dart';
 import 'core/app_themes.dart';
+import 'screens/phone_companion_screen.dart';
 import 'screens/root_screen.dart';
 
 import 'package:redrive/services/background_service.dart';
@@ -126,7 +127,9 @@ class RedriveApp extends StatelessWidget {
         }
         return const Locale('en');
       },
-      home: const RootScreen(),
+      home: AppConfig.isPhone
+          ? const PhoneCompanionScreen()
+          : const RootScreen(),
     );
   }
 }

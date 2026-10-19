@@ -131,6 +131,59 @@ class GarageProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Refuels the virtual tank of the active (or specified) profile to full capacity.
+  Future<void> refuelFull({String? profileId, DateTime? atDate}) async {
+    final targetId = profileId ?? _state.activeProfileId;
+    final targetProfile = _state.profiles.firstWhere(
+      (p) => p.id == targetId,
+      orElse: () => _state.activeProfile,
+    );
+    final updated = targetProfile.refuelFull(atDate: atDate);
+    await saveProfile(updated);
+  }
+
+  /// Adds [liters] of fuel to the virtual tank of the active (or specified) profile.
+  Future<void> refuelAmount(
+    double liters, {
+    String? profileId,
+    DateTime? atDate,
+  }) async {
+    final targetId = profileId ?? _state.activeProfileId;
+    final targetProfile = _state.profiles.firstWhere(
+      (p) => p.id == targetId,
+      orElse: () => _state.activeProfile,
+    );
+    final updated = targetProfile.refuelAmount(liters, atDate: atDate);
+    await saveProfile(updated);
+  }
+
+  /// Deducts [litersBurned] from the virtual tank of the active (or specified) profile.
+  Future<void> deductFuel(double litersBurned, {String? profileId}) async {
+    if (litersBurned <= 0) return;
+    final targetId = profileId ?? _state.activeProfileId;
+    final targetProfile = _state.profiles.firstWhere(
+      (p) => p.id == targetId,
+      orElse: () => _state.activeProfile,
+    );
+    if (targetProfile.fuelLevelSource != FuelLevelSource.virtualTank) return;
+    final updated = targetProfile.deductFuel(litersBurned);
+    await saveProfile(updated);
+  }
+
+  /// Updates the [FuelLevelSource] for the active (or specified) profile.
+  Future<void> setFuelLevelSource(
+    FuelLevelSource source, {
+    String? profileId,
+  }) async {
+    final targetId = profileId ?? _state.activeProfileId;
+    final targetProfile = _state.profiles.firstWhere(
+      (p) => p.id == targetId,
+      orElse: () => _state.activeProfile,
+    );
+    final updated = targetProfile.copyWith(fuelLevelSource: source);
+    await saveProfile(updated);
+  }
+
   /// Clears any previous URL parse error message.
   void clearUrlParseError() {
     if (_urlParseError != null) {

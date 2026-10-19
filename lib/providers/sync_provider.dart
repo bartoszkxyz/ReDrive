@@ -10,6 +10,7 @@ import 'package:redrive/models/vehicle_profile.dart';
 import 'package:redrive/providers/garage_provider.dart';
 import 'package:redrive/providers/obd_provider.dart';
 import 'package:redrive/providers/trip_provider.dart';
+import 'package:redrive/core/app_flavor.dart';
 import 'package:redrive/services/sync/bluetooth_sync_service.dart';
 
 /// Presentation and state management provider coordinating Bluetooth synchronization,
@@ -31,6 +32,8 @@ class SyncProvider extends ChangeNotifier {
   ThemeEngine? _themeEngine;
 
   bool _isDisposed = false;
+  final Completer<void> _initCompleter = Completer<void>();
+  Future<void> get initialized => _initCompleter.future;
 
   SyncProvider({BluetoothSyncService? syncService, ThemeEngine? themeEngine})
       : _syncService = syncService ??
@@ -44,13 +47,54 @@ class SyncProvider extends ChangeNotifier {
   }
 
   Future<void> _init() async {
-    await _syncService.loadPersistedState();
-    _setupDelegate();
+    try {
+      await _syncService.loadPersistedState();
+      _setupDelegate();
+    } finally {
+      if (!_initCompleter.isCompleted) {
+        _initCompleter.complete();
+      }
+    }
   }
 
   void _onServiceStateChanged() {
     if (_isDisposed) return;
+
+    // Fail-safe: When phone companion disconnects from Headunit,
+    // ensure we have a valid parked snapshot coordinate.
+    if (_syncService.state == SyncConnectionState.disconnected &&
+        AppConfig.isPhone) {
+      _checkPhoneDisconnectFallback();
+    }
+
     notifyListeners();
+  }
+
+  Future<void> _checkPhoneDisconnectFallback() async {
+    final snap = latestSnapshot;
+    final now = DateTime.now();
+    final isStale = snap == null ||
+        snap.latitude == null ||
+        now.difference(snap.timestamp).inSeconds > 45;
+    if (isStale) {
+      final fix = _tripProvider?.latestGpsFix;
+      if (fix != null) {
+        final fallback = (snap ??
+                ParkedCarSnapshot(
+                  timestamp: now,
+                  vehicleId: _garageProvider?.activeProfileId ?? '',
+                  vehicleName:
+                      _garageProvider?.activeProfile.name ?? 'My Vehicle',
+                ))
+            .copyWith(
+          latitude: fix.latitude,
+          longitude: fix.longitude,
+          timestamp: now,
+        );
+        await _syncService.updateParkedSnapshot(fallback);
+        notifyListeners();
+      }
+    }
   }
 
   /// Binds related providers to enable seamless sync data exchange
@@ -151,6 +195,21 @@ class SyncProvider extends ChangeNotifier {
   String? _lastTrackedTripId;
 
   void _listenToTripProvider(TripProvider tripProvider) {
+    tripProvider.onTripFinished = (trip) async {
+      final gp = _garageProvider;
+      if (gp != null) {
+        final profile = gp.activeProfile;
+        if (profile.fuelLevelSource == FuelLevelSource.virtualTank) {
+          await gp.deductFuel(trip.fuelConsumedLiters);
+        }
+      }
+      await captureParkedSnapshot();
+    };
+
+    tripProvider.onSpeedZeroStandstill = () async {
+      await captureParkedSnapshot();
+    };
+
     tripProvider.addListener(() {
       final active = tripProvider.activeTrip;
       // When a trip was active and ends, or when pastTrips has a new completed trip:
@@ -176,15 +235,42 @@ class SyncProvider extends ChangeNotifier {
     final obdData = obd?.data;
     final now = DateTime.now();
 
+    final double remainingFuelLiters;
+    final double fuelLevelPercent;
+    final double estimatedRangeKm;
+
+    switch (profile.fuelLevelSource) {
+      case FuelLevelSource.virtualTank:
+        remainingFuelLiters = profile.virtualTankCurrentLiters ??
+            (obdData?.remainingFuelLiters ?? 0.0);
+        fuelLevelPercent = profile.virtualFuelPercent ??
+            (obdData?.fuelLevelPercent ?? 0.0);
+        const nominalEconomy = 6.8;
+        estimatedRangeKm = remainingFuelLiters > 0
+            ? (remainingFuelLiters / nominalEconomy) * 100.0
+            : (obdData?.estimatedRangeKm ?? 0.0);
+        break;
+      case FuelLevelSource.none:
+        remainingFuelLiters = 0.0;
+        fuelLevelPercent = 0.0;
+        estimatedRangeKm = 0.0;
+        break;
+      case FuelLevelSource.obdPid:
+        remainingFuelLiters = obdData?.remainingFuelLiters ?? 0.0;
+        fuelLevelPercent = obdData?.fuelLevelPercent ?? 0.0;
+        estimatedRangeKm = obdData?.estimatedRangeKm ?? 0.0;
+        break;
+    }
+
     final snapshot = ParkedCarSnapshot(
       timestamp: now,
       vehicleId: profile.id,
       vehicleName: profile.name,
       latitude: fix?.latitude,
       longitude: fix?.longitude,
-      remainingFuelLiters: obdData?.remainingFuelLiters ?? 0.0,
-      fuelLevelPercent: obdData?.fuelLevelPercent ?? 0.0,
-      estimatedRangeKm: obdData?.estimatedRangeKm ?? 0.0,
+      remainingFuelLiters: remainingFuelLiters,
+      fuelLevelPercent: fuelLevelPercent,
+      estimatedRangeKm: estimatedRangeKm,
       batteryVoltage: obdData?.voltage ?? 12.6,
       coolantTempC: (obdData?.coolantTemp ?? 20).toDouble(),
       odometerKm: tp?.effectiveOdometerKm ?? profile.baseOdometerKm,

@@ -71,6 +71,46 @@ enum FuelType {
   }
 }
 
+/// Data source for fuel level tracking.
+enum FuelLevelSource {
+  obdPid,
+  virtualTank,
+  none;
+
+  /// Human-readable label for UI display.
+  String get label {
+    switch (this) {
+      case FuelLevelSource.obdPid:
+        return 'OBD-II Sensor (PID 2F)';
+      case FuelLevelSource.virtualTank:
+        return 'Virtual Fuel Tank';
+      case FuelLevelSource.none:
+        return 'Disabled / None';
+    }
+  }
+
+  /// Parses a fuel level source string case-insensitively, supporting common synonyms.
+  /// Defaults to [FuelLevelSource.virtualTank] if unmatched or null.
+  static FuelLevelSource fromString(String? raw) {
+    if (raw == null) return FuelLevelSource.virtualTank;
+    switch (raw.trim().toLowerCase()) {
+      case 'obdpid':
+      case 'obd_pid':
+      case 'obd':
+        return FuelLevelSource.obdPid;
+      case 'virtualtank':
+      case 'virtual_tank':
+      case 'virtual':
+        return FuelLevelSource.virtualTank;
+      case 'none':
+      case 'disabled':
+        return FuelLevelSource.none;
+      default:
+        return FuelLevelSource.virtualTank;
+    }
+  }
+}
+
 /// A recurring vehicle maintenance interval tracked against odometer distance.
 class MaintenanceItem {
   final String id;
@@ -215,6 +255,9 @@ class VehicleProfile {
   final double baseOdometerKm;
   final String? sourceAutoDataUrl;
   final List<MaintenanceItem> maintenanceItems;
+  final FuelLevelSource fuelLevelSource;
+  final double? virtualTankCurrentLiters;
+  final DateTime? lastRefuelDate;
 
   const VehicleProfile({
     required this.id,
@@ -235,6 +278,9 @@ class VehicleProfile {
     this.baseOdometerKm = 0.0,
     this.sourceAutoDataUrl,
     this.maintenanceItems = const [],
+    this.fuelLevelSource = FuelLevelSource.virtualTank,
+    this.virtualTankCurrentLiters,
+    this.lastRefuelDate,
   });
 
   /// Effective total vehicle odometer including cumulative trip distance.
@@ -292,7 +338,42 @@ class VehicleProfile {
       curbWeightKg: 1015,
       baseOdometerKm: baseOdo,
       maintenanceItems: defaultMaintenanceItems(baseOdometerKm: baseOdo),
+      fuelLevelSource: FuelLevelSource.virtualTank,
+      virtualTankCurrentLiters: 45.0, // starts full on default profile
     );
+  }
+
+  /// Records a full refuel event, filling the virtual tank to [fuelTankCapacityLiters].
+  VehicleProfile refuelFull({DateTime? atDate}) {
+    return copyWith(
+      virtualTankCurrentLiters: fuelTankCapacityLiters,
+      lastRefuelDate: atDate ?? DateTime.now(),
+    );
+  }
+
+  /// Records an incremental refuel event by [liters], clamped between 0.0 and [fuelTankCapacityLiters].
+  VehicleProfile refuelAmount(double liters, {DateTime? atDate}) {
+    final current = virtualTankCurrentLiters ?? 0.0;
+    final newLiters = (current + liters).clamp(0.0, fuelTankCapacityLiters);
+    return copyWith(
+      virtualTankCurrentLiters: newLiters,
+      lastRefuelDate: atDate ?? DateTime.now(),
+    );
+  }
+
+  /// Deducts [litersBurned] from the virtual fuel tank, clamped between 0.0 and [fuelTankCapacityLiters].
+  /// Returns `this` if [virtualTankCurrentLiters] is null.
+  VehicleProfile deductFuel(double litersBurned) {
+    if (virtualTankCurrentLiters == null) return this;
+    final remaining = (virtualTankCurrentLiters! - litersBurned).clamp(0.0, fuelTankCapacityLiters);
+    return copyWith(virtualTankCurrentLiters: remaining);
+  }
+
+  /// Current virtual fuel level expressed as a percentage (0.0% to 100.0%),
+  /// or null if virtual tank is untracked or tank capacity is zero.
+  double? get virtualFuelPercent {
+    if (virtualTankCurrentLiters == null || fuelTankCapacityLiters <= 0) return null;
+    return (virtualTankCurrentLiters! / fuelTankCapacityLiters * 100.0).clamp(0.0, 100.0);
   }
 
   VehicleProfile copyWith({
@@ -314,6 +395,9 @@ class VehicleProfile {
     double? baseOdometerKm,
     String? sourceAutoDataUrl,
     List<MaintenanceItem>? maintenanceItems,
+    FuelLevelSource? fuelLevelSource,
+    double? virtualTankCurrentLiters,
+    DateTime? lastRefuelDate,
   }) {
     return VehicleProfile(
       id: id ?? this.id,
@@ -337,6 +421,10 @@ class VehicleProfile {
       baseOdometerKm: baseOdometerKm ?? this.baseOdometerKm,
       sourceAutoDataUrl: sourceAutoDataUrl ?? this.sourceAutoDataUrl,
       maintenanceItems: maintenanceItems ?? this.maintenanceItems,
+      fuelLevelSource: fuelLevelSource ?? this.fuelLevelSource,
+      virtualTankCurrentLiters:
+          virtualTankCurrentLiters ?? this.virtualTankCurrentLiters,
+      lastRefuelDate: lastRefuelDate ?? this.lastRefuelDate,
     );
   }
 
@@ -360,6 +448,10 @@ class VehicleProfile {
         'sourceAutoDataUrl': sourceAutoDataUrl,
         'maintenanceItems':
             maintenanceItems.map((item) => item.toJson()).toList(),
+        'fuelLevelSource': fuelLevelSource.name,
+        'virtualTankCurrentLiters': virtualTankCurrentLiters,
+        if (lastRefuelDate != null)
+          'lastRefuelDate': lastRefuelDate!.toIso8601String(),
       };
 
   factory VehicleProfile.fromJson(Map<String, dynamic> json) {
@@ -399,6 +491,13 @@ class VehicleProfile {
       baseOdometerKm: _toDouble(json['baseOdometerKm'], 0.0),
       sourceAutoDataUrl: json['sourceAutoDataUrl']?.toString(),
       maintenanceItems: parsedItems,
+      fuelLevelSource:
+          FuelLevelSource.fromString(json['fuelLevelSource']?.toString()),
+      virtualTankCurrentLiters:
+          _toDoubleNullable(json['virtualTankCurrentLiters']),
+      lastRefuelDate: json['lastRefuelDate'] != null
+          ? DateTime.tryParse(json['lastRefuelDate'].toString())
+          : null,
     );
   }
 
@@ -406,6 +505,12 @@ class VehicleProfile {
     if (val == null) return defaultValue;
     if (val is num) return val.toDouble();
     return double.tryParse(val.toString()) ?? defaultValue;
+  }
+
+  static double? _toDoubleNullable(dynamic val) {
+    if (val == null) return null;
+    if (val is num) return val.toDouble();
+    return double.tryParse(val.toString());
   }
 
   static int _toInt(dynamic val, [int defaultValue = 0]) {
@@ -436,7 +541,10 @@ class VehicleProfile {
           curbWeightKg == other.curbWeightKg &&
           baseOdometerKm == other.baseOdometerKm &&
           sourceAutoDataUrl == other.sourceAutoDataUrl &&
-          listEquals(maintenanceItems, other.maintenanceItems);
+          listEquals(maintenanceItems, other.maintenanceItems) &&
+          fuelLevelSource == other.fuelLevelSource &&
+          virtualTankCurrentLiters == other.virtualTankCurrentLiters &&
+          lastRefuelDate == other.lastRefuelDate;
 
   @override
   int get hashCode => Object.hash(
@@ -457,12 +565,15 @@ class VehicleProfile {
         curbWeightKg,
         baseOdometerKm,
         sourceAutoDataUrl,
-        Object.hashAll(maintenanceItems),
+        fuelLevelSource,
+        virtualTankCurrentLiters,
+        Object.hash(lastRefuelDate, Object.hashAll(maintenanceItems)),
       );
 
   @override
   String toString() =>
       'VehicleProfile(id: $id, name: $name, year: $year, fuel: ${fuelType.label}, '
       'displacement: ${displacementLiters}L, tank: ${fuelTankCapacityLiters}L, '
+      'fuelLevelSource: ${fuelLevelSource.name}, virtualTank: ${virtualTankCurrentLiters}L, '
       'baseOdo: $baseOdometerKm km, items: ${maintenanceItems.length})';
 }

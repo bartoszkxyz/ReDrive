@@ -30,30 +30,32 @@ class TripsScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Trips & Fuel',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 32,
-                              fontWeight: FontWeight.w800,
-                              color: colorScheme.onSurface,
-                              letterSpacing: -0.8,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Trips & Fuel',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                                color: colorScheme.onSurface,
+                                letterSpacing: -0.8,
+                              ),
                             ),
-                          ),
-                          Text(
-                            'HISTORY & LOGS',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: colorScheme.onSurface.withValues(alpha: 0.5),
-                              letterSpacing: 1.5,
+                            Text(
+                              'HISTORY & LOGS',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.onSurface.withValues(alpha: 0.5),
+                                letterSpacing: 1.5,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       if (pastTrips.isNotEmpty)
                         IconButton(
@@ -357,25 +359,33 @@ class _LifetimeStatsCard extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _StatColumn(
-            label: 'Total Distance',
-            value: '${totalDistance.toStringAsFixed(1)} km',
+          Expanded(
+            child: _StatColumn(
+              label: 'Total Distance',
+              value: '${totalDistance.toStringAsFixed(1)} km',
+            ),
           ),
           _StatDivider(),
-          _StatColumn(
-            label: 'Total Fuel',
-            value: '${totalFuel.toStringAsFixed(1)} L',
+          Expanded(
+            child: _StatColumn(
+              label: 'Total Fuel',
+              value: '${totalFuel.toStringAsFixed(1)} L',
+            ),
           ),
           _StatDivider(),
-          _StatColumn(
-            label: 'Avg Economy',
-            value: totalDistance > 0 ? '${avgFuel.toStringAsFixed(1)} L/100' : '--',
-            highlight: true,
+          Expanded(
+            child: _StatColumn(
+              label: 'Avg Economy',
+              value: totalDistance > 0 ? '${avgFuel.toStringAsFixed(1)} L/100' : '--',
+              highlight: true,
+            ),
           ),
           _StatDivider(),
-          _StatColumn(
-            label: 'Trips',
-            value: '$tripsCount',
+          Expanded(
+            child: _StatColumn(
+              label: 'Trips',
+              value: '$tripsCount',
+            ),
           ),
         ],
       ),
