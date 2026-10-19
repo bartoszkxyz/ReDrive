@@ -54,9 +54,11 @@ Future<void> runRedriveApp(AppFlavor flavor) async {
 
   final bluetoothProvider = BluetoothProvider();
   final obdProvider = ObdProvider();
-  obdProvider.attachConnection(
-    BluetoothObdConnection(bluetoothProvider),
-  );
+  if (flavor.isHeadunit) {
+    obdProvider.attachConnection(
+      BluetoothObdConnection(bluetoothProvider),
+    );
+  }
   final themeEngine = ThemeEngine();
   final tripProvider = TripProvider()..bindToObd(obdProvider);
   final garageProvider = GarageProvider()
