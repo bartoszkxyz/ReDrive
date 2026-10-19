@@ -291,6 +291,7 @@ void main() {
       expect(find.byKey(const Key('cockpit_header_time')), findsOneWidget);
       expect(find.text('12:45 PM'), findsOneWidget);
       expect(find.byKey(const Key('dvr_rec_badge')), findsOneWidget);
+      expect(find.text('DVR: REC'), findsOneWidget);
       expect(find.byKey(const Key('bt_status_badge')), findsOneWidget);
       expect(find.byKey(const Key('cockpit_settings_button')), findsOneWidget);
     });
@@ -681,6 +682,7 @@ void main() {
             c.arguments['packageName'] == NativeAppLauncherService.pkgDvr),
         isTrue,
       );
+      expect(find.text('DVR: REC'), findsOneWidget);
 
       // Tap Settings button
       await tester.tap(find.byKey(const Key('cockpit_settings_button')));

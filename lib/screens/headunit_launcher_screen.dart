@@ -51,7 +51,9 @@ class _HeadunitLauncherScreenState extends State<HeadunitLauncherScreen> {
     _launcherService = widget.launcherService ?? NativeAppLauncherService();
 
     // Trigger automated background DVR recording for headunit ignition
-    _launcherService.startDvrRecording();
+    _launcherService.startDvrRecording().then((_) {
+      if (mounted) setState(() {});
+    });
 
     // Register active screen PID watchlist with OBD provider
     WidgetsBinding.instance.addPostFrameCallback((_) {

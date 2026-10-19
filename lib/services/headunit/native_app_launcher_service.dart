@@ -88,6 +88,9 @@ class NativeAppLauncherService {
   /// Launch Apple CarPlay / Android Auto (TLink5 / ZLink).
   Future<bool> launchTlink() => launchApp(pkgTlink5, activityName: actTlink5);
 
+  /// Whether the DVR session is currently active.
+  bool isDvrActive = false;
+
   /// Launch native TS18 AM/FM Radio tuner.
   Future<bool> launchRadio() => launchApp(pkgRadio, activityName: actRadio);
 
@@ -95,7 +98,13 @@ class NativeAppLauncherService {
   Future<bool> launchDsp() => launchApp(pkgDsp, activityName: actDsp);
 
   /// Launch USB Dashcam / DVR app.
-  Future<bool> launchDvr() => launchApp(pkgDvr, activityName: actDvr);
+  Future<bool> launchDvr() async {
+    final success = await launchApp(pkgDvr, activityName: actDvr);
+    if (success) {
+      isDvrActive = true;
+    }
+    return success;
+  }
 
   /// Launch TS18 Bluetooth Phone & Audio UI.
   Future<bool> launchBluetooth() => launchApp(pkgBluetooth, activityName: actBluetooth);
@@ -110,6 +119,9 @@ class NativeAppLauncherService {
   Future<bool> startDvrRecording() async {
     try {
       final result = await channel.invokeMethod<bool>('startDvrService');
+      if (result == true) {
+        isDvrActive = true;
+      }
       return result ?? false;
     } catch (_) {
       return false;
@@ -118,11 +130,15 @@ class NativeAppLauncherService {
 
   /// Checks if the DVR background recording service is currently running.
   Future<bool> isDvrRecording() async {
+    if (isDvrActive) return true;
     try {
       final result = await channel.invokeMethod<bool>('isDvrRunning');
-      return result ?? false;
+      if (result == true) {
+        isDvrActive = true;
+      }
+      return result ?? isDvrActive;
     } catch (_) {
-      return false;
+      return isDvrActive;
     }
   }
 

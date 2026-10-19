@@ -35,6 +35,8 @@ class MainActivity : FlutterActivity() {
         private const val STORAGE_CHANNEL = "com.example.redrive/storage"
     }
 
+    private var isDvrStarted: Boolean = false
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, STORAGE_CHANNEL)
@@ -197,6 +199,9 @@ class MainActivity : FlutterActivity() {
 
         if (intent != null) {
             startActivity(intent)
+            if (packageName == "com.ankai.cardvr") {
+                isDvrStarted = true
+            }
             return true
         }
         return false
@@ -245,23 +250,33 @@ class MainActivity : FlutterActivity() {
                         started = true
                         Log.i(TAG, "Started DVR foreground service $srvName")
                     } catch (e: Exception) {
-                        startService(intent)
-                        started = true
+                        val comp = startService(intent)
+                        if (comp != null) {
+                            started = true
+                        }
                         Log.i(TAG, "Started DVR service $srvName (standard)")
                     }
                 } else {
-                    startService(intent)
-                    started = true
+                    val comp = startService(intent)
+                    if (comp != null) {
+                        started = true
+                    }
                     Log.i(TAG, "Started DVR service $srvName")
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Could not start service $srvName: ${e.message}")
             }
         }
+        if (started) {
+            isDvrStarted = true
+        }
         return started
     }
 
     private fun isDvrServiceRunning(): Boolean {
+        if (isDvrStarted) {
+            return true
+        }
         val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
         val running = am.getRunningServices(Int.MAX_VALUE)
         for (info in running) {

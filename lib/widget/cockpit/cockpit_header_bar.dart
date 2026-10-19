@@ -198,7 +198,14 @@ class _CockpitHeaderBarState extends State<CockpitHeaderBar>
               // DVR: REC Badge
               InkWell(
                 key: const Key('dvr_rec_badge'),
-                onTap: () => _launcher.launchDvr(),
+                onTap: () async {
+                  final launched = await _launcher.launchDvr();
+                  if (launched && mounted) {
+                    setState(() {
+                      _dvrRecording = true;
+                    });
+                  }
+                },
                 borderRadius: BorderRadius.circular(6),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),

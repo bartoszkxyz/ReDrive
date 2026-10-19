@@ -254,36 +254,64 @@ void main() {
       final started = await launcherService.startDvrRecording();
 
       expect(started, isTrue);
+      expect(launcherService.isDvrActive, isTrue);
       expect(methodCalls, hasLength(1));
       expect(methodCalls.first.method, 'startDvrService');
+    });
+
+    test('startDvrRecording success activates isDvrActive and isDvrRecording returns true', () async {
+      mockResult = true;
+      expect(await launcherService.startDvrRecording(), isTrue);
+      expect(launcherService.isDvrActive, isTrue);
+
+      methodCalls.clear();
+      // Since isDvrActive is true, isDvrRecording returns true immediately without extra platform call
+      expect(await launcherService.isDvrRecording(), isTrue);
+      expect(methodCalls, isEmpty);
+    });
+
+    test('launchDvr success sets isDvrActive to true and isDvrRecording reflects it', () async {
+      mockResult = true;
+      expect(await launcherService.launchDvr(), isTrue);
+      expect(launcherService.isDvrActive, isTrue);
+      expect(await launcherService.isDvrRecording(), isTrue);
     });
 
     test('startDvrRecording returns false on exception or null', () async {
       mockException = PlatformException(code: 'DVR_START_FAILED', message: 'Failed');
       expect(await launcherService.startDvrRecording(), isFalse);
+      expect(launcherService.isDvrActive, isFalse);
 
       mockException = null;
       mockResult = null;
       expect(await launcherService.startDvrRecording(), isFalse);
+      expect(launcherService.isDvrActive, isFalse);
     });
 
-    test('isDvrRecording invokes isDvrRunning and returns result', () async {
+    test('isDvrRecording invokes isDvrRunning and updates isDvrActive when channel returns true', () async {
       mockResult = true;
 
       final running = await launcherService.isDvrRecording();
 
       expect(running, isTrue);
+      expect(launcherService.isDvrActive, isTrue);
       expect(methodCalls, hasLength(1));
       expect(methodCalls.first.method, 'isDvrRunning');
     });
 
-    test('isDvrRecording returns false on exception or null', () async {
+    test('isDvrRecording returns false on exception or null when not active', () async {
       mockException = PlatformException(code: 'ERROR', message: 'Failed');
       expect(await launcherService.isDvrRecording(), isFalse);
 
       mockException = null;
       mockResult = null;
       expect(await launcherService.isDvrRecording(), isFalse);
+    });
+
+    test('isDvrActive setter allows override for testing or UI previews', () {
+      expect(launcherService.isDvrActive, isFalse);
+      launcherService.isDvrActive = true;
+      expect(launcherService.isDvrActive, isTrue);
     });
   });
 
