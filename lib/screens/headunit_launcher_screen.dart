@@ -122,6 +122,7 @@ class _HeadunitLauncherScreenState extends State<HeadunitLauncherScreen> {
                       flex: 4,
                       child: PipApplicationBay(
                         launcherService: _launcherService,
+                        autoSetPipWindow: false,
                       ),
                     ),
                   ],

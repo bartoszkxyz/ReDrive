@@ -62,15 +62,6 @@ class HeadunitBootReceiver : BroadcastReceiver() {
             return
         }
 
-        // For Bluetooth state changes, only trigger when turning ON
-        if (action == "android.bluetooth.adapter.action.STATE_CHANGED") {
-            val state = intent.getIntExtra("android.bluetooth.adapter.extra.STATE", -1)
-            // 12 is BluetoothAdapter.STATE_ON
-            if (state != 12) {
-                return
-            }
-        }
-
         // 3. Start foreground service (ensures persistence and wake lock in background)
         try {
             val serviceIntent = Intent(context, BackgroundService::class.java)

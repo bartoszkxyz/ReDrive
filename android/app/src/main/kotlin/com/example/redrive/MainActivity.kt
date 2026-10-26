@@ -130,57 +130,99 @@ class MainActivity : FlutterActivity() {
                     "setPipWindow" -> {
                         val packageName = call.argument<String>("packageName")
                         val activityName = call.argument<String>("activityName")
-                        val x = call.argument<Int>("x") ?: 740
-                        val y = call.argument<Int>("y") ?: 68
-                        val width = call.argument<Int>("width") ?: 510
-                        val height = call.argument<Int>("height") ?: 564
                         if (packageName.isNullOrBlank()) {
                             result.error("INVALID_ARGS", "packageName is required", null)
                             return@setMethodCallHandler
                         }
                         try {
-                            setSystemProperty("sys.tw.forcepip.x", x.toString())
-                            setSystemProperty("sys.tw.forcepip.y", y.toString())
-                            setSystemProperty("sys.tw.forcepip.w", width.toString())
-                            setSystemProperty("sys.tw.forcepip.h", height.toString())
-                            setSystemProperty("persist.tw.pip.corner", "10")
-                            setSystemProperty("sys.tw.forcepip", "1")
+                            // Launch target application safely without blocking the UI thread or setting hazardous properties
                             val launched = launchApplication(packageName, activityName)
                             result.success(launched)
                         } catch (e: Exception) {
-                            Log.e(TAG, "Failed to set PIP window for $packageName", e)
+                            Log.e(TAG, "Failed to launch app $packageName", e)
                             result.error("PIP_FAILED", e.message, null)
                         }
                     }
 
                     "releasePipWindow" -> {
+                        result.success(true)
+                    }
+
+                    "getAudioState" -> {
                         try {
-                            setSystemProperty("sys.tw.forcepip", "0")
-                            result.success(true)
+                            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                            val current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                            val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                            val isMuted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                audioManager.isStreamMute(AudioManager.STREAM_MUSIC)
+                            } else {
+                                current == 0
+                            }
+                            result.success(
+                                mapOf(
+                                    "volume" to current,
+                                    "maxVolume" to max,
+                                    "isMuted" to isMuted,
+                                    "isMusicActive" to audioManager.isMusicActive
+                                )
+                            )
                         } catch (e: Exception) {
-                            result.success(false)
+                            result.error("AUDIO_ERROR", e.message, null)
+                        }
+                    }
+
+                    "setVolume" -> {
+                        val volume = call.argument<Int>("volume")
+                        if (volume != null) {
+                            try {
+                                val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                                val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                                val clamped = volume.coerceIn(0, max)
+                                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, clamped, 0)
+                                result.success(true)
+                            } catch (e: Exception) {
+                                result.error("AUDIO_ERROR", e.message, null)
+                            }
+                        } else {
+                            result.error("INVALID_ARGS", "volume is required", null)
+                        }
+                    }
+
+                    "adjustVolume" -> {
+                        val direction = call.argument<Int>("direction") ?: 0 // 1 = up, -1 = down
+                        try {
+                            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                            val adj = if (direction > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
+                            audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, adj, 0)
+                            val current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                            val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                            result.success(mapOf("volume" to current, "maxVolume" to max))
+                        } catch (e: Exception) {
+                            result.error("AUDIO_ERROR", e.message, null)
+                        }
+                    }
+
+                    "sendMediaKey" -> {
+                        val keyCode = call.argument<Int>("keyCode")
+                        if (keyCode != null) {
+                            try {
+                                val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                                val down = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, keyCode)
+                                val up = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, keyCode)
+                                audioManager.dispatchMediaKeyEvent(down)
+                                audioManager.dispatchMediaKeyEvent(up)
+                                result.success(true)
+                            } catch (e: Exception) {
+                                result.error("MEDIA_KEY_ERROR", e.message, null)
+                            }
+                        } else {
+                            result.error("INVALID_ARGS", "keyCode is required", null)
                         }
                     }
 
                     else -> result.notImplemented()
                 }
             }
-    }
-
-    private fun setSystemProperty(key: String, value: String): Boolean {
-        try {
-            val spClass = Class.forName("android.os.SystemProperties")
-            val setMethod = spClass.getMethod("set", String::class.java, String::class.java)
-            setMethod.invoke(null, key, value)
-            return true
-        } catch (_: Exception) {}
-        try {
-            val process = Runtime.getRuntime().exec(arrayOf("setprop", key, value))
-            process.waitFor()
-            return process.exitValue() == 0
-        } catch (_: Exception) {
-            return false
-        }
     }
 
     private fun launchApplication(packageName: String, activityName: String?): Boolean {
@@ -703,9 +745,22 @@ class MainActivity : FlutterActivity() {
         throw IllegalStateException("Unable to access /storage/emulated/0/")
     }
 
+    private var isResumedState: Boolean = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setupCrashHandler()
         handleSilentStart(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        isResumedState = true
+    }
+
+    override fun onPause() {
+        super.onPause()
+        isResumedState = false
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -716,12 +771,49 @@ class MainActivity : FlutterActivity() {
 
     private fun handleSilentStart(intent: Intent?) {
         if (intent?.getBooleanExtra("silent_start", false) == true) {
+            if (isResumedState) {
+                Log.i(TAG, "ReDrive is active in foreground; ignoring silent_start moveTaskToBack")
+                return
+            }
             Log.i(TAG, "ReDrive started silently from ignition wake; moving task to back")
             moveTaskToBack(true)
             try {
                 @Suppress("DEPRECATION")
                 overridePendingTransition(0, 0)
             } catch (_: Exception) {}
+        }
+    }
+
+    private fun setupCrashHandler() {
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
+                val time = sdf.format(Date())
+                val stackTraceString = Log.getStackTraceString(throwable)
+                val crashReport = "[$time] [FATAL NATIVE CRASH] Thread: ${thread.name} (ID: ${thread.id})\n$stackTraceString\n\n"
+
+                // 1. Try writing to internal files directory
+                try {
+                    val crashFileInternal = File(filesDir, "redrive_crash.log")
+                    crashFileInternal.appendText(crashReport)
+                } catch (_: Exception) {}
+
+                // 2. Try writing to public Download/ReDrive directory
+                try {
+                    val extDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "ReDrive")
+                    if (!extDir.exists()) extDir.mkdirs()
+                    if (extDir.exists() && extDir.canWrite()) {
+                        File(extDir, "redrive_crash.log").appendText(crashReport)
+                    }
+                } catch (_: Exception) {}
+
+                Log.e(TAG, "FATAL CRASH logged to redrive_crash.log: ${throwable.message}", throwable)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to persist crash report", e)
+            } finally {
+                defaultHandler?.uncaughtException(thread, throwable)
+            }
         }
     }
 }

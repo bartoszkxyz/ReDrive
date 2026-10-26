@@ -158,6 +158,52 @@ void main() {
       );
     });
 
+    testWidgets('radio tab volume controls and media skip buttons trigger launcherService',
+        (tester) async {
+      await tester.pumpWidget(buildHarness());
+      await tester.pumpAndSettle();
+
+      methodCalls.clear();
+
+      // Volume Down
+      await tester.tap(find.byKey(const Key('pip_volume_down_button')));
+      await tester.pumpAndSettle();
+      expect(
+        methodCalls.any((c) => c.method == 'adjustVolume' && c.arguments['direction'] == -1),
+        isTrue,
+      );
+
+      methodCalls.clear();
+
+      // Volume Up
+      await tester.tap(find.byKey(const Key('pip_volume_up_button')));
+      await tester.pumpAndSettle();
+      expect(
+        methodCalls.any((c) => c.method == 'adjustVolume' && c.arguments['direction'] == 1),
+        isTrue,
+      );
+
+      methodCalls.clear();
+
+      // Mute Toggle
+      await tester.tap(find.byKey(const Key('pip_volume_mute_button')));
+      await tester.pumpAndSettle();
+      expect(
+        methodCalls.any((c) => c.method == 'setVolume'),
+        isTrue,
+      );
+
+      methodCalls.clear();
+
+      // Media Next
+      await tester.tap(find.byKey(const Key('pip_media_next_button')));
+      await tester.pumpAndSettle();
+      expect(
+        methodCalls.any((c) => c.method == 'sendMediaKey' && c.arguments['keyCode'] == NativeAppLauncherService.keyCodeMediaNext),
+        isTrue,
+      );
+    });
+
     testWidgets('reassign button opens sheet and updates slot app',
         (tester) async {
       await tester.pumpWidget(buildHarness());

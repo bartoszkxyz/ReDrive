@@ -26,6 +26,27 @@ import 'package:redrive/services/logging/log_service.dart';
 Future<void> runRedriveApp(AppFlavor flavor) async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Install robust top-level crash logging to guarantee errors are captured on disk
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    LogService.e(
+      'Unhandled Flutter error: ${details.exceptionAsString()}',
+      tag: 'FlutterCrash',
+      error: details.exception,
+      stackTrace: details.stack,
+    );
+  };
+
+  WidgetsBinding.instance.platformDispatcher.onError = (Object error, StackTrace stack) {
+    LogService.e(
+      'Unhandled async exception: $error',
+      tag: 'AsyncCrash',
+      error: error,
+      stackTrace: stack,
+    );
+    return true;
+  };
+
   AppConfig.initialize(
     flavor: flavor,
     appTitle: flavor.isPhone ? 'OBDrive Companion' : 'OBDrive Headunit',

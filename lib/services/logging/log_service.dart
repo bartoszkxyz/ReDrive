@@ -153,8 +153,10 @@ class LogService {
       level: _toDeveloperLogLevel(level),
     );
 
-    // 2. If debug logging is disabled, do not buffer or write to disk
-    if (!_isEnabled) return;
+    // 2. Always capture warnings, errors, and fatal exceptions, even if verbose debug logging is disabled.
+    // Verbose debug and info messages are only captured when _isEnabled is true.
+    final bool isCritical = level == LogLevel.warning || level == LogLevel.error;
+    if (!_isEnabled && !isCritical) return;
 
     final entry = LogEntry(
       timestamp: DateTime.now(),
@@ -178,6 +180,11 @@ class LogService {
 
     // 5. Queue for background file write
     _queueFileLine(entry.formatted);
+
+    // 6. If it's an error, also append immediately to redrive_crash.log
+    if (level == LogLevel.error) {
+      _appendCrashLog(entry.formatted);
+    }
   }
 
   static int _toDeveloperLogLevel(LogLevel level) {
@@ -242,6 +249,32 @@ class LogService {
     }
   }
 
+  static File? _cachedCrashLogFile;
+
+  static void _appendCrashLog(String formattedLine) {
+    unawaited(() async {
+      try {
+        final crashFile = await getCrashLogFile();
+        await crashFile.writeAsString('$formattedLine\n', mode: FileMode.append, flush: true);
+      } catch (_) {}
+    }());
+  }
+
+  /// Returns the persistent crash log file on disk.
+  static Future<File> getCrashLogFile() async {
+    if (_cachedCrashLogFile != null) return _cachedCrashLogFile!;
+
+    Directory dir;
+    try {
+      dir = await getApplicationDocumentsDirectory();
+    } catch (_) {
+      dir = Directory.systemTemp;
+    }
+
+    _cachedCrashLogFile = File('${dir.path}/redrive_crash.log');
+    return _cachedCrashLogFile!;
+  }
+
   /// Returns the target log file on disk.
   static Future<File> getLogFile() async {
     if (_cachedLogFile != null) return _cachedLogFile!;
@@ -277,6 +310,10 @@ class LogService {
       if (await file.exists()) {
         await file.delete();
       }
+      final crashFile = await getCrashLogFile();
+      if (await crashFile.exists()) {
+        await crashFile.delete();
+      }
     } catch (_) {}
     i('Logs cleared by user', tag: 'System');
   }
@@ -288,20 +325,39 @@ class LogService {
 
   /// Returns full log contents as a single formatted string for copying or exporting.
   static Future<String> exportLogs() async {
+    final buffer = StringBuffer();
+    try {
+      final crashFile = await getCrashLogFile();
+      if (await crashFile.exists()) {
+        final crashContent = await crashFile.readAsString();
+        if (crashContent.trim().isNotEmpty) {
+          buffer.writeln('=== CRITICAL / CRASH LOGS ===');
+          buffer.writeln(crashContent.trim());
+          buffer.writeln('===============================\n');
+        }
+      }
+    } catch (_) {}
+
+    // If memory buffer has entries, it always contains the most up-to-date log session
+    if (_memoryBuffer.isNotEmpty) {
+      buffer.writeln(_memoryBuffer.map((e) => e.formatted).join('\n'));
+      return buffer.toString().trim();
+    }
+
     try {
       final file = await getLogFile();
       if (await file.exists()) {
         final content = await file.readAsString();
         if (content.trim().isNotEmpty) {
-          return content;
+          buffer.writeln(content.trim());
+          return buffer.toString().trim();
         }
       }
     } catch (_) {}
 
-    // Fallback to memory buffer
-    if (_memoryBuffer.isEmpty) {
-      return 'No logs collected yet.';
+    if (buffer.isNotEmpty) {
+      return buffer.toString().trim();
     }
-    return _memoryBuffer.map((e) => e.formatted).join('\n');
+    return 'No logs collected yet.';
   }
 }

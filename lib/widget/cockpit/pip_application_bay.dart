@@ -62,6 +62,10 @@ class PipApplicationBay extends StatefulWidget {
 
 class _PipApplicationBayState extends State<PipApplicationBay> {
   int _activeSlotIndex = 0;
+  int _volume = 15;
+  int _maxVolume = 30;
+  bool _isMuted = false;
+  bool _isDvrRecording = false;
 
   late final List<PipSlotConfig> _slots = [
     // Slot 1: Stock TS18 Radio (Hardcoded Primary)
@@ -101,6 +105,62 @@ class _PipApplicationBayState extends State<PipApplicationBay> {
         if (!mounted) return;
         _applyActivePipWindow();
       });
+    }
+
+    _loadAudioAndDvrState();
+  }
+
+  void _loadAudioAndDvrState() {
+    widget.launcherService.getAudioState().then((state) {
+      if (state != null && mounted) {
+        setState(() {
+          _volume = state['volume'] as int? ?? _volume;
+          _maxVolume = state['maxVolume'] as int? ?? _maxVolume;
+          _isMuted = state['isMuted'] as bool? ?? _isMuted;
+        });
+      }
+    });
+
+    widget.launcherService.isDvrRecording().then((rec) {
+      if (mounted) {
+        setState(() => _isDvrRecording = rec);
+      }
+    });
+  }
+
+  void _changeVolume(int delta) async {
+    HapticFeedback.selectionClick();
+    final next = (_volume + delta).clamp(0, _maxVolume);
+    setState(() {
+      _volume = next;
+      _isMuted = next == 0;
+    });
+    final res = await widget.launcherService.adjustVolume(delta > 0 ? 1 : -1);
+    if (res != null && mounted) {
+      setState(() {
+        _volume = res['volume'] as int? ?? _volume;
+        _maxVolume = res['maxVolume'] as int? ?? _maxVolume;
+      });
+    }
+  }
+
+  void _toggleMute() async {
+    HapticFeedback.lightImpact();
+    final newMute = !_isMuted;
+    setState(() => _isMuted = newMute);
+    await widget.launcherService.setVolume(newMute ? 0 : 15);
+  }
+
+  void _sendMediaKey(int keyCode) {
+    HapticFeedback.selectionClick();
+    widget.launcherService.sendMediaKey(keyCode);
+  }
+
+  void _toggleDvr() async {
+    HapticFeedback.mediumImpact();
+    final res = await widget.launcherService.startDvrRecording();
+    if (mounted) {
+      setState(() => _isDvrRecording = res);
     }
   }
 
@@ -238,14 +298,14 @@ class _PipApplicationBayState extends State<PipApplicationBay> {
 
           const SizedBox(height: 10),
 
-          // 2. Main PIP Live View Surface (Hardware overlay target)
+          // 2. Main PIP Live View Surface (Tactile automotive controller & app portal)
           Expanded(
             child: Stack(
               key: const Key('pip_live_surface'),
               children: [
-                // Visual Tile Background / Container Anchor
                 Positioned.fill(
                   child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
                     decoration: BoxDecoration(
                       color: colors.background.withValues(alpha: 0.8),
                       borderRadius: BorderRadius.circular(12.0),
@@ -254,56 +314,7 @@ class _PipApplicationBayState extends State<PipApplicationBay> {
                         width: 1.5,
                       ),
                     ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            activeSlot.icon,
-                            size: 48,
-                            color: colors.primaryAccent.withValues(alpha: 0.8),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            activeSlot.label.toUpperCase(),
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2,
-                              color: colors.textMain,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: colors.primaryAccent.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'TS18 NATIVE HARDWARE PIP',
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1.0,
-                                color: colors.primaryAccent,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Direct Touch Active • Hardware Constrained',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 11,
-                              color: colors.textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    child: _buildActiveSurface(activeSlot, colors),
                   ),
                 ),
 
@@ -363,6 +374,527 @@ class _PipApplicationBayState extends State<PipApplicationBay> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildActiveSurface(PipSlotConfig activeSlot, CustomThemeColors colors) {
+    if (activeSlot.packageName == NativeAppLauncherService.pkgRadio) {
+      return _buildRadioCard(colors);
+    } else if (activeSlot.packageName == NativeAppLauncherService.pkgDvr) {
+      return _buildDvrCard(colors);
+    } else if (activeSlot.packageName == NativeAppLauncherService.pkgTlink5) {
+      return _buildTlinkCard(colors);
+    } else {
+      return _buildGenericAppCard(activeSlot, colors);
+    }
+  }
+
+  Widget _buildRadioCard(CustomThemeColors colors) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: colors.primaryAccent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.radio_rounded, color: colors.primaryAccent, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'RADIO & AUDIO',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                      color: colors.textMain,
+                    ),
+                  ),
+                  Text(
+                    'TS18 Automotive Tuner',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      color: colors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        // Volume Controller Row
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: colors.surfaceCard.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: colors.textMuted.withValues(alpha: 0.15)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                key: const Key('pip_volume_mute_button'),
+                icon: Icon(
+                  _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                  color: _isMuted ? Colors.redAccent : colors.primaryAccent,
+                  size: 20,
+                ),
+                onPressed: _toggleMute,
+                visualDensity: VisualDensity.compact,
+              ),
+              IconButton(
+                key: const Key('pip_volume_down_button'),
+                icon: Icon(Icons.remove_circle_outline_rounded, color: colors.textMain, size: 20),
+                onPressed: () => _changeVolume(-1),
+                visualDensity: VisualDensity.compact,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  color: colors.background,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'VOL: $_volume / $_maxVolume',
+                  style: TextStyle(
+                    fontFamily: 'RobotoMono',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: colors.primaryAccent,
+                  ),
+                ),
+              ),
+              IconButton(
+                key: const Key('pip_volume_up_button'),
+                icon: Icon(Icons.add_circle_outline_rounded, color: colors.textMain, size: 20),
+                onPressed: () => _changeVolume(1),
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+        ),
+
+        // Media Quick Action Row
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildMediaButton(
+              key: const Key('pip_media_prev_button'),
+              icon: Icons.skip_previous_rounded,
+              label: 'PREV',
+              colors: colors,
+              onTap: () => _sendMediaKey(NativeAppLauncherService.keyCodeMediaPrevious),
+            ),
+            _buildMediaButton(
+              key: const Key('pip_media_play_button'),
+              icon: Icons.play_arrow_rounded,
+              label: 'PLAY',
+              colors: colors,
+              onTap: () => _sendMediaKey(NativeAppLauncherService.keyCodeMediaPlayPause),
+            ),
+            _buildMediaButton(
+              key: const Key('pip_media_next_button'),
+              icon: Icons.skip_next_rounded,
+              label: 'NEXT',
+              colors: colors,
+              onTap: () => _sendMediaKey(NativeAppLauncherService.keyCodeMediaNext),
+            ),
+          ],
+        ),
+
+        // Open App Button
+        SizedBox(
+          width: double.infinity,
+          height: 38,
+          child: ElevatedButton.icon(
+            key: const Key('pip_action_launch_radio'),
+            onPressed: _maximizeActiveApp,
+            icon: const Icon(Icons.radio_rounded, size: 16),
+            label: const Text(
+              'OPEN RADIO TUNER',
+              style: TextStyle(fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colors.primaryAccent.withValues(alpha: 0.2),
+              foregroundColor: colors.primaryAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: colors.primaryAccent.withValues(alpha: 0.5)),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMediaButton({
+    required Key key,
+    required IconData icon,
+    required String label,
+    required CustomThemeColors colors,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: key,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: colors.surfaceCard,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: colors.textMuted.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: colors.primaryAccent),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: colors.textMain,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDvrCard(CustomThemeColors colors) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: colors.primaryAccent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.videocam_rounded, color: colors.primaryAccent, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'HD DASHCAM (DVR)',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                      color: colors.textMain,
+                    ),
+                  ),
+                  Text(
+                    'Topway TS18 USB / AV Input',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      color: colors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _isDvrRecording
+                    ? const Color(0xFF00E676).withValues(alpha: 0.18)
+                    : Colors.amber.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: _isDvrRecording ? const Color(0xFF00E676) : Colors.amber,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _isDvrRecording ? const Color(0xFF00E676) : Colors.amber,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    _isDvrRecording ? 'REC ACTIVE' : 'STANDBY',
+                    style: TextStyle(
+                      fontFamily: 'RobotoMono',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: _isDvrRecording ? const Color(0xFF00E676) : Colors.amber,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: colors.surfaceCard.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: colors.textMuted.withValues(alpha: 0.15)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.sd_card_rounded, color: colors.textMuted, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Continuous loop recording • Direct TS18 hardware trigger on ignition',
+                  style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: colors.textMuted),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 38,
+                child: OutlinedButton.icon(
+                  key: const Key('pip_action_record_dvr'),
+                  onPressed: _toggleDvr,
+                  icon: Icon(_isDvrRecording ? Icons.stop_rounded : Icons.fiber_manual_record_rounded, size: 16),
+                  label: Text(
+                    _isDvrRecording ? 'STOP REC' : 'START REC',
+                    style: const TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w800),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _isDvrRecording ? Colors.redAccent : const Color(0xFF00E676),
+                    side: BorderSide(
+                      color: _isDvrRecording ? Colors.redAccent : const Color(0xFF00E676),
+                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: SizedBox(
+                height: 38,
+                child: ElevatedButton.icon(
+                  key: const Key('pip_action_launch_dvr'),
+                  onPressed: _maximizeActiveApp,
+                  icon: const Icon(Icons.fullscreen_rounded, size: 16),
+                  label: const Text(
+                    'VIEW CAMERA',
+                    style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w800),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colors.primaryAccent.withValues(alpha: 0.2),
+                    foregroundColor: colors.primaryAccent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: colors.primaryAccent.withValues(alpha: 0.5)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTlinkCard(CustomThemeColors colors) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: colors.primaryAccent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.phone_android_rounded, color: colors.primaryAccent, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'PHONE & SMART LINK',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                      color: colors.textMain,
+                    ),
+                  ),
+                  Text(
+                    'CarPlay • Android Auto (TLINK5)',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      color: colors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: colors.surfaceCard.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: colors.textMuted.withValues(alpha: 0.15)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.wifi_tethering_rounded, color: colors.primaryAccent, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Android Auto operates via 5GHz Wi-Fi link without competing with OBD Bluetooth.',
+                  style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: colors.textMuted),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 38,
+                child: ElevatedButton.icon(
+                  key: const Key('pip_action_launch_tlink'),
+                  onPressed: _maximizeActiveApp,
+                  icon: const Icon(Icons.screen_share_rounded, size: 16),
+                  label: const Text(
+                    'OPEN TLINK5',
+                    style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w800),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colors.primaryAccent.withValues(alpha: 0.2),
+                    foregroundColor: colors.primaryAccent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: colors.primaryAccent.withValues(alpha: 0.5)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: SizedBox(
+                height: 38,
+                child: OutlinedButton.icon(
+                  key: const Key('pip_action_launch_bt'),
+                  onPressed: () => widget.launcherService.launchBluetooth(),
+                  icon: const Icon(Icons.call_rounded, size: 16),
+                  label: const Text(
+                    'PHONE APP',
+                    style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w800),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colors.textMain,
+                    side: BorderSide(color: colors.textMuted.withValues(alpha: 0.3)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGenericAppCard(PipSlotConfig slot, CustomThemeColors colors) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        Icon(slot.icon, size: 44, color: colors.primaryAccent),
+        Column(
+          children: [
+            Text(
+              slot.label.toUpperCase(),
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.8,
+                color: colors.textMain,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              slot.packageName,
+              style: TextStyle(
+                fontFamily: 'RobotoMono',
+                fontSize: 11,
+                color: colors.textMuted,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(
+          width: double.infinity,
+          height: 38,
+          child: ElevatedButton.icon(
+            key: Key('pip_action_launch_${slot.id}'),
+            onPressed: _maximizeActiveApp,
+            icon: const Icon(Icons.open_in_new_rounded, size: 16),
+            label: Text(
+              'OPEN ${slot.label.toUpperCase()}',
+              style: const TextStyle(fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w800),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colors.primaryAccent.withValues(alpha: 0.2),
+              foregroundColor: colors.primaryAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: colors.primaryAccent.withValues(alpha: 0.5)),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

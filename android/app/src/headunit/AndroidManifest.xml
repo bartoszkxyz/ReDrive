@@ -54,9 +54,6 @@
                 <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
                 <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
 
-                <!-- Hardware triggers upon ignition -->
-                <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
-
                 <!-- FYT / SYU Headunits (Joying, Mekede, Teyes, etc.) -->
                 <action android:name="com.syu.action.ACC_ON" />
                 <action android:name="com.syu.action.ACC_OFF" />

@@ -290,10 +290,6 @@ class BluetoothProvider extends ChangeNotifier {
       try {
         _log("Connection attempt to ${device.name} ($targetAddress) #$i");
 
-        try {
-          await _bluetooth.bondDevice(targetAddress);
-        } catch (_) {}
-
         if (currentId != _connectionId) return false;
 
         if (i > 1) {
@@ -362,6 +358,9 @@ class BluetoothProvider extends ChangeNotifier {
     return false;
   }
 
+  bool _isAutoConnecting = false;
+  bool get isAutoConnecting => _isAutoConnecting;
+
   /// Automatically connects to the most recently used OBD adapter on startup/ignition
   /// with a settle delay and silent retry loop.
   Future<bool> autoConnectLastDevice({
@@ -375,62 +374,67 @@ class BluetoothProvider extends ChangeNotifier {
     final lastMac = await AppPreferences.getLastObdMac();
     if (lastMac == null || lastMac.isEmpty) return false;
 
-    if (_isConnected || _isConnecting) return true;
+    if (_isConnected || _isConnecting || _isAutoConnecting) return true;
+    _isAutoConnecting = true;
 
-    final lastName = await AppPreferences.getLastObdName() ?? "OBD Adapter";
-    _log("🚗 Headunit Auto-Connect initiated for $lastName ($lastMac). Settling for voltage & adapter boot...");
+    try {
+      final lastName = await AppPreferences.getLastObdName() ?? "OBD Adapter";
+      _log("🚗 Headunit Auto-Connect initiated for $lastName ($lastMac). Settling for voltage & adapter boot...");
 
-    // 1. Initial stabilization delay for adapter boot & vehicle starter motor voltage dip
-    if (settleDelay > Duration.zero) {
-      await Future.delayed(settleDelay);
-    }
+      // 1. Initial stabilization delay for adapter boot & vehicle starter motor voltage dip
+      if (settleDelay > Duration.zero) {
+        await Future.delayed(settleDelay);
+      }
 
-    if (_isConnected) return true;
-
-    final targetDevice = BluetoothObdDevice(
-      name: lastName,
-      address: lastMac,
-      isBle: false,
-    );
-
-    // 2. Retry loop up to maxAttempts
-    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
       if (_isConnected) return true;
 
-      _log("🚗 Headunit Auto-Connect attempt #$attempt of $maxAttempts to $lastName ($lastMac)...");
-      _setReconnecting(true);
-      _connectionMessage = "Connecting to $lastName ($attempt/$maxAttempts)...";
-      notifyListeners();
+      final targetDevice = BluetoothObdDevice(
+        name: lastName,
+        address: lastMac,
+        isBle: false,
+      );
 
-      try {
-        final bondedList = await _bluetooth.bondedDevices;
-        if (bondedList != null) {
-          for (final b in bondedList) {
-            _deviceMap[b.address] = b;
-            if (b.address.toLowerCase() == lastMac.toLowerCase()) {
-              _deviceMap[lastMac] = b;
+      // 2. Retry loop up to maxAttempts
+      for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+        if (_isConnected) return true;
+
+        _log("🚗 Headunit Auto-Connect attempt #$attempt of $maxAttempts to $lastName ($lastMac)...");
+        _setReconnecting(true);
+        _connectionMessage = "Connecting to $lastName ($attempt/$maxAttempts)...";
+        notifyListeners();
+
+        try {
+          final bondedList = await _bluetooth.bondedDevices;
+          if (bondedList != null) {
+            for (final b in bondedList) {
+              _deviceMap[b.address] = b;
+              if (b.address.toLowerCase() == lastMac.toLowerCase()) {
+                _deviceMap[lastMac] = b;
+              }
             }
           }
+        } catch (e) {
+          _log("Failed to query bonded devices during auto-connect: $e", level: LogLevel.warning, error: e);
         }
-      } catch (e) {
-        _log("Failed to query bonded devices during auto-connect: $e", level: LogLevel.warning, error: e);
+
+        final success = await connectToDevice(targetDevice);
+        if (success && _isConnected) {
+          _setReconnecting(false);
+          _log("✅ Headunit Auto-Connect succeeded on attempt #$attempt");
+          return true;
+        }
+
+        if (attempt < maxAttempts) {
+          await Future.delayed(retryDelay);
+        }
       }
 
-      final success = await connectToDevice(targetDevice);
-      if (success && _isConnected) {
-        _setReconnecting(false);
-        _log("✅ Headunit Auto-Connect succeeded on attempt #$attempt");
-        return true;
-      }
-
-      if (attempt < maxAttempts) {
-        await Future.delayed(retryDelay);
-      }
+      _setReconnecting(false);
+      _log("⚠️ Headunit Auto-Connect completed all $maxAttempts attempts without connection", level: LogLevel.warning);
+      return false;
+    } finally {
+      _isAutoConnecting = false;
     }
-
-    _setReconnecting(false);
-    _log("⚠️ Headunit Auto-Connect completed all $maxAttempts attempts without connection", level: LogLevel.warning);
-    return false;
   }
 
   /// Настраивает прослушивание входного потока данных от обд сканера

@@ -67,10 +67,57 @@ class NativeAppLauncherService {
   static const String pkgCarSettings = 'com.dofun.carsetting';
   static const String actCarSettings = 'com.dofun.carsetting.ui.MainActivity';
 
+  // KeyCodes for automotive media controls
+  static const int keyCodeMediaPlayPause = 85;
+  static const int keyCodeMediaNext = 87;
+  static const int keyCodeMediaPrevious = 88;
+
   final MethodChannel channel;
 
   NativeAppLauncherService({MethodChannel? channel})
       : channel = channel ?? const MethodChannel('com.example.redrive/storage');
+
+  /// Retrieves current audio volume and stream status.
+  Future<Map<String, dynamic>?> getAudioState() async {
+    try {
+      final result = await channel.invokeMapMethod<String, dynamic>('getAudioState');
+      return result;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Sets the media stream volume level (0 to maxVolume).
+  Future<bool> setVolume(int volume) async {
+    try {
+      final result = await channel.invokeMethod<bool>('setVolume', {'volume': volume});
+      return result ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Adjusts volume up (direction = 1) or down (direction = -1).
+  Future<Map<String, dynamic>?> adjustVolume(int direction) async {
+    try {
+      final result = await channel.invokeMapMethod<String, dynamic>('adjustVolume', {
+        'direction': direction,
+      });
+      return result;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Dispatches a media key event (Play/Pause, Next, Previous).
+  Future<bool> sendMediaKey(int keyCode) async {
+    try {
+      final result = await channel.invokeMethod<bool>('sendMediaKey', {'keyCode': keyCode});
+      return result ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Launches an application by package name with an optional main activity name.
   Future<bool> launchApp(String packageName, {String? activityName}) async {
