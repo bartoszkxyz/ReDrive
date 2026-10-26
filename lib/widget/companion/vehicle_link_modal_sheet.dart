@@ -314,9 +314,9 @@ class _VehicleLinkModalSheetState extends State<VehicleLinkModalSheet> {
                                       ),
                                     ),
                                     const SizedBox(height: 2),
-                                    const Text(
-                                      '192.168.43.1:7355',
-                                      style: TextStyle(
+                                    Text(
+                                      '${syncProvider.networkSyncManager.activeTargetHost}:${syncProvider.networkSyncManager.serverPort}',
+                                      style: const TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.w700,
                                         color: Colors.white,

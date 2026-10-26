@@ -64,6 +64,32 @@ class SocketSyncTransport implements SyncTransport {
   }
 }
 
+/// Minimal interface information for in-car network candidate evaluation.
+class NetworkInterfaceInfo {
+  final String name;
+  final List<String> addresses;
+
+  const NetworkInterfaceInfo({
+    required this.name,
+    required this.addresses,
+  });
+}
+
+/// Discovered in-car network candidate interface and gateway address.
+class InCarGatewayCandidate {
+  final String interfaceName;
+  final String localAddress;
+  final String gatewayAddress;
+  final bool isAndroidAutoSubnet;
+
+  const InCarGatewayCandidate({
+    required this.interfaceName,
+    required this.localAddress,
+    required this.gatewayAddress,
+    required this.isAndroidAutoSubnet,
+  });
+}
+
 /// Individual verification steps for the 4-step link self-test.
 enum LinkSelfTestStep {
   wifiEnabled,
@@ -141,6 +167,10 @@ class NetworkSyncManager extends ChangeNotifier {
   String? _connectedPeerAddress;
   String? get connectedPeerAddress => _connectedPeerAddress;
 
+  String? _discoveredTargetHost;
+  String? get discoveredTargetHost => _discoveredTargetHost;
+  String get activeTargetHost => _discoveredTargetHost ?? _connectedPeerAddress ?? defaultAndroidAutoGateway;
+
   NetworkSyncManager({
     required this.syncService,
     required this.isHeadunit,
@@ -152,6 +182,84 @@ class NetworkSyncManager extends ChangeNotifier {
     if (!_isDisposed) {
       notifyListeners();
     }
+  }
+
+  /// Discovers active in-car network interfaces and derives the target headunit gateway.
+  Future<InCarGatewayCandidate?> discoverInCarGateway({
+    List<NetworkInterfaceInfo>? interfaces,
+  }) async {
+    try {
+      if (interfaces == null) {
+        final rawInterfaces = await NetworkInterface.list(
+          includeLoopback: false,
+          type: InternetAddressType.IPv4,
+        );
+        interfaces = rawInterfaces
+            .map((i) => NetworkInterfaceInfo(
+                  name: i.name,
+                  addresses: i.addresses.map((a) => a.address).toList(),
+                ))
+            .toList();
+      }
+      return evaluateInCarCandidates(interfaces);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Evaluates network interface candidates and returns the best in-car gateway candidate.
+  static InCarGatewayCandidate? evaluateInCarCandidates(
+    List<NetworkInterfaceInfo> interfaces,
+  ) {
+    // Filter out known cellular modems & VPN tunnels
+    final inCarInterfaces = interfaces.where((iface) {
+      final name = iface.name.toLowerCase();
+      final isCellular = name.startsWith('rmnet') ||
+          name.startsWith('ccmni') ||
+          name.startsWith('pdp') ||
+          name.startsWith('wwan') ||
+          name.startsWith('tun') ||
+          name.startsWith('dummy');
+      return !isCellular;
+    }).toList();
+
+    // Sort: p2p (Wi-Fi Direct for AA) and wlan first
+    inCarInterfaces.sort((a, b) {
+      final aScore = a.name.startsWith('p2p') ? 2 : (a.name.startsWith('wlan') ? 1 : 0);
+      final bScore = b.name.startsWith('p2p') ? 2 : (b.name.startsWith('wlan') ? 1 : 0);
+      return bScore.compareTo(aScore);
+    });
+
+    for (final iface in inCarInterfaces) {
+      for (final ip in iface.addresses) {
+        if (ip.startsWith('127.') || ip.startsWith('169.254.')) continue;
+
+        final parts = ip.split('.');
+        if (parts.length == 4) {
+          final oct4 = int.tryParse(parts[3]) ?? 0;
+          String gateway;
+          if (oct4 != 1) {
+            gateway = '${parts[0]}.${parts[1]}.${parts[2]}.1';
+          } else {
+            gateway = '${parts[0]}.${parts[1]}.${parts[2]}.2';
+          }
+
+          final isSubnet = ip.startsWith('192.168.43.') ||
+              ip.startsWith('192.168.49.') ||
+              ip.startsWith('192.168.50.') ||
+              iface.name.startsWith('p2p') ||
+              iface.name.startsWith('wlan');
+
+          return InCarGatewayCandidate(
+            interfaceName: iface.name,
+            localAddress: ip,
+            gatewayAddress: gateway,
+            isAndroidAutoSubnet: isSubnet,
+          );
+        }
+      }
+    }
+    return null;
   }
 
   /// Starts the TCP Sync Server on the Headunit.
@@ -234,10 +342,37 @@ class NetworkSyncManager extends ChangeNotifier {
     _lastError = null;
     _safeNotifyListeners();
 
+    final candidate = await discoverInCarGateway();
+    final effectiveHost = (host != defaultAndroidAutoGateway)
+        ? host
+        : (_discoveredTargetHost ?? candidate?.gatewayAddress ?? defaultAndroidAutoGateway);
+    final sourceAddress = candidate?.localAddress;
+
     try {
-      LogService.i('Connecting to Headunit Sync Server at $host:$port...', tag: 'Sync');
-      final socket = await Socket.connect(host, port, timeout: timeout);
-      _connectedPeerAddress = host;
+      LogService.i(
+        'Connecting to Headunit Sync Server at $effectiveHost:$port (source: ${sourceAddress ?? "any"})...',
+        tag: 'Sync',
+      );
+
+      Socket socket;
+      if (sourceAddress != null && sourceAddress.isNotEmpty) {
+        try {
+          socket = await Socket.connect(
+            effectiveHost,
+            port,
+            sourceAddress: sourceAddress,
+            timeout: timeout,
+          );
+        } catch (bindErr) {
+          LogService.d('Socket connect with sourceAddress failed ($bindErr), retrying default route', tag: 'Sync');
+          socket = await Socket.connect(effectiveHost, port, timeout: timeout);
+        }
+      } else {
+        socket = await Socket.connect(effectiveHost, port, timeout: timeout);
+      }
+
+      _connectedPeerAddress = effectiveHost;
+      _discoveredTargetHost = effectiveHost;
 
       await _activeTransport?.close();
       _activeClientSocket?.destroy();
@@ -254,7 +389,7 @@ class NetworkSyncManager extends ChangeNotifier {
       return true;
     } catch (e) {
       _isConnecting = false;
-      _lastError = 'Connection to $host:$port failed: $e';
+      _lastError = 'Connection to $effectiveHost:$port failed: $e';
       _safeNotifyListeners();
       LogService.w(_lastError!, tag: 'Sync');
       return false;
@@ -280,24 +415,10 @@ class NetworkSyncManager extends ChangeNotifier {
     }
   }
 
-  /// Checks whether any local IPv4 network interface is in the Android Auto hotspot subnet (192.168.43.x).
+  /// Checks whether any local IPv4 network interface is in an in-car Android Auto subnet.
   Future<bool> isAndroidAutoSubnetActive() async {
-    try {
-      final interfaces = await NetworkInterface.list(
-        includeLoopback: false,
-        type: InternetAddressType.IPv4,
-      );
-      for (final iface in interfaces) {
-        for (final addr in iface.addresses) {
-          if (addr.address.startsWith('192.168.43.')) {
-            return true;
-          }
-        }
-      }
-      return false;
-    } catch (_) {
-      return false;
-    }
+    final candidate = await discoverInCarGateway();
+    return candidate != null && candidate.isAndroidAutoSubnet;
   }
 
   /// Probes TCP reachability of the Headunit server without keeping a socket open.
@@ -305,23 +426,50 @@ class NetworkSyncManager extends ChangeNotifier {
   Future<int?> pingHeadunit({
     String host = defaultAndroidAutoGateway,
     int port = defaultPort,
-    Duration timeout = const Duration(milliseconds: 1500),
+    Duration timeout = const Duration(seconds: 3),
   }) async {
+    final candidate = await discoverInCarGateway();
+    final effectiveHost = (host != defaultAndroidAutoGateway)
+        ? host
+        : (_discoveredTargetHost ?? candidate?.gatewayAddress ?? defaultAndroidAutoGateway);
+    final sourceAddress = candidate?.localAddress;
+
     final sw = Stopwatch()..start();
+    Socket? s;
     try {
-      final s = await Socket.connect(host, port, timeout: timeout);
+      if (sourceAddress != null && sourceAddress.isNotEmpty) {
+        try {
+          s = await Socket.connect(
+            effectiveHost,
+            port,
+            sourceAddress: sourceAddress,
+            timeout: timeout,
+          );
+        } catch (_) {
+          s = await Socket.connect(effectiveHost, port, timeout: timeout);
+        }
+      } else {
+        s = await Socket.connect(effectiveHost, port, timeout: timeout);
+      }
       sw.stop();
+      _discoveredTargetHost = effectiveHost;
+      try {
+        await s.close();
+      } catch (_) {}
       s.destroy();
       return sw.elapsedMilliseconds;
     } catch (_) {
+      try {
+        s?.destroy();
+      } catch (_) {}
       return null;
     }
   }
 
   /// Runs the 4-step link self-test from the Phone Companion perspective:
   /// 1. Phone Wi-Fi enabled check
-  /// 2. In-car Android Auto subnet check (192.168.43.x)
-  /// 3. Headunit Socket Ping (port 7355)
+  /// 2. In-car Android Auto subnet check (192.168.43.x, 192.168.49.x, etc.)
+  /// 3. Headunit Socket Ping (port 7355) with source address binding
   /// 4. Protocol handshake & Headunit status
   Future<LinkSelfTestReport> runLinkSelfTest({
     String host = defaultAndroidAutoGateway,
@@ -365,32 +513,42 @@ class NetworkSyncManager extends ChangeNotifier {
       details: 'Active interface(s): ${localIps.join(", ")}',
     ));
 
-    // 2. Android Auto Subnet check
-    final hasSubnet = localIps.any((ip) => ip.startsWith('192.168.43.'));
-    if (hasSubnet) {
-      results.add(const LinkStepResult(
+    // 2. In-Car Android Auto Subnet & Gateway Discovery
+    final ifaceInfos = interfaces
+        .map((i) => NetworkInterfaceInfo(
+              name: i.name,
+              addresses: i.addresses.map((a) => a.address).toList(),
+            ))
+        .toList();
+    final candidate = await discoverInCarGateway(interfaces: ifaceInfos);
+    final effectiveHost = (host != defaultAndroidAutoGateway)
+        ? host
+        : (candidate?.gatewayAddress ?? defaultAndroidAutoGateway);
+
+    if (candidate != null && candidate.isAndroidAutoSubnet) {
+      results.add(LinkStepResult(
         step: LinkSelfTestStep.androidAutoSubnet,
         status: LinkStepStatus.passed,
         title: 'Android Auto Subnet',
-        details: 'Connected to in-car Android Auto hotspot subnet (192.168.43.x).',
+        details: 'Connected on ${candidate.interfaceName} (${candidate.localAddress}). Target gateway: $effectiveHost.',
       ));
     } else {
       results.add(LinkStepResult(
         step: LinkSelfTestStep.androidAutoSubnet,
         status: LinkStepStatus.warning,
         title: 'Android Auto Subnet',
-        details: 'Phone is not on 192.168.43.x (Current: ${localIps.first}). Targeting gateway $host.',
+        details: 'Phone is not on recognized in-car subnet (Current: ${localIps.first}). Targeting gateway $effectiveHost.',
       ));
     }
 
     // 3. Headunit Socket Ping
-    final ping = await pingHeadunit(host: host, port: port);
+    final ping = await pingHeadunit(host: effectiveHost, port: port);
     if (ping != null) {
       results.add(LinkStepResult(
         step: LinkSelfTestStep.headunitSocketPing,
         status: LinkStepStatus.passed,
         title: 'Headunit Socket Ping',
-        details: 'Headunit server at $host:$port responded in ${ping}ms.',
+        details: 'Headunit server at $effectiveHost:$port responded in ${ping}ms.',
         pingMs: ping,
       ));
     } else {
@@ -398,7 +556,7 @@ class NetworkSyncManager extends ChangeNotifier {
         step: LinkSelfTestStep.headunitSocketPing,
         status: LinkStepStatus.failed,
         title: 'Headunit Socket Ping',
-        details: 'Cannot reach Headunit server at $host:$port. Socket connection timed out.',
+        details: 'Cannot reach Headunit server at $effectiveHost:$port. Socket connection timed out.',
       ));
       diagnosticTip = 'Headunit ReDrive service may be asleep (ignition off) or Android Auto Wi-Fi disconnected.';
       return LinkSelfTestReport(
@@ -409,8 +567,11 @@ class NetworkSyncManager extends ChangeNotifier {
       );
     }
 
+    // Brief pause between ping close and handshake connect to allow headunit server socket transition
+    await Future.delayed(const Duration(milliseconds: 150));
+
     // 4. Protocol Handshake & State
-    final connected = await connectToHeadunit(host: host, port: port);
+    final connected = await connectToHeadunit(host: effectiveHost, port: port);
     if (connected) {
       results.add(const LinkStepResult(
         step: LinkSelfTestStep.protocolHandshake,
@@ -455,18 +616,23 @@ class NetworkSyncManager extends ChangeNotifier {
       return true;
     }
 
+    final candidate = await discoverInCarGateway();
+    final effectiveHost = (host != defaultAndroidAutoGateway)
+        ? host
+        : (_discoveredTargetHost ?? candidate?.gatewayAddress ?? defaultAndroidAutoGateway);
+
     // Attempt 1: Connect to Headunit
     bool connected = await connectToHeadunit(
-      host: host,
+      host: effectiveHost,
       port: port,
-      timeout: const Duration(seconds: 3),
+      timeout: const Duration(seconds: 4),
     );
 
     if (!connected) {
       // Retry once after 2-second boot delay in case headunit service was starting
       await Future.delayed(retryDelay);
       connected = await connectToHeadunit(
-        host: host,
+        host: effectiveHost,
         port: port,
         timeout: const Duration(seconds: 4),
       );

@@ -102,5 +102,71 @@ void main() {
       await headunitManager.stopServer();
       expect(headunitManager.isServerRunning, isFalse);
     });
+
+    test('evaluateInCarCandidates resolves Android Auto Wi-Fi Direct p2p subnet and gateway', () {
+      final interfaces = [
+        const NetworkInterfaceInfo(
+          name: 'rmnet_data0',
+          addresses: ['10.155.42.11'],
+        ),
+        const NetworkInterfaceInfo(
+          name: 'p2p-wlan0-0',
+          addresses: ['192.168.49.125'],
+        ),
+      ];
+
+      final candidate = NetworkSyncManager.evaluateInCarCandidates(interfaces);
+      expect(candidate, isNotNull);
+      expect(candidate!.interfaceName, 'p2p-wlan0-0');
+      expect(candidate.localAddress, '192.168.49.125');
+      expect(candidate.gatewayAddress, '192.168.49.1');
+      expect(candidate.isAndroidAutoSubnet, isTrue);
+    });
+
+    test('evaluateInCarCandidates resolves Carlinkit / dongle subnet (192.168.50.x)', () {
+      final interfaces = [
+        const NetworkInterfaceInfo(
+          name: 'wlan0',
+          addresses: ['192.168.50.15'],
+        ),
+      ];
+
+      final candidate = NetworkSyncManager.evaluateInCarCandidates(interfaces);
+      expect(candidate, isNotNull);
+      expect(candidate!.interfaceName, 'wlan0');
+      expect(candidate.localAddress, '192.168.50.15');
+      expect(candidate.gatewayAddress, '192.168.50.1');
+      expect(candidate.isAndroidAutoSubnet, isTrue);
+    });
+
+    test('evaluateInCarCandidates resolves Hotspot AP mode where phone is at .1', () {
+      final interfaces = [
+        const NetworkInterfaceInfo(
+          name: 'wlan0',
+          addresses: ['192.168.43.1'],
+        ),
+      ];
+
+      final candidate = NetworkSyncManager.evaluateInCarCandidates(interfaces);
+      expect(candidate, isNotNull);
+      expect(candidate!.gatewayAddress, '192.168.43.2');
+      expect(candidate.isAndroidAutoSubnet, isTrue);
+    });
+
+    test('evaluateInCarCandidates ignores cellular and loopback interfaces', () {
+      final interfaces = [
+        const NetworkInterfaceInfo(
+          name: 'rmnet_data0',
+          addresses: ['10.0.0.5'],
+        ),
+        const NetworkInterfaceInfo(
+          name: 'tun0',
+          addresses: ['172.16.0.1'],
+        ),
+      ];
+
+      final candidate = NetworkSyncManager.evaluateInCarCandidates(interfaces);
+      expect(candidate, isNull);
+    });
   });
 }
