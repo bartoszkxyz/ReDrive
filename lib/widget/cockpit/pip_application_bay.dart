@@ -5,7 +5,7 @@ import '../../core/theme/custom_dashboard_theme.dart';
 import '../../core/theme/theme_engine.dart';
 import '../../services/headunit/native_app_launcher_service.dart';
 
-/// Configuration for an application slot in the PIP Bay.
+/// Configuration for an application slot in the Cockpit Launcher Bay.
 class PipSlotConfig {
   final String id;
   final String label;
@@ -40,10 +40,14 @@ class PipSlotConfig {
   }
 }
 
-/// Native Topway TS18 Picture-in-Picture (PIP) Application Bay.
+/// TS18 Radio & Audio Controls Bay for the Cockpit Launcher.
 ///
-/// Drives Topway's hardware display overlay (sys.tw.forcepip) to constrain
-/// live applications (Radio, DVR, TLINK5) into Section 3 of the Cockpit Launcher.
+/// Provides:
+/// 1. Digital FM / AM radio tuner frequency display and seek/step controls.
+/// 2. Tactile 6-station preset memory bank (P1 - P6).
+/// 3. Direct native Android master volume control (Mute, Vol -, Vol +).
+/// 4. Media skip & playback controls (Previous, Play/Pause, Next).
+/// 5. One-tap launch button to open TS18 FM/AM Radio (com.tw.radio) full-screen.
 class PipApplicationBay extends StatefulWidget {
   final NativeAppLauncherService launcherService;
   final void Function(PipSlotConfig slot)? onSlotChanged;
@@ -53,7 +57,7 @@ class PipApplicationBay extends StatefulWidget {
     super.key,
     NativeAppLauncherService? launcherService,
     this.onSlotChanged,
-    this.autoSetPipWindow = true,
+    this.autoSetPipWindow = false,
   }) : launcherService = launcherService ?? NativeAppLauncherService();
 
   @override
@@ -61,41 +65,27 @@ class PipApplicationBay extends StatefulWidget {
 }
 
 class _PipApplicationBayState extends State<PipApplicationBay> {
-  int _activeSlotIndex = 0;
+  static const PipSlotConfig _radioSlot = PipSlotConfig(
+    id: 'radio',
+    label: 'Radio',
+    icon: Icons.radio_rounded,
+    packageName: NativeAppLauncherService.pkgRadio,
+    activityName: NativeAppLauncherService.actRadio,
+    isConfigurable: false,
+  );
+
+  bool _isAm = false;
+  double _fmFrequency = 98.50;
+  int _amFrequency = 648;
+  int _selectedPresetIndex = 2; // Default to P3
+
+  final List<double> _fmPresets = [89.1, 95.8, 98.5, 101.2, 104.5, 107.0];
+  final List<int> _amPresets = [540, 648, 720, 810, 990, 1080];
+
   int _volume = 15;
   int _maxVolume = 30;
   bool _isMuted = false;
-  bool _isDvrRecording = false;
-
-  late final List<PipSlotConfig> _slots = [
-    // Slot 1: Stock TS18 Radio (Hardcoded Primary)
-    const PipSlotConfig(
-      id: 'radio',
-      label: 'Radio',
-      icon: Icons.radio_rounded,
-      packageName: NativeAppLauncherService.pkgRadio,
-      activityName: NativeAppLauncherService.actRadio,
-      isConfigurable: false,
-    ),
-    // Slot 2: HD DVR Dashcam (Configurable)
-    const PipSlotConfig(
-      id: 'dvr',
-      label: 'DVR',
-      icon: Icons.videocam_rounded,
-      packageName: NativeAppLauncherService.pkgDvr,
-      activityName: NativeAppLauncherService.actDvr,
-      isConfigurable: true,
-    ),
-    // Slot 3: TLINK5 CarPlay & Auto (Configurable)
-    const PipSlotConfig(
-      id: 'tlink',
-      label: 'TLINK5',
-      icon: Icons.phone_android_rounded,
-      packageName: NativeAppLauncherService.pkgTlink5,
-      activityName: NativeAppLauncherService.actTlink5,
-      isConfigurable: true,
-    ),
-  ];
+  bool _isPlaying = true;
 
   @override
   void initState() {
@@ -107,10 +97,10 @@ class _PipApplicationBayState extends State<PipApplicationBay> {
       });
     }
 
-    _loadAudioAndDvrState();
+    _loadAudioState();
   }
 
-  void _loadAudioAndDvrState() {
+  void _loadAudioState() {
     widget.launcherService.getAudioState().then((state) {
       if (state != null && mounted) {
         setState(() {
@@ -120,10 +110,71 @@ class _PipApplicationBayState extends State<PipApplicationBay> {
         });
       }
     });
+  }
 
-    widget.launcherService.isDvrRecording().then((rec) {
-      if (mounted) {
-        setState(() => _isDvrRecording = rec);
+  void _applyActivePipWindow() {
+    widget.launcherService.setPipWindow(
+      packageName: _radioSlot.packageName,
+      activityName: _radioSlot.activityName,
+      x: 742,
+      y: 68,
+      width: 510,
+      height: 564,
+    );
+    widget.onSlotChanged?.call(_radioSlot);
+  }
+
+  void _maximizeActiveApp() {
+    HapticFeedback.mediumImpact();
+    widget.launcherService.launchRadio();
+  }
+
+  void _setBand(bool isAm) {
+    if (_isAm == isAm) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _isAm = isAm;
+      _selectedPresetIndex = -1;
+    });
+  }
+
+  void _stepFrequency(double delta) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_isAm) {
+        final next = (_amFrequency + (delta * 90).round()).clamp(531, 1602);
+        _amFrequency = next;
+      } else {
+        final next = (_fmFrequency + delta).clamp(87.5, 108.0);
+        _fmFrequency = double.parse(next.toStringAsFixed(2));
+      }
+      _selectedPresetIndex = -1;
+    });
+  }
+
+  void _seekFrequency(bool up) {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      if (_isAm) {
+        final step = up ? 45 : -45;
+        _amFrequency = (_amFrequency + step).clamp(531, 1602);
+      } else {
+        final step = up ? 0.5 : -0.5;
+        final next = (_fmFrequency + step).clamp(87.5, 108.0);
+        _fmFrequency = double.parse(next.toStringAsFixed(2));
+      }
+      _selectedPresetIndex = -1;
+    });
+  }
+
+  void _selectPreset(int index) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _selectedPresetIndex = index;
+      if (_isAm) {
+        _amFrequency = _amPresets[index];
+      } else {
+        _fmFrequency = _fmPresets[index];
       }
     });
   }
@@ -153,81 +204,21 @@ class _PipApplicationBayState extends State<PipApplicationBay> {
 
   void _sendMediaKey(int keyCode) {
     HapticFeedback.selectionClick();
-    widget.launcherService.sendMediaKey(keyCode);
-  }
-
-  void _toggleDvr() async {
-    HapticFeedback.mediumImpact();
-    final res = await widget.launcherService.startDvrRecording();
-    if (mounted) {
-      setState(() => _isDvrRecording = res);
+    if (keyCode == NativeAppLauncherService.keyCodeMediaPlayPause) {
+      setState(() => _isPlaying = !_isPlaying);
     }
-  }
-
-  void _applyActivePipWindow() {
-    final activeSlot = _slots[_activeSlotIndex];
-    widget.launcherService.setPipWindow(
-      packageName: activeSlot.packageName,
-      activityName: activeSlot.activityName,
-      x: 742,
-      y: 68,
-      width: 510,
-      height: 564,
-    );
-    widget.onSlotChanged?.call(activeSlot);
-  }
-
-  void _selectSlot(int index) {
-    if (_activeSlotIndex == index) return;
-    HapticFeedback.selectionClick();
-    setState(() {
-      _activeSlotIndex = index;
-    });
-    _applyActivePipWindow();
-  }
-
-  void _maximizeActiveApp() {
-    HapticFeedback.mediumImpact();
-    final activeSlot = _slots[_activeSlotIndex];
-    widget.launcherService.launchApp(
-      activeSlot.packageName,
-      activityName: activeSlot.activityName,
-    );
-  }
-
-  void _openReassignDialog(BuildContext context, CustomThemeColors colors) async {
-    HapticFeedback.lightImpact();
-    final apps = await widget.launcherService.getInstalledApps();
-    if (!mounted || !context.mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (sheetContext) => _ReassignAppSheet(
-        colors: colors,
-        installedApps: apps,
-        activeSlot: _slots[_activeSlotIndex],
-        onAppSelected: (app) {
-          Navigator.of(sheetContext).pop();
-          setState(() {
-            _slots[_activeSlotIndex] = _slots[_activeSlotIndex].copyWith(
-              label: app.label,
-              packageName: app.packageName,
-              activityName: app.activityName,
-            );
-          });
-          _applyActivePipWindow();
-        },
-      ),
-    );
+    widget.launcherService.sendMediaKey(keyCode);
   }
 
   @override
   Widget build(BuildContext context) {
     final themeEngine = context.watch<ThemeEngine?>();
     final colors = themeEngine?.colors ?? const CustomThemeColors();
-    final activeSlot = _slots[_activeSlotIndex];
+
+    final currentFreqStr = _isAm
+        ? '$_amFrequency'
+        : _fmFrequency.toStringAsFixed(2);
+    final currentUnitStr = _isAm ? 'kHz' : 'MHz';
 
     return Container(
       key: const Key('pip_application_bay'),
@@ -250,320 +241,480 @@ class _PipApplicationBayState extends State<PipApplicationBay> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 1. Top Segmented Tab Bar
+          // 1. Top Header Bar: Radio Title, FM/AM Band Selector & Fullscreen Maximize
           Row(
             children: [
-              for (int i = 0; i < _slots.length; i++) ...[
-                Expanded(
-                  child: _PipTabButton(
-                    key: Key('pip_tab_${_slots[i].id}'),
-                    label: _slots[i].label,
-                    icon: _slots[i].icon,
-                    isActive: i == _activeSlotIndex,
-                    colors: colors,
-                    onTap: () => _selectSlot(i),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: colors.primaryAccent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.radio_rounded, size: 16, color: colors.primaryAccent),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'RADIO TUNER',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                    color: colors.textMain,
                   ),
                 ),
-                if (i < _slots.length - 1) const SizedBox(width: 6),
-              ],
-              if (activeSlot.isConfigurable) ...[
-                const SizedBox(width: 6),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    key: const Key('pip_reassign_button'),
-                    onTap: () => _openReassignDialog(context, colors),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: colors.background.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: colors.textMuted.withValues(alpha: 0.2),
-                          width: 1,
+              ),
+
+              // FM / AM Band Switcher
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: colors.background,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: colors.textMuted.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _BandButton(
+                      key: const Key('pip_tab_radio'),
+                      label: 'FM',
+                      isActive: !_isAm,
+                      colors: colors,
+                      onTap: () => _setBand(false),
+                    ),
+                    _BandButton(
+                      key: const Key('radio_band_am'),
+                      label: 'AM',
+                      isActive: _isAm,
+                      colors: colors,
+                      onTap: () => _setBand(true),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              // Corner Maximize Button
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  key: const Key('pip_maximize_button'),
+                  onTap: _maximizeActiveApp,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceCard.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: colors.primaryAccent.withValues(alpha: 0.4),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.fullscreen_rounded, size: 15, color: colors.primaryAccent),
+                        const SizedBox(width: 3),
+                        Text(
+                          'FULL',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                            color: colors.textMain,
+                          ),
                         ),
-                      ),
-                      child: Icon(
-                        Icons.settings_outlined,
-                        size: 16,
-                        color: colors.textMuted,
-                      ),
+                      ],
                     ),
                   ),
                 ),
-              ],
+              ),
             ],
           ),
 
           const SizedBox(height: 10),
 
-          // 2. Main PIP Live View Surface (Tactile automotive controller & app portal)
+          // 2. Radio Interactive Surface
           Expanded(
-            child: Stack(
+            child: Container(
               key: const Key('pip_live_surface'),
-              children: [
-                Positioned.fill(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-                    decoration: BoxDecoration(
-                      color: colors.background.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(12.0),
-                      border: Border.all(
-                        color: colors.primaryAccent.withValues(alpha: 0.25),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: _buildActiveSurface(activeSlot, colors),
-                  ),
+              padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+              decoration: BoxDecoration(
+                color: colors.background.withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(12.0),
+                border: Border.all(
+                  color: colors.primaryAccent.withValues(alpha: 0.25),
+                  width: 1.5,
                 ),
-
-                // Corner Maximize Fullscreen Button
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      key: const Key('pip_maximize_button'),
-                      onTap: _maximizeActiveApp,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: colors.surfaceCard.withValues(alpha: 0.9),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: colors.primaryAccent.withValues(alpha: 0.4),
-                            width: 1,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  // Frequency & Status Hero Readout
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                currentFreqStr,
+                                style: TextStyle(
+                                  fontFamily: 'RobotoMono',
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w900,
+                                  color: colors.primaryAccent,
+                                  letterSpacing: -1.0,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                currentUnitStr,
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: colors.textMuted,
+                                ),
+                              ),
+                            ],
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.5),
-                              blurRadius: 4,
+                          Row(
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFF00E676),
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                'STEREO • TS18 LIVE AUDIO',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.6,
+                                  color: colors.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+
+                      // Signal Indicator
+                      Row(
+                        children: List.generate(4, (i) {
+                          return Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                            width: 3.5,
+                            height: 8.0 + (i * 3.5),
+                            decoration: BoxDecoration(
+                              color: colors.primaryAccent.withValues(alpha: (i + 1) * 0.25),
+                              borderRadius: BorderRadius.circular(2),
                             ),
-                          ],
+                          );
+                        }),
+                      ),
+                    ],
+                  ),
+
+                  // Tuning & Seeking Bar
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceCard.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: colors.textMuted.withValues(alpha: 0.15)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _TuneActionButton(
+                          key: const Key('radio_seek_down'),
+                          icon: Icons.fast_rewind_rounded,
+                          label: 'SEEK -',
+                          colors: colors,
+                          onTap: () => _seekFrequency(false),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.fullscreen_rounded,
-                              size: 16,
-                              color: colors.primaryAccent,
+                        _TuneActionButton(
+                          key: const Key('radio_step_down'),
+                          icon: Icons.chevron_left_rounded,
+                          label: '-0.1',
+                          colors: colors,
+                          onTap: () => _stepFrequency(-0.1),
+                        ),
+                        _TuneActionButton(
+                          key: const Key('radio_step_up'),
+                          icon: Icons.chevron_right_rounded,
+                          label: '+0.1',
+                          colors: colors,
+                          onTap: () => _stepFrequency(0.1),
+                        ),
+                        _TuneActionButton(
+                          key: const Key('radio_seek_up'),
+                          icon: Icons.fast_forward_rounded,
+                          label: 'SEEK +',
+                          colors: colors,
+                          onTap: () => _seekFrequency(true),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 6-Station Presets Bank (P1 to P6)
+                  Row(
+                    children: [
+                      for (int i = 0; i < 6; i++) ...[
+                        Expanded(
+                          child: _PresetButton(
+                            key: Key('radio_preset_${i + 1}'),
+                            label: 'P${i + 1}',
+                            freq: _isAm
+                                ? '${_amPresets[i]}'
+                                : _fmPresets[i].toStringAsFixed(1),
+                            isSelected: i == _selectedPresetIndex,
+                            colors: colors,
+                            onTap: () => _selectPreset(i),
+                          ),
+                        ),
+                        if (i < 5) const SizedBox(width: 4),
+                      ],
+                    ],
+                  ),
+
+                  // Volume Controller Row
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceCard.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: colors.textMuted.withValues(alpha: 0.15)),
+                    ),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          key: const Key('pip_volume_mute_button'),
+                          icon: Icon(
+                            _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                            color: _isMuted ? Colors.redAccent : colors.primaryAccent,
+                            size: 18,
+                          ),
+                          onPressed: _toggleMute,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        IconButton(
+                          key: const Key('pip_volume_down_button'),
+                          icon: Icon(Icons.remove_circle_outline_rounded, color: colors.textMain, size: 18),
+                          onPressed: () => _changeVolume(-1),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'MASTER VOLUME',
+                                      style: TextStyle(
+                                        fontFamily: 'Inter',
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        color: colors.textMuted,
+                                      ),
+                                    ),
+                                    Text(
+                                      '$_volume / $_maxVolume',
+                                      style: TextStyle(
+                                        fontFamily: 'RobotoMono',
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: colors.primaryAccent,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(3),
+                                  child: LinearProgressIndicator(
+                                    value: _maxVolume > 0 ? (_volume / _maxVolume) : 0,
+                                    backgroundColor: colors.background,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      _isMuted ? Colors.redAccent : colors.primaryAccent,
+                                    ),
+                                    minHeight: 5,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'FULL',
+                          ),
+                        ),
+                        IconButton(
+                          key: const Key('pip_volume_up_button'),
+                          icon: Icon(Icons.add_circle_outline_rounded, color: colors.textMain, size: 18),
+                          onPressed: () => _changeVolume(1),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Media Skip Controls & Full Radio App Launch Button
+                  Row(
+                    children: [
+                      _MediaIconButton(
+                        key: const Key('pip_media_prev_button'),
+                        icon: Icons.skip_previous_rounded,
+                        colors: colors,
+                        onTap: () => _sendMediaKey(NativeAppLauncherService.keyCodeMediaPrevious),
+                      ),
+                      const SizedBox(width: 6),
+                      _MediaIconButton(
+                        key: const Key('pip_media_play_button'),
+                        icon: _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        colors: colors,
+                        onTap: () => _sendMediaKey(NativeAppLauncherService.keyCodeMediaPlayPause),
+                      ),
+                      const SizedBox(width: 6),
+                      _MediaIconButton(
+                        key: const Key('pip_media_next_button'),
+                        icon: Icons.skip_next_rounded,
+                        colors: colors,
+                        onTap: () => _sendMediaKey(NativeAppLauncherService.keyCodeMediaNext),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // Open Full App Button
+                      Expanded(
+                        child: SizedBox(
+                          height: 36,
+                          child: ElevatedButton.icon(
+                            key: const Key('pip_action_launch_radio'),
+                            onPressed: _maximizeActiveApp,
+                            icon: const Icon(Icons.radio_rounded, size: 15),
+                            label: const Text(
+                              'OPEN RADIO APP',
                               style: TextStyle(
                                 fontFamily: 'Inter',
                                 fontSize: 11,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
                                 letterSpacing: 0.5,
-                                color: colors.textMain,
                               ),
                             ),
-                          ],
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: colors.primaryAccent.withValues(alpha: 0.18),
+                              foregroundColor: colors.primaryAccent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side: BorderSide(color: colors.primaryAccent.withValues(alpha: 0.5)),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildActiveSurface(PipSlotConfig activeSlot, CustomThemeColors colors) {
-    if (activeSlot.packageName == NativeAppLauncherService.pkgRadio) {
-      return _buildRadioCard(colors);
-    } else if (activeSlot.packageName == NativeAppLauncherService.pkgDvr) {
-      return _buildDvrCard(colors);
-    } else if (activeSlot.packageName == NativeAppLauncherService.pkgTlink5) {
-      return _buildTlinkCard(colors);
-    } else {
-      return _buildGenericAppCard(activeSlot, colors);
-    }
-  }
+class _BandButton extends StatelessWidget {
+  final String label;
+  final bool isActive;
+  final CustomThemeColors colors;
+  final VoidCallback onTap;
 
-  Widget _buildRadioCard(CustomThemeColors colors) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: colors.primaryAccent.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.radio_rounded, color: colors.primaryAccent, size: 22),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'RADIO & AUDIO',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.8,
-                      color: colors.textMain,
-                    ),
-                  ),
-                  Text(
-                    'TS18 Automotive Tuner',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 11,
-                      color: colors.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+  const _BandButton({
+    super.key,
+    required this.label,
+    required this.isActive,
+    required this.colors,
+    required this.onTap,
+  });
 
-        // Volume Controller Row
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: colors.surfaceCard.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: colors.textMuted.withValues(alpha: 0.15)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(
-                key: const Key('pip_volume_mute_button'),
-                icon: Icon(
-                  _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                  color: _isMuted ? Colors.redAccent : colors.primaryAccent,
-                  size: 20,
-                ),
-                onPressed: _toggleMute,
-                visualDensity: VisualDensity.compact,
-              ),
-              IconButton(
-                key: const Key('pip_volume_down_button'),
-                icon: Icon(Icons.remove_circle_outline_rounded, color: colors.textMain, size: 20),
-                onPressed: () => _changeVolume(-1),
-                visualDensity: VisualDensity.compact,
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                decoration: BoxDecoration(
-                  color: colors.background,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  'VOL: $_volume / $_maxVolume',
-                  style: TextStyle(
-                    fontFamily: 'RobotoMono',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: colors.primaryAccent,
-                  ),
-                ),
-              ),
-              IconButton(
-                key: const Key('pip_volume_up_button'),
-                icon: Icon(Icons.add_circle_outline_rounded, color: colors.textMain, size: 20),
-                onPressed: () => _changeVolume(1),
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
-          ),
-        ),
-
-        // Media Quick Action Row
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildMediaButton(
-              key: const Key('pip_media_prev_button'),
-              icon: Icons.skip_previous_rounded,
-              label: 'PREV',
-              colors: colors,
-              onTap: () => _sendMediaKey(NativeAppLauncherService.keyCodeMediaPrevious),
-            ),
-            _buildMediaButton(
-              key: const Key('pip_media_play_button'),
-              icon: Icons.play_arrow_rounded,
-              label: 'PLAY',
-              colors: colors,
-              onTap: () => _sendMediaKey(NativeAppLauncherService.keyCodeMediaPlayPause),
-            ),
-            _buildMediaButton(
-              key: const Key('pip_media_next_button'),
-              icon: Icons.skip_next_rounded,
-              label: 'NEXT',
-              colors: colors,
-              onTap: () => _sendMediaKey(NativeAppLauncherService.keyCodeMediaNext),
-            ),
-          ],
-        ),
-
-        // Open App Button
-        SizedBox(
-          width: double.infinity,
-          height: 38,
-          child: ElevatedButton.icon(
-            key: const Key('pip_action_launch_radio'),
-            onPressed: _maximizeActiveApp,
-            icon: const Icon(Icons.radio_rounded, size: 16),
-            label: const Text(
-              'OPEN RADIO TUNER',
-              style: TextStyle(fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 0.5),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colors.primaryAccent.withValues(alpha: 0.2),
-              foregroundColor: colors.primaryAccent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: colors.primaryAccent.withValues(alpha: 0.5)),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMediaButton({
-    required Key key,
-    required IconData icon,
-    required String label,
-    required CustomThemeColors colors,
-    required VoidCallback onTap,
-  }) {
+  @override
+  Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        key: key,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: colors.surfaceCard,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: colors.textMuted.withValues(alpha: 0.2)),
+            color: isActive
+                ? colors.primaryAccent.withValues(alpha: 0.25)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
           ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 10,
+              fontWeight: isActive ? FontWeight.w900 : FontWeight.w600,
+              color: isActive ? colors.primaryAccent : colors.textMuted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TuneActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final CustomThemeColors colors;
+  final VoidCallback onTap;
+
+  const _TuneActionButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.colors,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 16, color: colors.primaryAccent),
-              const SizedBox(width: 4),
+              Icon(icon, size: 14, color: colors.primaryAccent),
+              const SizedBox(width: 2),
               Text(
                 label,
                 style: TextStyle(
@@ -579,338 +730,82 @@ class _PipApplicationBayState extends State<PipApplicationBay> {
       ),
     );
   }
+}
 
-  Widget _buildDvrCard(CustomThemeColors colors) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: colors.primaryAccent.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.videocam_rounded, color: colors.primaryAccent, size: 22),
+class _PresetButton extends StatelessWidget {
+  final String label;
+  final String freq;
+  final bool isSelected;
+  final CustomThemeColors colors;
+  final VoidCallback onTap;
+
+  const _PresetButton({
+    super.key,
+    required this.label,
+    required this.freq,
+    required this.isSelected,
+    required this.colors,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colors.primaryAccent.withValues(alpha: 0.22)
+                : colors.surfaceCard.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: isSelected
+                  ? colors.primaryAccent
+                  : colors.textMuted.withValues(alpha: 0.15),
+              width: 1,
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'HD DASHCAM (DVR)',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.8,
-                      color: colors.textMain,
-                    ),
-                  ),
-                  Text(
-                    'Topway TS18 USB / AV Input',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 11,
-                      color: colors.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: _isDvrRecording
-                    ? const Color(0xFF00E676).withValues(alpha: 0.18)
-                    : Colors.amber.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: _isDvrRecording ? const Color(0xFF00E676) : Colors.amber,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 8,
+                  fontWeight: FontWeight.w700,
+                  color: isSelected ? colors.primaryAccent : colors.textMuted,
                 ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _isDvrRecording ? const Color(0xFF00E676) : Colors.amber,
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    _isDvrRecording ? 'REC ACTIVE' : 'STANDBY',
-                    style: TextStyle(
-                      fontFamily: 'RobotoMono',
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: _isDvrRecording ? const Color(0xFF00E676) : Colors.amber,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: colors.surfaceCard.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: colors.textMuted.withValues(alpha: 0.15)),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.sd_card_rounded, color: colors.textMuted, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Continuous loop recording • Direct TS18 hardware trigger on ignition',
-                  style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: colors.textMuted),
+              Text(
+                freq,
+                style: TextStyle(
+                  fontFamily: 'RobotoMono',
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected ? colors.primaryAccent : colors.textMain,
                 ),
               ),
             ],
           ),
         ),
-
-        Row(
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 38,
-                child: OutlinedButton.icon(
-                  key: const Key('pip_action_record_dvr'),
-                  onPressed: _toggleDvr,
-                  icon: Icon(_isDvrRecording ? Icons.stop_rounded : Icons.fiber_manual_record_rounded, size: 16),
-                  label: Text(
-                    _isDvrRecording ? 'STOP REC' : 'START REC',
-                    style: const TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w800),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _isDvrRecording ? Colors.redAccent : const Color(0xFF00E676),
-                    side: BorderSide(
-                      color: _isDvrRecording ? Colors.redAccent : const Color(0xFF00E676),
-                    ),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: SizedBox(
-                height: 38,
-                child: ElevatedButton.icon(
-                  key: const Key('pip_action_launch_dvr'),
-                  onPressed: _maximizeActiveApp,
-                  icon: const Icon(Icons.fullscreen_rounded, size: 16),
-                  label: const Text(
-                    'VIEW CAMERA',
-                    style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w800),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colors.primaryAccent.withValues(alpha: 0.2),
-                    foregroundColor: colors.primaryAccent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      side: BorderSide(color: colors.primaryAccent.withValues(alpha: 0.5)),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTlinkCard(CustomThemeColors colors) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: colors.primaryAccent.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.phone_android_rounded, color: colors.primaryAccent, size: 22),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'PHONE & SMART LINK',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.8,
-                      color: colors.textMain,
-                    ),
-                  ),
-                  Text(
-                    'CarPlay • Android Auto (TLINK5)',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 11,
-                      color: colors.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: colors.surfaceCard.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: colors.textMuted.withValues(alpha: 0.15)),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.wifi_tethering_rounded, color: colors.primaryAccent, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Android Auto operates via 5GHz Wi-Fi link without competing with OBD Bluetooth.',
-                  style: TextStyle(fontFamily: 'Inter', fontSize: 11, color: colors.textMuted),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        Row(
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 38,
-                child: ElevatedButton.icon(
-                  key: const Key('pip_action_launch_tlink'),
-                  onPressed: _maximizeActiveApp,
-                  icon: const Icon(Icons.screen_share_rounded, size: 16),
-                  label: const Text(
-                    'OPEN TLINK5',
-                    style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w800),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colors.primaryAccent.withValues(alpha: 0.2),
-                    foregroundColor: colors.primaryAccent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      side: BorderSide(color: colors.primaryAccent.withValues(alpha: 0.5)),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: SizedBox(
-                height: 38,
-                child: OutlinedButton.icon(
-                  key: const Key('pip_action_launch_bt'),
-                  onPressed: () => widget.launcherService.launchBluetooth(),
-                  icon: const Icon(Icons.call_rounded, size: 16),
-                  label: const Text(
-                    'PHONE APP',
-                    style: TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w800),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: colors.textMain,
-                    side: BorderSide(color: colors.textMuted.withValues(alpha: 0.3)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGenericAppCard(PipSlotConfig slot, CustomThemeColors colors) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        Icon(slot.icon, size: 44, color: colors.primaryAccent),
-        Column(
-          children: [
-            Text(
-              slot.label.toUpperCase(),
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.8,
-                color: colors.textMain,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              slot.packageName,
-              style: TextStyle(
-                fontFamily: 'RobotoMono',
-                fontSize: 11,
-                color: colors.textMuted,
-              ),
-            ),
-          ],
-        ),
-        SizedBox(
-          width: double.infinity,
-          height: 38,
-          child: ElevatedButton.icon(
-            key: Key('pip_action_launch_${slot.id}'),
-            onPressed: _maximizeActiveApp,
-            icon: const Icon(Icons.open_in_new_rounded, size: 16),
-            label: Text(
-              'OPEN ${slot.label.toUpperCase()}',
-              style: const TextStyle(fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w800),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colors.primaryAccent.withValues(alpha: 0.2),
-              foregroundColor: colors.primaryAccent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: colors.primaryAccent.withValues(alpha: 0.5)),
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
 
-class _PipTabButton extends StatelessWidget {
-  final String label;
+class _MediaIconButton extends StatelessWidget {
   final IconData icon;
-  final bool isActive;
   final CustomThemeColors colors;
   final VoidCallback onTap;
 
-  const _PipTabButton({
+  const _MediaIconButton({
     super.key,
-    required this.label,
     required this.icon,
-    required this.isActive,
     required this.colors,
     required this.onTap,
   });
@@ -923,165 +818,14 @@ class _PipTabButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+          padding: const EdgeInsets.all(7),
           decoration: BoxDecoration(
-            color: isActive
-                ? colors.primaryAccent.withValues(alpha: 0.18)
-                : colors.background.withValues(alpha: 0.5),
+            color: colors.surfaceCard,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isActive
-                  ? colors.primaryAccent.withValues(alpha: 0.7)
-                  : colors.textMuted.withValues(alpha: 0.15),
-              width: 1.0,
-            ),
+            border: Border.all(color: colors.textMuted.withValues(alpha: 0.2)),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 14,
-                color: isActive ? colors.primaryAccent : colors.textMuted,
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 11,
-                    fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
-                    color: isActive ? colors.primaryAccent : colors.textMuted,
-                    letterSpacing: 0.4,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
+          child: Icon(icon, size: 18, color: colors.primaryAccent),
         ),
-      ),
-    );
-  }
-}
-
-class _ReassignAppSheet extends StatelessWidget {
-  final CustomThemeColors colors;
-  final List<DiscoveredAppInfo> installedApps;
-  final PipSlotConfig activeSlot;
-  final ValueChanged<DiscoveredAppInfo> onAppSelected;
-
-  const _ReassignAppSheet({
-    required this.colors,
-    required this.installedApps,
-    required this.activeSlot,
-    required this.onAppSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      key: const Key('pip_reassign_sheet'),
-      height: 480,
-      decoration: BoxDecoration(
-        color: colors.surfaceCard,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        border: Border.all(
-          color: colors.primaryAccent.withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: colors.textMuted.withValues(alpha: 0.15),
-                  width: 1,
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.swap_horiz_rounded, color: colors.primaryAccent, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Reassign ${activeSlot.label} Slot',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: colors.textMain,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  color: colors.textMuted,
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: installedApps.isEmpty
-                ? Center(
-                    child: Text(
-                      'No launchable apps discovered',
-                      style: TextStyle(color: colors.textMuted),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: installedApps.length,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemBuilder: (ctx, index) {
-                      final app = installedApps[index];
-                      final isSelected = app.packageName == activeSlot.packageName;
-
-                      return Material(
-                        color: Colors.transparent,
-                        child: ListTile(
-                          key: Key('reassign_app_${app.packageName}'),
-                          leading: CircleAvatar(
-                            backgroundColor: isSelected
-                                ? colors.primaryAccent.withValues(alpha: 0.2)
-                                : colors.background,
-                            child: Icon(
-                              Icons.apps_rounded,
-                              size: 18,
-                              color: isSelected ? colors.primaryAccent : colors.textMuted,
-                            ),
-                          ),
-                          title: Text(
-                            app.label,
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                              color: isSelected ? colors.primaryAccent : colors.textMain,
-                            ),
-                          ),
-                          subtitle: Text(
-                            app.packageName,
-                            style: TextStyle(
-                              fontFamily: 'RobotoMono',
-                              fontSize: 11,
-                              color: colors.textMuted,
-                            ),
-                          ),
-                          trailing: isSelected
-                              ? Icon(Icons.check_circle_rounded, color: colors.primaryAccent)
-                              : null,
-                          onTap: () => onAppSelected(app),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
       ),
     );
   }

@@ -26,19 +26,26 @@ void main() {
       if (call.method == 'launchApp') {
         return true;
       }
-      if (call.method == 'getInstalledApps') {
-        return [
-          {
-            'packageName': 'com.google.android.apps.maps',
-            'activityName': 'com.google.android.maps.MapsActivity',
-            'label': 'Maps',
-          },
-          {
-            'packageName': 'com.spotify.music',
-            'activityName': 'com.spotify.music.MainActivity',
-            'label': 'Spotify',
-          },
-        ];
+      if (call.method == 'getAudioState') {
+        return {
+          'volume': 15,
+          'maxVolume': 30,
+          'isMuted': false,
+          'isMusicActive': true,
+        };
+      }
+      if (call.method == 'adjustVolume') {
+        final dir = call.arguments['direction'] as int? ?? 0;
+        return {
+          'volume': (15 + dir).clamp(0, 30),
+          'maxVolume': 30,
+        };
+      }
+      if (call.method == 'setVolume') {
+        return true;
+      }
+      if (call.method == 'sendMediaKey') {
+        return true;
       }
       return null;
     });
@@ -53,6 +60,7 @@ void main() {
 
   Widget buildHarness({
     void Function(PipSlotConfig)? onSlotChanged,
+    bool autoSetPipWindow = false,
   }) {
     final themeEngine = ThemeEngine(inMemory: true);
     return MaterialApp(
@@ -65,6 +73,7 @@ void main() {
             child: PipApplicationBay(
               launcherService: launcherService,
               onSlotChanged: onSlotChanged,
+              autoSetPipWindow: autoSetPipWindow,
             ),
           ),
         ),
@@ -72,93 +81,98 @@ void main() {
     );
   }
 
-  group('PipApplicationBay Widget Tests', () {
-    testWidgets('renders default slots and sets initial TS18 PIP window for Radio',
+  group('PipApplicationBay Radio & Audio Controls Widget Tests', () {
+    testWidgets('renders radio controls panel and FM frequency display by default',
         (tester) async {
-      PipSlotConfig? activeSlot;
-
-      await tester.pumpWidget(
-        buildHarness(onSlotChanged: (slot) => activeSlot = slot),
-      );
+      await tester.pumpWidget(buildHarness());
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('pip_application_bay')), findsOneWidget);
+      expect(find.byKey(const Key('pip_live_surface')), findsOneWidget);
       expect(find.byKey(const Key('pip_tab_radio')), findsOneWidget);
-      expect(find.byKey(const Key('pip_tab_dvr')), findsOneWidget);
-      expect(find.byKey(const Key('pip_tab_tlink')), findsOneWidget);
+      expect(find.byKey(const Key('radio_band_am')), findsOneWidget);
+      expect(find.byKey(const Key('pip_maximize_button')), findsOneWidget);
 
-      expect(activeSlot?.id, 'radio');
-      expect(activeSlot?.packageName, NativeAppLauncherService.pkgRadio);
+      // Default FM readout (98.50 MHz)
+      expect(find.text('98.50'), findsOneWidget);
+      expect(find.text('MHz'), findsOneWidget);
+      expect(find.text('STEREO • TS18 LIVE AUDIO'), findsOneWidget);
 
-      // Verify native setPipWindow was called
+      // Presets P1 to P6
+      for (int i = 1; i <= 6; i++) {
+        expect(find.byKey(Key('radio_preset_$i')), findsOneWidget);
+      }
+
+      // Master volume and media buttons
+      expect(find.byKey(const Key('pip_volume_down_button')), findsOneWidget);
+      expect(find.byKey(const Key('pip_volume_up_button')), findsOneWidget);
+      expect(find.byKey(const Key('pip_volume_mute_button')), findsOneWidget);
+      expect(find.byKey(const Key('pip_media_prev_button')), findsOneWidget);
+      expect(find.byKey(const Key('pip_media_play_button')), findsOneWidget);
+      expect(find.byKey(const Key('pip_media_next_button')), findsOneWidget);
+      expect(find.byKey(const Key('pip_action_launch_radio')), findsOneWidget);
+    });
+
+    testWidgets('autoSetPipWindow triggers setPipWindow when enabled',
+        (tester) async {
+      PipSlotConfig? slot;
+      await tester.pumpWidget(buildHarness(
+        autoSetPipWindow: true,
+        onSlotChanged: (s) => slot = s,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(slot?.id, 'radio');
       expect(
         methodCalls.any((c) =>
             c.method == 'setPipWindow' &&
-            c.arguments['packageName'] == NativeAppLauncherService.pkgRadio &&
-            c.arguments['x'] == 742 &&
-            c.arguments['y'] == 68 &&
-            c.arguments['width'] == 510 &&
-            c.arguments['height'] == 564),
+            c.arguments['packageName'] == NativeAppLauncherService.pkgRadio),
         isTrue,
       );
     });
 
-    testWidgets('switching tabs updates active slot and invokes setPipWindow',
+    testWidgets('switching between FM and AM band updates frequency and units',
         (tester) async {
       await tester.pumpWidget(buildHarness());
       await tester.pumpAndSettle();
 
-      methodCalls.clear();
-
-      // Tap DVR tab
-      await tester.tap(find.byKey(const Key('pip_tab_dvr')));
+      // Tap AM
+      await tester.tap(find.byKey(const Key('radio_band_am')));
       await tester.pumpAndSettle();
 
-      expect(
-        methodCalls.any((c) =>
-            c.method == 'setPipWindow' &&
-            c.arguments['packageName'] == NativeAppLauncherService.pkgDvr),
-        isTrue,
-      );
+      expect(find.text('648'), findsNWidgets(2)); // Main readout and Preset P2
+      expect(find.text('kHz'), findsOneWidget);
 
-      methodCalls.clear();
-
-      // Tap TLINK tab
-      await tester.tap(find.byKey(const Key('pip_tab_tlink')));
+      // Tap FM
+      await tester.tap(find.byKey(const Key('pip_tab_radio')));
       await tester.pumpAndSettle();
 
-      expect(
-        methodCalls.any((c) =>
-            c.method == 'setPipWindow' &&
-            c.arguments['packageName'] == NativeAppLauncherService.pkgTlink5),
-        isTrue,
-      );
+      expect(find.text('98.50'), findsOneWidget);
+      expect(find.text('MHz'), findsOneWidget);
     });
 
-    testWidgets('fullscreen maximize button launches current active app',
+    testWidgets('stepping frequency and selecting preset updates display',
         (tester) async {
       await tester.pumpWidget(buildHarness());
       await tester.pumpAndSettle();
 
-      // Switch to TLINK5
-      await tester.tap(find.byKey(const Key('pip_tab_tlink')));
+      // Step up +0.1
+      await tester.tap(find.byKey(const Key('radio_step_up')));
       await tester.pumpAndSettle();
+      expect(find.text('98.60'), findsOneWidget);
 
-      methodCalls.clear();
-
-      // Tap Fullscreen maximize button
-      await tester.tap(find.byKey(const Key('pip_maximize_button')));
+      // Step down -0.1
+      await tester.tap(find.byKey(const Key('radio_step_down')));
       await tester.pumpAndSettle();
+      expect(find.text('98.50'), findsOneWidget);
 
-      expect(
-        methodCalls.any((c) =>
-            c.method == 'launchApp' &&
-            c.arguments['packageName'] == NativeAppLauncherService.pkgTlink5),
-        isTrue,
-      );
+      // Tap Preset P1 (89.1)
+      await tester.tap(find.byKey(const Key('radio_preset_1')));
+      await tester.pumpAndSettle();
+      expect(find.text('89.10'), findsOneWidget);
     });
 
-    testWidgets('radio tab volume controls and media skip buttons trigger launcherService',
+    testWidgets('volume controls and media skip buttons trigger launcherService',
         (tester) async {
       await tester.pumpWidget(buildHarness());
       await tester.pumpAndSettle();
@@ -199,40 +213,41 @@ void main() {
       await tester.tap(find.byKey(const Key('pip_media_next_button')));
       await tester.pumpAndSettle();
       expect(
-        methodCalls.any((c) => c.method == 'sendMediaKey' && c.arguments['keyCode'] == NativeAppLauncherService.keyCodeMediaNext),
+        methodCalls.any((c) =>
+            c.method == 'sendMediaKey' &&
+            c.arguments['keyCode'] == NativeAppLauncherService.keyCodeMediaNext),
         isTrue,
       );
     });
 
-    testWidgets('reassign button opens sheet and updates slot app',
+    testWidgets('fullscreen maximize button and open radio button launch Radio app',
         (tester) async {
       await tester.pumpWidget(buildHarness());
       await tester.pumpAndSettle();
 
-      // Radio is not configurable, switch to DVR (configurable)
-      await tester.tap(find.byKey(const Key('pip_tab_dvr')));
+      methodCalls.clear();
+
+      // Tap Corner Maximize button
+      await tester.tap(find.byKey(const Key('pip_maximize_button')));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('pip_reassign_button')), findsOneWidget);
-      await tester.tap(find.byKey(const Key('pip_reassign_button')));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('pip_reassign_sheet')), findsOneWidget);
-      expect(find.text('Maps'), findsOneWidget);
+      expect(
+        methodCalls.any((c) =>
+            c.method == 'launchApp' &&
+            c.arguments['packageName'] == NativeAppLauncherService.pkgRadio),
+        isTrue,
+      );
 
       methodCalls.clear();
 
-      // Select Maps
-      await tester.tap(find.byKey(const Key('reassign_app_com.google.android.apps.maps')));
+      // Tap Open Radio App button
+      await tester.tap(find.byKey(const Key('pip_action_launch_radio')));
       await tester.pumpAndSettle();
 
-      // Sheet should close and PIP window be set for Maps
-      expect(find.byKey(const Key('pip_reassign_sheet')), findsNothing);
-      expect(find.text('MAPS'), findsOneWidget);
       expect(
         methodCalls.any((c) =>
-            c.method == 'setPipWindow' &&
-            c.arguments['packageName'] == 'com.google.android.apps.maps'),
+            c.method == 'launchApp' &&
+            c.arguments['packageName'] == NativeAppLauncherService.pkgRadio),
         isTrue,
       );
     });
