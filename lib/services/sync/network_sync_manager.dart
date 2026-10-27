@@ -233,6 +233,16 @@ class NetworkSyncManager extends ChangeNotifier {
     }
   }
 
+  /// Checks whether two IPv4 addresses belong to the same /24 subnet.
+  static bool sharesSubnet(String ip1, String ip2) {
+    final p1 = ip1.split('.');
+    final p2 = ip2.split('.');
+    if (p1.length == 4 && p2.length == 4) {
+      return p1[0] == p2[0] && p1[1] == p2[1] && p1[2] == p2[2];
+    }
+    return false;
+  }
+
   /// Evaluates network interface candidates and returns the best in-car gateway candidate.
   static InCarGatewayCandidate? evaluateInCarCandidates(
     List<NetworkInterfaceInfo> interfaces,
@@ -423,19 +433,37 @@ class NetworkSyncManager extends ChangeNotifier {
       );
 
       Socket socket;
-      try {
-        socket = await Socket.connect(effectiveHost, port, timeout: timeout);
-      } catch (directErr) {
-        if (sourceAddress != null && sourceAddress.isNotEmpty) {
-          LogService.d('Direct connect failed ($directErr), retrying with sourceAddress $sourceAddress', tag: 'Sync');
+      final useSourceFirst = sourceAddress != null &&
+          sourceAddress.isNotEmpty &&
+          sharesSubnet(sourceAddress, effectiveHost);
+
+      if (useSourceFirst) {
+        try {
           socket = await Socket.connect(
             effectiveHost,
             port,
             sourceAddress: sourceAddress,
             timeout: timeout,
           );
-        } else {
-          rethrow;
+        } catch (sourceErr) {
+          LogService.d('Subnet sourceAddress connect failed ($sourceErr), falling back to default route', tag: 'Sync');
+          socket = await Socket.connect(effectiveHost, port, timeout: timeout);
+        }
+      } else {
+        try {
+          socket = await Socket.connect(effectiveHost, port, timeout: timeout);
+        } catch (directErr) {
+          if (sourceAddress != null && sourceAddress.isNotEmpty) {
+            LogService.d('Direct connect failed ($directErr), retrying with sourceAddress $sourceAddress', tag: 'Sync');
+            socket = await Socket.connect(
+              effectiveHost,
+              port,
+              sourceAddress: sourceAddress,
+              timeout: timeout,
+            );
+          } else {
+            rethrow;
+          }
         }
       }
 
@@ -500,19 +528,36 @@ class NetworkSyncManager extends ChangeNotifier {
   ]) async {
     final sw = Stopwatch()..start();
     Socket? s;
+    final useSourceFirst = sourceAddress != null &&
+        sourceAddress.isNotEmpty &&
+        sharesSubnet(sourceAddress, host);
+
     try {
-      try {
-        s = await Socket.connect(host, port, timeout: timeout);
-      } catch (directErr) {
-        if (sourceAddress != null && sourceAddress.isNotEmpty) {
+      if (useSourceFirst) {
+        try {
           s = await Socket.connect(
             host,
             port,
             sourceAddress: sourceAddress,
             timeout: timeout,
           );
-        } else {
-          rethrow;
+        } catch (_) {
+          s = await Socket.connect(host, port, timeout: timeout);
+        }
+      } else {
+        try {
+          s = await Socket.connect(host, port, timeout: timeout);
+        } catch (directErr) {
+          if (sourceAddress != null && sourceAddress.isNotEmpty) {
+            s = await Socket.connect(
+              host,
+              port,
+              sourceAddress: sourceAddress,
+              timeout: timeout,
+            );
+          } else {
+            rethrow;
+          }
         }
       }
       sw.stop();

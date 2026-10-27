@@ -231,5 +231,13 @@ void main() {
       final candidate = NetworkSyncManager.evaluateInCarCandidates(interfaces);
       expect(candidate, isNull);
     });
+
+    test('sharesSubnet correctly identifies matching and non-matching /24 subnets', () {
+      expect(NetworkSyncManager.sharesSubnet('192.168.43.26', '192.168.43.1'), isTrue);
+      expect(NetworkSyncManager.sharesSubnet('192.168.49.12', '192.168.49.1'), isTrue);
+      expect(NetworkSyncManager.sharesSubnet('192.168.43.26', '192.168.49.1'), isFalse);
+      expect(NetworkSyncManager.sharesSubnet('10.0.0.5', '192.168.43.1'), isFalse);
+      expect(NetworkSyncManager.sharesSubnet('invalid', '192.168.43.1'), isFalse);
+    });
   });
 }
