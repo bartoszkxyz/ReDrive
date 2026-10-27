@@ -479,6 +479,11 @@ def main() -> int:
         pkg_id = cfg['package_id']
         display_name = cfg['display_name']
 
+        # Stop existing daemons to reclaim RAM within container cgroup limits
+        gradlew_path = os.path.join(repo_root, 'android', 'gradlew')
+        if os.path.exists(gradlew_path):
+            subprocess.run([gradlew_path, '--stop'], cwd=os.path.join(repo_root, 'android'), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
         print(f"\n── Building Flavor: {target} ({display_name}) ────────────")
         cmd = [
             'flutter', 'build', 'apk',
