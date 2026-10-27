@@ -63,6 +63,7 @@ class SyncProvider extends ChangeNotifier {
   Future<void> _init() async {
     try {
       await _syncService.loadPersistedState();
+      await _networkSyncManager.loadSavedTargetHost();
       await loadRetentionSettings();
       _setupDelegate();
     } finally {
@@ -351,6 +352,11 @@ class SyncProvider extends ChangeNotifier {
   /// Stops the Headunit TCP Sync Server.
   Future<void> stopNetworkSyncServer() {
     return _networkSyncManager.stopServer();
+  }
+
+  /// Sets and persists a user-configured target host on Phone Companion.
+  Future<void> setCustomTargetHost(String host) {
+    return _networkSyncManager.setCustomTargetHost(host);
   }
 
   static const String prefRawBlackboxDaysKey = 'sync_pref_raw_blackbox_retention_days';

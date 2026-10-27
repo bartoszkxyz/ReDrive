@@ -166,4 +166,61 @@ void main() {
     expect(session.lastError, same(failure));
     expect(connection.sentCommands, ['ATZ\r']);
   });
+
+  test('initializes session cleanly when ATZ encounters residual frame from previous session', () async {
+    final connection = FakeObdConnection();
+    final client = ElmClient(connection: connection);
+    final session = ObdSession(elmClient: client);
+
+    addTearDown(() async {
+      await client.dispose();
+      await connection.dispose();
+    });
+
+    final initialization = session.initialize();
+
+    expect(connection.sentCommands, ['ATZ\r']);
+
+    // Emit residual data from prior PID polling loop (e.g. 41 11 22 >)
+    connection.emit('41 11 22\r>');
+    await pumpEventQueue();
+
+    // Session retries ATZ after 200ms
+    await Future.delayed(const Duration(milliseconds: 250));
+    await pumpEventQueue();
+
+    expect(connection.sentCommands, ['ATZ\r', 'ATZ\r']);
+
+    // Emit actual adapter info
+    connection.emit('ELM327 v2.3\r>');
+    await pumpEventQueue();
+
+    expect(connection.sentCommands, ['ATZ\r', 'ATZ\r', 'ATE0\r']);
+    connection.emit('OK\r>');
+    await pumpEventQueue();
+
+    expect(connection.sentCommands, ['ATZ\r', 'ATZ\r', 'ATE0\r', 'ATL0\r']);
+    connection.emit('OK\r>');
+    await pumpEventQueue();
+
+    expect(connection.sentCommands, ['ATZ\r', 'ATZ\r', 'ATE0\r', 'ATL0\r', 'ATSP0\r']);
+    connection.emit('OK\r>');
+    await pumpEventQueue();
+
+    expect(connection.sentCommands, [
+      'ATZ\r',
+      'ATZ\r',
+      'ATE0\r',
+      'ATL0\r',
+      'ATSP0\r',
+      '0100\r',
+    ]);
+
+    connection.emit('41 00 08 18 00 00\r>');
+    final supportedPids = await initialization;
+
+    expect(supportedPids, {5, 12, 13});
+    expect(session.state, ObdSessionState.ready);
+    expect(session.lastError, isNull);
+  });
 }

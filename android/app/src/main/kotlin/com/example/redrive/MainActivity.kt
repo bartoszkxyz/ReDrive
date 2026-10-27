@@ -17,8 +17,12 @@ import android.util.DisplayMetrics
 import android.util.Log
 import android.view.InputDevice
 import android.view.WindowManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONArray
 import org.json.JSONObject
@@ -33,12 +37,91 @@ class MainActivity : FlutterActivity() {
     companion object {
         private const val TAG = "MainActivity"
         private const val STORAGE_CHANNEL = "com.example.redrive/storage"
+        private const val GPS_CHANNEL = "com.example.redrive/gps_stream"
     }
 
     private var isDvrStarted: Boolean = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, GPS_CHANNEL)
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                private var locationListener: LocationListener? = null
+
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    if (events == null) return
+                    val locationManager = getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+                    if (locationManager == null) {
+                        Log.w(TAG, "LocationManager not available")
+                        return
+                    }
+
+                    val hasFine = checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    val hasCoarse = checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+                    if (!hasFine && !hasCoarse) {
+                        Log.w(TAG, "Location permissions not granted for gps_stream")
+                        return
+                    }
+
+                    val listener = object : LocationListener {
+                        override fun onLocationChanged(loc: Location) {
+                            val map = HashMap<String, Any>()
+                            map["latitude"] = loc.latitude
+                            map["longitude"] = loc.longitude
+                            map["speedKmh"] = loc.speed * 3.6
+                            map["headingDeg"] = loc.bearing.toDouble()
+                            map["altitudeMeters"] = loc.altitude
+                            map["accuracyMeters"] = loc.accuracy.toDouble()
+                            map["timestampMs"] = loc.time
+                            runOnUiThread {
+                                try {
+                                    events.success(map)
+                                } catch (_: Exception) {}
+                            }
+                        }
+
+                        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+                        override fun onProviderEnabled(provider: String) {}
+                        override fun onProviderDisabled(provider: String) {}
+                    }
+                    locationListener = listener
+
+                    try {
+                        if (hasFine && locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                            locationManager.requestLocationUpdates(
+                                LocationManager.GPS_PROVIDER,
+                                1000L,
+                                0f,
+                                listener
+                            )
+                        } else if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                            locationManager.requestLocationUpdates(
+                                LocationManager.NETWORK_PROVIDER,
+                                1000L,
+                                0f,
+                                listener
+                            )
+                        }
+                    } catch (e: SecurityException) {
+                        Log.w(TAG, "SecurityException requesting location updates", e)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Exception requesting location updates", e)
+                    }
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    locationListener?.let { listener ->
+                        val locationManager = getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+                        try {
+                            locationManager?.removeUpdates(listener)
+                        } catch (_: Exception) {}
+                    }
+                    locationListener = null
+                }
+            })
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, STORAGE_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {

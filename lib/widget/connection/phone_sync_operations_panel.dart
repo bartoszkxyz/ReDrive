@@ -27,6 +27,32 @@ class _PhoneSyncOperationsPanelState extends State<PhoneSyncOperationsPanel> {
   final TextEditingController _hostController =
       TextEditingController(text: NetworkSyncManager.defaultAndroidAutoGateway);
   bool _isConnecting = false;
+  List<String> _localIps = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final syncProvider = context.read<SyncProvider>();
+      if (AppConfig.isHeadunit) {
+        _refreshLocalIps();
+      } else {
+        final activeHost = syncProvider.networkSyncManager.activeTargetHost;
+        if (activeHost.isNotEmpty) {
+          _hostController.text = activeHost;
+        }
+      }
+    });
+  }
+
+  Future<void> _refreshLocalIps() async {
+    final syncProvider = context.read<SyncProvider>();
+    final ips = await syncProvider.networkSyncManager.getLocalIpAddresses();
+    if (mounted) {
+      setState(() => _localIps = ips);
+    }
+  }
 
   @override
   void dispose() {
@@ -47,6 +73,9 @@ class _PhoneSyncOperationsPanelState extends State<PhoneSyncOperationsPanel> {
     HapticFeedback.mediumImpact();
     setState(() => _isConnecting = true);
     final host = _hostController.text.trim();
+    if (host.isNotEmpty) {
+      await syncProvider.setCustomTargetHost(host);
+    }
     final ok = await syncProvider.connectNetworkSync(
       host: host.isNotEmpty ? host : NetworkSyncManager.defaultAndroidAutoGateway,
     );
@@ -219,10 +248,12 @@ class _PhoneSyncOperationsPanelState extends State<PhoneSyncOperationsPanel> {
                           const SizedBox(height: 2),
                           Text(
                             isHeadunit
-                                ? 'Server Port: 7355 (Local Subnet)'
+                                ? (_localIps.isNotEmpty
+                                    ? 'Port 7355 • IP: ${_localIps.join(", ")}'
+                                    : 'Port 7355 (All Network Interfaces)')
                                 : 'Target Gateway: ${_hostController.text}:7355',
-                            style: const TextStyle(
-                              color: Colors.white54,
+                            style: TextStyle(
+                              color: isHeadunit ? Colors.white70 : Colors.white54,
                               fontSize: 12,
                               fontFamily: 'monospace',
                             ),

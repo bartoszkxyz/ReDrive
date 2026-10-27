@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:redrive/services/logging/log_service.dart';
 import 'package:redrive/services/sync/bluetooth_sync_service.dart';
 
@@ -144,6 +145,7 @@ class LinkSelfTestReport {
 class NetworkSyncManager extends ChangeNotifier {
   static const int defaultPort = 7355;
   static const String defaultAndroidAutoGateway = '192.168.43.1';
+  static const String prefTargetHostKey = 'sync_pref_custom_target_host';
 
   final BluetoothSyncService syncService;
   final bool isHeadunit;
@@ -182,6 +184,30 @@ class NetworkSyncManager extends ChangeNotifier {
     if (!_isDisposed) {
       notifyListeners();
     }
+  }
+
+  /// Loads any previously saved target host IP from [SharedPreferences].
+  Future<void> loadSavedTargetHost() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(prefTargetHostKey);
+      if (saved != null && saved.trim().isNotEmpty) {
+        _discoveredTargetHost = saved.trim();
+        _safeNotifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  /// Sets and persists a user-specified Headunit target host IP.
+  Future<void> setCustomTargetHost(String host) async {
+    final clean = host.trim();
+    if (clean.isEmpty) return;
+    _discoveredTargetHost = clean;
+    _safeNotifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(prefTargetHostKey, clean);
+    } catch (_) {}
   }
 
   /// Discovers active in-car network interfaces and derives the target headunit gateway.
@@ -266,7 +292,11 @@ class NetworkSyncManager extends ChangeNotifier {
   Future<bool> startServer({int port = defaultPort}) async {
     await stopServer();
     try {
-      _serverSocket = await ServerSocket.bind(InternetAddress.anyIPv4, port);
+      _serverSocket = await ServerSocket.bind(
+        InternetAddress.anyIPv4,
+        port,
+        shared: true,
+      );
       _serverPort = port;
       _isServerRunning = true;
       _lastError = null;
@@ -289,11 +319,42 @@ class NetworkSyncManager extends ChangeNotifier {
       );
       return true;
     } catch (e) {
-      _lastError = 'Failed to bind server on port $port: $e';
-      _isServerRunning = false;
-      _safeNotifyListeners();
-      LogService.w(_lastError!, tag: 'Sync');
-      return false;
+      LogService.d('Initial bind failed on port $port ($e), retrying after short backoff...', tag: 'Sync');
+      try {
+        await Future.delayed(const Duration(milliseconds: 250));
+        _serverSocket = await ServerSocket.bind(
+          InternetAddress.anyIPv4,
+          port,
+          shared: true,
+        );
+        _serverPort = port;
+        _isServerRunning = true;
+        _lastError = null;
+        _safeNotifyListeners();
+
+        LogService.i('NetworkSyncManager server listening on port $port (after retry)', tag: 'Sync');
+
+        _serverSocket!.listen(
+          _handleIncomingConnection,
+          onError: (Object error) {
+            _lastError = 'Server error: $error';
+            _isServerRunning = false;
+            _safeNotifyListeners();
+            LogService.e('NetworkSyncManager server listen error', tag: 'Sync', error: error);
+          },
+          onDone: () {
+            _isServerRunning = false;
+            _safeNotifyListeners();
+          },
+        );
+        return true;
+      } catch (retryError) {
+        _lastError = 'Failed to bind server on port $port: $retryError';
+        _isServerRunning = false;
+        _safeNotifyListeners();
+        LogService.w(_lastError!, tag: 'Sync');
+        return false;
+      }
     }
   }
 
@@ -302,7 +363,9 @@ class NetworkSyncManager extends ChangeNotifier {
     _connectedPeerAddress = socket.remoteAddress.address;
 
     await _activeTransport?.close();
-    _activeClientSocket?.destroy();
+    try {
+      _activeClientSocket?.destroy();
+    } catch (_) {}
 
     _activeClientSocket = socket;
     final transport = SocketSyncTransport(socket);
@@ -323,9 +386,14 @@ class NetworkSyncManager extends ChangeNotifier {
 
     await _activeTransport?.close();
     _activeTransport = null;
-    _activeClientSocket?.destroy();
+    try {
+      _activeClientSocket?.destroy();
+    } catch (_) {}
     _activeClientSocket = null;
     _connectedPeerAddress = null;
+
+    // Brief yield to allow the OS kernel to release port resources
+    await Future.delayed(const Duration(milliseconds: 100));
 
     _safeNotifyListeners();
   }
@@ -355,27 +423,29 @@ class NetworkSyncManager extends ChangeNotifier {
       );
 
       Socket socket;
-      if (sourceAddress != null && sourceAddress.isNotEmpty) {
-        try {
+      try {
+        socket = await Socket.connect(effectiveHost, port, timeout: timeout);
+      } catch (directErr) {
+        if (sourceAddress != null && sourceAddress.isNotEmpty) {
+          LogService.d('Direct connect failed ($directErr), retrying with sourceAddress $sourceAddress', tag: 'Sync');
           socket = await Socket.connect(
             effectiveHost,
             port,
             sourceAddress: sourceAddress,
             timeout: timeout,
           );
-        } catch (bindErr) {
-          LogService.d('Socket connect with sourceAddress failed ($bindErr), retrying default route', tag: 'Sync');
-          socket = await Socket.connect(effectiveHost, port, timeout: timeout);
+        } else {
+          rethrow;
         }
-      } else {
-        socket = await Socket.connect(effectiveHost, port, timeout: timeout);
       }
 
       _connectedPeerAddress = effectiveHost;
       _discoveredTargetHost = effectiveHost;
 
       await _activeTransport?.close();
-      _activeClientSocket?.destroy();
+      try {
+        _activeClientSocket?.destroy();
+      } catch (_) {}
 
       _activeClientSocket = socket;
       final transport = SocketSyncTransport(socket);
@@ -421,38 +491,31 @@ class NetworkSyncManager extends ChangeNotifier {
     return candidate != null && candidate.isAndroidAutoSubnet;
   }
 
-  /// Probes TCP reachability of the Headunit server without keeping a socket open.
-  /// Returns ping latency in milliseconds, or null if unreachable.
-  Future<int?> pingHeadunit({
-    String host = defaultAndroidAutoGateway,
-    int port = defaultPort,
-    Duration timeout = const Duration(seconds: 3),
-  }) async {
-    final candidate = await discoverInCarGateway();
-    final effectiveHost = (host != defaultAndroidAutoGateway)
-        ? host
-        : (_discoveredTargetHost ?? candidate?.gatewayAddress ?? defaultAndroidAutoGateway);
-    final sourceAddress = candidate?.localAddress;
-
+  /// Helper to probe a single TCP socket endpoint.
+  Future<int?> _probeSocketEndpoint(
+    String host,
+    int port,
+    Duration timeout, [
+    String? sourceAddress,
+  ]) async {
     final sw = Stopwatch()..start();
     Socket? s;
     try {
-      if (sourceAddress != null && sourceAddress.isNotEmpty) {
-        try {
+      try {
+        s = await Socket.connect(host, port, timeout: timeout);
+      } catch (directErr) {
+        if (sourceAddress != null && sourceAddress.isNotEmpty) {
           s = await Socket.connect(
-            effectiveHost,
+            host,
             port,
             sourceAddress: sourceAddress,
             timeout: timeout,
           );
-        } catch (_) {
-          s = await Socket.connect(effectiveHost, port, timeout: timeout);
+        } else {
+          rethrow;
         }
-      } else {
-        s = await Socket.connect(effectiveHost, port, timeout: timeout);
       }
       sw.stop();
-      _discoveredTargetHost = effectiveHost;
       try {
         await s.close();
       } catch (_) {}
@@ -466,10 +529,72 @@ class NetworkSyncManager extends ChangeNotifier {
     }
   }
 
+  /// Probes TCP reachability of the Headunit server without keeping a socket open.
+  /// If [autoProbeFallbacks] is enabled, checks other automotive gateways on failure.
+  /// Returns ping latency in milliseconds, or null if unreachable.
+  Future<int?> pingHeadunit({
+    String host = defaultAndroidAutoGateway,
+    int port = defaultPort,
+    Duration timeout = const Duration(seconds: 3),
+    bool autoProbeFallbacks = true,
+  }) async {
+    final candidate = await discoverInCarGateway();
+    final effectiveHost = (host != defaultAndroidAutoGateway)
+        ? host
+        : (_discoveredTargetHost ?? candidate?.gatewayAddress ?? defaultAndroidAutoGateway);
+    final sourceAddress = candidate?.localAddress;
+
+    // 1. Probe primary target
+    final primaryPing = await _probeSocketEndpoint(
+      effectiveHost,
+      port,
+      timeout,
+      sourceAddress,
+    );
+    if (primaryPing != null) {
+      _discoveredTargetHost = effectiveHost;
+      return primaryPing;
+    }
+
+    // 2. If fallback probing is disabled or custom host was explicitly requested, stop here
+    if (!autoProbeFallbacks || host != defaultAndroidAutoGateway) {
+      return null;
+    }
+
+    // 3. Fallback automotive gateway candidates (Hotspot, Wi-Fi Direct, Dongles, Loopback)
+    final fallbackCandidates = <String>{
+      if (candidate?.gatewayAddress != null) candidate!.gatewayAddress,
+      defaultAndroidAutoGateway,
+      '192.168.49.1', // Android Auto P2P Wi-Fi Direct GO
+      '192.168.50.2', // Carlinkit / AutoKit
+      '192.168.50.1', // Alternative dongle gateway
+      '127.0.0.1',    // Local test / loopback
+    }..remove(effectiveHost);
+
+    for (final fallbackHost in fallbackCandidates) {
+      final fallbackPing = await _probeSocketEndpoint(
+        fallbackHost,
+        port,
+        const Duration(milliseconds: 1200),
+      );
+      if (fallbackPing != null) {
+        LogService.i(
+          'Discovered Headunit Sync Server on alternative gateway $fallbackHost:$port (${fallbackPing}ms)',
+          tag: 'Sync',
+        );
+        _discoveredTargetHost = fallbackHost;
+        _safeNotifyListeners();
+        return fallbackPing;
+      }
+    }
+
+    return null;
+  }
+
   /// Runs the 4-step link self-test from the Phone Companion perspective:
   /// 1. Phone Wi-Fi enabled check
   /// 2. In-car Android Auto subnet check (192.168.43.x, 192.168.49.x, etc.)
-  /// 3. Headunit Socket Ping (port 7355) with source address binding
+  /// 3. Headunit Socket Ping (port 7355) with source address binding and automotive gateway probe
   /// 4. Protocol handshake & Headunit status
   Future<LinkSelfTestReport> runLinkSelfTest({
     String host = defaultAndroidAutoGateway,
@@ -523,7 +648,7 @@ class NetworkSyncManager extends ChangeNotifier {
     final candidate = await discoverInCarGateway(interfaces: ifaceInfos);
     final effectiveHost = (host != defaultAndroidAutoGateway)
         ? host
-        : (candidate?.gatewayAddress ?? defaultAndroidAutoGateway);
+        : (_discoveredTargetHost ?? candidate?.gatewayAddress ?? defaultAndroidAutoGateway);
 
     if (candidate != null && candidate.isAndroidAutoSubnet) {
       results.add(LinkStepResult(
@@ -541,24 +666,37 @@ class NetworkSyncManager extends ChangeNotifier {
       ));
     }
 
-    // 3. Headunit Socket Ping
-    final ping = await pingHeadunit(host: effectiveHost, port: port);
+    // 3. Headunit Socket Ping with multi-gateway probe
+    final ping = await pingHeadunit(
+      host: effectiveHost,
+      port: port,
+      autoProbeFallbacks: true,
+    );
+    final resolvedHost = _discoveredTargetHost ?? effectiveHost;
+
     if (ping != null) {
       results.add(LinkStepResult(
         step: LinkSelfTestStep.headunitSocketPing,
         status: LinkStepStatus.passed,
         title: 'Headunit Socket Ping',
-        details: 'Headunit server at $effectiveHost:$port responded in ${ping}ms.',
+        details: 'Headunit server at $resolvedHost:$port responded in ${ping}ms.',
         pingMs: ping,
       ));
     } else {
+      final probedHosts = <String>{
+        effectiveHost,
+        if (candidate?.gatewayAddress != null) candidate!.gatewayAddress,
+        defaultAndroidAutoGateway,
+        '192.168.49.1',
+      }.join(', ');
+
       results.add(LinkStepResult(
         step: LinkSelfTestStep.headunitSocketPing,
         status: LinkStepStatus.failed,
         title: 'Headunit Socket Ping',
-        details: 'Cannot reach Headunit server at $effectiveHost:$port. Socket connection timed out.',
+        details: 'Cannot reach Headunit server on port $port (probed: $probedHosts). Socket connection timed out.',
       ));
-      diagnosticTip = 'Headunit ReDrive service may be asleep (ignition off) or Android Auto Wi-Fi disconnected.';
+      diagnosticTip = 'Headunit ReDrive server may be asleep (ignition off) or on a different IP. Verify "Server Listening" on Headunit screen.';
       return LinkSelfTestReport(
         steps: results,
         timestamp: DateTime.now(),
@@ -571,7 +709,7 @@ class NetworkSyncManager extends ChangeNotifier {
     await Future.delayed(const Duration(milliseconds: 150));
 
     // 4. Protocol Handshake & State
-    final connected = await connectToHeadunit(host: effectiveHost, port: port);
+    final connected = await connectToHeadunit(host: resolvedHost, port: port);
     if (connected) {
       results.add(const LinkStepResult(
         step: LinkSelfTestStep.protocolHandshake,

@@ -52,6 +52,75 @@ class _VehicleLinkModalSheetState extends State<VehicleLinkModalSheet> {
     }
   }
 
+  Future<void> _showEditTargetDialog(BuildContext context, SyncProvider syncProvider) async {
+    final controller = TextEditingController(
+      text: syncProvider.networkSyncManager.activeTargetHost,
+    );
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E222A),
+        title: const Text('Target Headunit IP', style: TextStyle(color: Colors.white, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter your Headunit IP or pick a preset:',
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              style: const TextStyle(color: Colors.white, fontFamily: 'monospace'),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.black26,
+                hintText: '192.168.43.1',
+                hintStyle: const TextStyle(color: Colors.white24),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              children: [
+                ActionChip(
+                  label: const Text('Hotspot (.43.1)', style: TextStyle(fontSize: 11)),
+                  onPressed: () => controller.text = '192.168.43.1',
+                ),
+                ActionChip(
+                  label: const Text('Wi-Fi Direct (.49.1)', style: TextStyle(fontSize: 11)),
+                  onPressed: () => controller.text = '192.168.49.1',
+                ),
+                ActionChip(
+                  label: const Text('Carlinkit (.50.2)', style: TextStyle(fontSize: 11)),
+                  onPressed: () => controller.text = '192.168.50.2',
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('SAVE & PROBE'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && controller.text.trim().isNotEmpty) {
+      await syncProvider.setCustomTargetHost(controller.text.trim());
+      setState(() => _isLoadingInitialState = true);
+      await _checkInitialNetworkStatus();
+    }
+  }
+
   Future<void> _handleRunSelfTest() async {
     setState(() => _isRunningSelfTest = true);
     final syncProvider = context.read<SyncProvider>();
@@ -306,20 +375,40 @@ class _VehicleLinkModalSheetState extends State<VehicleLinkModalSheet> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
-                                      'Target Gateway',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.white54,
-                                      ),
+                                    Wrap(
+                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      children: [
+                                        const Text(
+                                          'Target Gateway',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.white54,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        GestureDetector(
+                                          key: const Key('edit_target_gateway_button'),
+                                          onTap: () => _showEditTargetDialog(context, syncProvider),
+                                          child: const Icon(
+                                            Icons.edit_rounded,
+                                            size: 13,
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                     const SizedBox(height: 2),
-                                    Text(
-                                      '${syncProvider.networkSyncManager.activeTargetHost}:${syncProvider.networkSyncManager.serverPort}',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
+                                    GestureDetector(
+                                      onTap: () => _showEditTargetDialog(context, syncProvider),
+                                      child: Text(
+                                        '${syncProvider.networkSyncManager.activeTargetHost}:${syncProvider.networkSyncManager.serverPort}',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                          decoration: TextDecoration.underline,
+                                          decorationStyle: TextDecorationStyle.dotted,
+                                        ),
                                       ),
                                     ),
                                   ],

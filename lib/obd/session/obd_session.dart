@@ -34,12 +34,30 @@ class ObdSession {
     LogService.i("Starting OBD initialization sequence (protocol: $protocolCommand)...", tag: 'OBD');
 
     try {
-      final zResp = await _executeAndExpect(
-        'ATZ',
-        ElmResponseType.adapterInfo,
-        timeout: const Duration(seconds: 4),
-        allowOkForAdapterInfo: true,
-      );
+      // When reconnecting to an ELM327 adapter that was previously streaming PIDs,
+      // the serial/Bluetooth RFCOMM buffer may contain residual frames (e.g. 41 11 22 > or 13.2V>).
+      // We retry ATZ up to 3 times, discarding residual non-adapterInfo frames until the reset completes.
+      ElmResponse? zResp;
+      for (int attempt = 1; attempt <= 3; attempt++) {
+        final resp = await _elmClient.execute(
+          'ATZ',
+          timeout: const Duration(seconds: 4),
+        );
+        if (resp.type == ElmResponseType.adapterInfo || resp.type == ElmResponseType.ok) {
+          zResp = resp;
+          break;
+        }
+        LogService.w(
+          'ATZ attempt $attempt received residual frame: (${resp.type}) ${resp.raw.trim()}. Retrying reset...',
+          tag: 'OBD',
+        );
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+
+      if (zResp == null) {
+        throw StateError('ATZ reset failed: adapter did not return adapterInfo/OK after 3 attempts');
+      }
+
       LogService.i("Adapter identified: ${zResp.raw.trim()}", tag: 'OBD');
 
       await _executeAndExpect('ATE0', ElmResponseType.ok);

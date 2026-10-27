@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:redrive/services/sync/bluetooth_sync_service.dart';
 import 'package:redrive/services/sync/network_sync_manager.dart';
 
@@ -101,6 +102,68 @@ void main() {
       await phoneManager.stopServer();
       await headunitManager.stopServer();
       expect(headunitManager.isServerRunning, isFalse);
+    });
+
+    test('server restarts cleanly multiple times on same port without SocketException (shared bind)', () async {
+      final headunitService = BluetoothSyncService(
+        deviceId: 'headunit_restart_test',
+        deviceRole: 'headunit',
+        inMemory: true,
+      );
+      final headunitManager = NetworkSyncManager(
+        syncService: headunitService,
+        isHeadunit: true,
+      );
+
+      final tempServer = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final dynamicPort = tempServer.port;
+      await tempServer.close();
+
+      // Start 1
+      final ok1 = await headunitManager.startServer(port: dynamicPort);
+      expect(ok1, isTrue);
+      expect(headunitManager.isServerRunning, isTrue);
+      expect(headunitManager.lastError, isNull);
+
+      // Rapid Restart 2 (simulating user tapping "RESTART" on headunit)
+      final ok2 = await headunitManager.startServer(port: dynamicPort);
+      expect(ok2, isTrue);
+      expect(headunitManager.isServerRunning, isTrue);
+      expect(headunitManager.lastError, isNull);
+
+      // Rapid Restart 3
+      final ok3 = await headunitManager.startServer(port: dynamicPort);
+      expect(ok3, isTrue);
+      expect(headunitManager.isServerRunning, isTrue);
+      expect(headunitManager.lastError, isNull);
+
+      await headunitManager.stopServer();
+      expect(headunitManager.isServerRunning, isFalse);
+    });
+
+    test('custom target host persists and restores across instances', () async {
+      SharedPreferences.setMockInitialValues({});
+      final service = BluetoothSyncService(
+        deviceId: 'phone_pref_test',
+        deviceRole: 'phone',
+        inMemory: true,
+      );
+      final manager1 = NetworkSyncManager(
+        syncService: service,
+        isHeadunit: false,
+      );
+
+      await manager1.setCustomTargetHost('192.168.1.188');
+      expect(manager1.discoveredTargetHost, '192.168.1.188');
+      expect(manager1.activeTargetHost, '192.168.1.188');
+
+      final manager2 = NetworkSyncManager(
+        syncService: service,
+        isHeadunit: false,
+      );
+      await manager2.loadSavedTargetHost();
+      expect(manager2.discoveredTargetHost, '192.168.1.188');
+      expect(manager2.activeTargetHost, '192.168.1.188');
     });
 
     test('evaluateInCarCandidates resolves Android Auto Wi-Fi Direct p2p subnet and gateway', () {
