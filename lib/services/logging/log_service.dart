@@ -74,7 +74,15 @@ class LogEntry {
 /// - Reactive stream for real-time UI log viewer.
 class LogService {
   static const int maxMemoryEntries = 1500;
-  static const int maxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
+  static const int maxFileSizeBytes = 2 * 1024 * 1024; // 2 MB (reasonable rotation threshold)
+
+  /// Optional override for testing rotation boundaries deterministically.
+  static int? maxFileSizeBytesOverride;
+  static int get activeMaxFileSizeBytes => maxFileSizeBytesOverride ?? maxFileSizeBytes;
+
+  /// Optional override for testing public mirror directory persistence.
+  static Directory? publicMirrorDirOverride;
+  static Directory? _cachedMirrorDir;
 
   static bool _isEnabled = false;
   static bool get isEnabled => _isEnabled;
@@ -84,7 +92,10 @@ class LogService {
       StreamController<LogEntry>.broadcast();
 
   static File? _cachedLogFile;
+  static File? _cachedRotatedLogFile;
+  static File? _cachedCrashLogFile;
   static bool _isWriting = false;
+  static Completer<void>? _currentWriteCompleter;
   static final List<String> _pendingWriteLines = [];
 
   /// Stream of new log entries emitted in real-time.
@@ -95,7 +106,9 @@ class LogService {
     try {
       _isEnabled = await AppPreferences.isDebugLoggingEnabled();
       if (_isEnabled) {
-        i('LogService initialized (debug logging active)', tag: 'System');
+        final mirror = await getPublicReDriveDirectory();
+        final mirrorDesc = mirror != null ? 'mirrored to ${mirror.path}' : 'internal sandbox only';
+        i('LogService initialized (debug logging active, $mirrorDesc)', tag: 'System');
       }
     } catch (_) {
       _isEnabled = false;
@@ -207,37 +220,75 @@ class LogService {
     }
   }
 
+  /// Flushes all pending log lines to disk and mirrors immediately.
+  static Future<void> flush() async {
+    while (_isWriting || _pendingWriteLines.isNotEmpty) {
+      if (!_isWriting && _pendingWriteLines.isNotEmpty) {
+        await _flushQueueToFile();
+      } else if (_currentWriteCompleter != null && !_currentWriteCompleter!.isCompleted) {
+        await _currentWriteCompleter!.future;
+      } else {
+        break;
+      }
+    }
+  }
+
   static Future<void> _flushQueueToFile() async {
     if (_isWriting || _pendingWriteLines.isEmpty) return;
     _isWriting = true;
+    if (_currentWriteCompleter == null || _currentWriteCompleter!.isCompleted) {
+      _currentWriteCompleter = Completer<void>();
+    }
 
     try {
       final file = await getLogFile();
       final batch = List<String>.from(_pendingWriteLines);
       _pendingWriteLines.clear();
 
-      // Check file size before appending
-      if (await file.exists()) {
-        final length = await file.length();
-        if (length > maxFileSizeBytes) {
-          // Truncate/rotate file: overwrite with latest batch
-          await file.writeAsString(
-            '--- LOG ROTATED (size exceeded 5MB) ---\n${batch.join('\n')}\n',
-            mode: FileMode.write,
-            flush: true,
-          );
-          _isWriting = false;
-          if (_pendingWriteLines.isNotEmpty) {
-            unawaited(_flushQueueToFile());
-          }
-          return;
+      bool needRotate = false;
+      if (file.existsSync()) {
+        final length = file.lengthSync();
+        if (length >= activeMaxFileSizeBytes) {
+          needRotate = true;
         }
       }
 
-      await file.writeAsString(
-        '${batch.join('\n')}\n',
-        mode: FileMode.append,
-        flush: true,
+      if (needRotate) {
+        // Rotate primary file: archive current to redrive_debug.1.log
+        final rotatedFile = await getRotatedLogFile();
+        try {
+          if (rotatedFile.existsSync()) {
+            rotatedFile.deleteSync();
+          }
+          rotatedFile.parent.createSync(recursive: true);
+          file.renameSync(rotatedFile.path);
+        } catch (_) {
+          try {
+            file.copySync(rotatedFile.path);
+            file.deleteSync();
+          } catch (_) {}
+        }
+
+        // Fresh primary file with latest batch
+        await file.writeAsString(
+          '--- LOG ROTATED (archived to redrive_debug.1.log) ---\n${batch.join('\n')}\n',
+          mode: FileMode.write,
+          flush: true,
+        );
+      } else {
+        await file.writeAsString(
+          '${batch.join('\n')}\n',
+          mode: FileMode.append,
+          flush: true,
+        );
+      }
+
+      // Mirror write asynchronously to public downloads directory
+      await _mirrorWrite(
+        needRotate
+            ? ['--- LOG ROTATED (archived to redrive_debug.1.log) ---', ...batch]
+            : batch,
+        rotate: needRotate,
       );
     } catch (_) {
       // Ignore file write errors gracefully (e.g. storage permissions or headless tests)
@@ -245,11 +296,48 @@ class LogService {
       _isWriting = false;
       if (_pendingWriteLines.isNotEmpty) {
         unawaited(_flushQueueToFile());
+      } else {
+        if (_currentWriteCompleter != null && !_currentWriteCompleter!.isCompleted) {
+          _currentWriteCompleter!.complete();
+        }
       }
     }
   }
 
-  static File? _cachedCrashLogFile;
+  /// Mirrors written log batches to the public ReDrive downloads directory.
+  static Future<void> _mirrorWrite(List<String> lines, {bool rotate = false}) async {
+    try {
+      final mirrorDir = await getPublicReDriveDirectory();
+      if (mirrorDir == null) return;
+
+      final mirrorFile = File('${mirrorDir.path}/redrive_debug.log');
+      final mirrorRotated = File('${mirrorDir.path}/redrive_debug.1.log');
+
+      if (rotate) {
+        try {
+          if (mirrorRotated.existsSync()) {
+            mirrorRotated.deleteSync();
+          }
+          if (mirrorFile.existsSync()) {
+            try {
+              mirrorFile.renameSync(mirrorRotated.path);
+            } catch (_) {
+              mirrorFile.copySync(mirrorRotated.path);
+              mirrorFile.deleteSync();
+            }
+          }
+        } catch (_) {}
+      }
+
+      await mirrorFile.writeAsString(
+        '${lines.join('\n')}\n',
+        mode: rotate ? FileMode.write : FileMode.append,
+        flush: true,
+      );
+    } catch (_) {
+      // Mirror writes must never throw or disrupt application logging
+    }
+  }
 
   static void _appendCrashLog(String formattedLine) {
     unawaited(() async {
@@ -257,7 +345,78 @@ class LogService {
         final crashFile = await getCrashLogFile();
         await crashFile.writeAsString('$formattedLine\n', mode: FileMode.append, flush: true);
       } catch (_) {}
+
+      try {
+        final mirrorDir = await getPublicReDriveDirectory();
+        if (mirrorDir != null) {
+          final mirrorCrashFile = File('${mirrorDir.path}/redrive_crash.log');
+          await mirrorCrashFile.writeAsString('$formattedLine\n', mode: FileMode.append, flush: true);
+        }
+      } catch (_) {}
     }());
+  }
+
+  /// Resolves the public, user-accessible directory for mirrored logs.
+  /// On Android: `/storage/emulated/0/Download/ReDrive` (or `/storage/emulated/0/ReDrive`).
+  /// On Desktop/Linux: `$HOME/Downloads/ReDrive`.
+  static Future<Directory?> getPublicReDriveDirectory() async {
+    if (publicMirrorDirOverride != null) {
+      return publicMirrorDirOverride;
+    }
+    if (_cachedMirrorDir != null && _cachedMirrorDir!.existsSync()) {
+      return _cachedMirrorDir;
+    }
+
+    if (Platform.isAndroid) {
+      const publicCandidates = <String>[
+        '/storage/emulated/0/Download/ReDrive',
+        '/storage/emulated/0/ReDrive',
+      ];
+
+      for (final path in publicCandidates) {
+        try {
+          final dir = Directory(path);
+          if (!dir.existsSync()) {
+            dir.createSync(recursive: true);
+          }
+          final probe = File('${dir.path}/.probe_${DateTime.now().millisecondsSinceEpoch}');
+          probe.writeAsStringSync('ok', flush: true);
+          probe.deleteSync();
+          _cachedMirrorDir = dir;
+          return dir;
+        } catch (_) {
+          // Candidate not writable, proceed to next
+        }
+      }
+
+      // Fallback: app-specific external storage which does not require WRITE_EXTERNAL_STORAGE
+      try {
+        final extDir = await getExternalStorageDirectory();
+        if (extDir != null) {
+          final fallbackDir = Directory('${extDir.path}/ReDrive');
+          if (!fallbackDir.existsSync()) {
+            fallbackDir.createSync(recursive: true);
+          }
+          _cachedMirrorDir = fallbackDir;
+          return fallbackDir;
+        }
+      } catch (_) {}
+    } else {
+      // Desktop / Linux / macOS
+      final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+      if (home != null && home.isNotEmpty) {
+        try {
+          final dir = Directory('$home/Downloads/ReDrive');
+          if (!dir.existsSync()) {
+            dir.createSync(recursive: true);
+          }
+          _cachedMirrorDir = dir;
+          return dir;
+        } catch (_) {}
+      }
+    }
+
+    return null;
   }
 
   /// Returns the persistent crash log file on disk.
@@ -275,7 +434,7 @@ class LogService {
     return _cachedCrashLogFile!;
   }
 
-  /// Returns the target log file on disk.
+  /// Returns the target active log file on disk.
   static Future<File> getLogFile() async {
     if (_cachedLogFile != null) return _cachedLogFile!;
 
@@ -290,29 +449,64 @@ class LogService {
     return _cachedLogFile!;
   }
 
-  /// Returns the current size of the log file on disk in bytes.
-  static Future<int> getLogFileSize() async {
+  /// Returns the rotated archive log file on disk.
+  static Future<File> getRotatedLogFile() async {
+    if (_cachedRotatedLogFile != null) return _cachedRotatedLogFile!;
+
+    Directory dir;
     try {
-      final file = await getLogFile();
-      if (await file.exists()) {
-        return await file.length();
-      }
-    } catch (_) {}
-    return 0;
+      dir = await getApplicationDocumentsDirectory();
+    } catch (_) {
+      dir = Directory.systemTemp;
+    }
+
+    _cachedRotatedLogFile = File('${dir.path}/redrive_debug.1.log');
+    return _cachedRotatedLogFile!;
   }
 
-  /// Clears in-memory buffer and resets the log file on disk.
+  /// Returns the current total size of all active and rotated log files on disk in bytes.
+  static Future<int> getLogFileSize() async {
+    int total = 0;
+    try {
+      final file = await getLogFile();
+      if (file.existsSync()) {
+        total += file.lengthSync();
+      }
+      final rotated = await getRotatedLogFile();
+      if (rotated.existsSync()) {
+        total += rotated.lengthSync();
+      }
+    } catch (_) {}
+    return total;
+  }
+
+  /// Clears in-memory buffer and resets all log files on disk and in the mirror directory.
   static Future<void> clearLogs() async {
     _memoryBuffer.clear();
     _pendingWriteLines.clear();
     try {
       final file = await getLogFile();
-      if (await file.exists()) {
-        await file.delete();
+      if (file.existsSync()) {
+        file.deleteSync();
+      }
+      final rotated = await getRotatedLogFile();
+      if (rotated.existsSync()) {
+        rotated.deleteSync();
       }
       final crashFile = await getCrashLogFile();
-      if (await crashFile.exists()) {
-        await crashFile.delete();
+      if (crashFile.existsSync()) {
+        crashFile.deleteSync();
+      }
+
+      // Also clean public mirror files
+      final mirrorDir = await getPublicReDriveDirectory();
+      if (mirrorDir != null) {
+        final mirrorLog = File('${mirrorDir.path}/redrive_debug.log');
+        if (mirrorLog.existsSync()) mirrorLog.deleteSync();
+        final mirrorRotated = File('${mirrorDir.path}/redrive_debug.1.log');
+        if (mirrorRotated.existsSync()) mirrorRotated.deleteSync();
+        final mirrorCrash = File('${mirrorDir.path}/redrive_crash.log');
+        if (mirrorCrash.existsSync()) mirrorCrash.deleteSync();
       }
     } catch (_) {}
     i('Logs cleared by user', tag: 'System');
@@ -324,11 +518,12 @@ class LogService {
   }
 
   /// Returns full log contents as a single formatted string for copying or exporting.
+  /// Combines critical crash logs, rotated archive history, and active session logs.
   static Future<String> exportLogs() async {
     final buffer = StringBuffer();
     try {
       final crashFile = await getCrashLogFile();
-      if (await crashFile.exists()) {
+      if (crashFile.existsSync()) {
         final crashContent = await crashFile.readAsString();
         if (crashContent.trim().isNotEmpty) {
           buffer.writeln('=== CRITICAL / CRASH LOGS ===');
@@ -338,22 +533,41 @@ class LogService {
       }
     } catch (_) {}
 
-    // If memory buffer has entries, it always contains the most up-to-date log session
+    // Flush any pending entries before reading disk logs
+    await flush();
+
+    bool readFromDisk = false;
+    try {
+      final rotatedFile = await getRotatedLogFile();
+      if (rotatedFile.existsSync()) {
+        final rotatedContent = await rotatedFile.readAsString();
+        if (rotatedContent.trim().isNotEmpty) {
+          buffer.writeln('=== ARCHIVED LOGS (redrive_debug.1.log) ===');
+          buffer.writeln(rotatedContent.trim());
+          buffer.writeln('===========================================\n');
+          readFromDisk = true;
+        }
+      }
+
+      final file = await getLogFile();
+      if (file.existsSync()) {
+        final content = await file.readAsString();
+        if (content.trim().isNotEmpty) {
+          buffer.writeln(content.trim());
+          readFromDisk = true;
+        }
+      }
+    } catch (_) {}
+
+    if (readFromDisk) {
+      return buffer.toString().trim();
+    }
+
+    // Fallback to memory buffer if disk was unavailable or empty
     if (_memoryBuffer.isNotEmpty) {
       buffer.writeln(_memoryBuffer.map((e) => e.formatted).join('\n'));
       return buffer.toString().trim();
     }
-
-    try {
-      final file = await getLogFile();
-      if (await file.exists()) {
-        final content = await file.readAsString();
-        if (content.trim().isNotEmpty) {
-          buffer.writeln(content.trim());
-          return buffer.toString().trim();
-        }
-      }
-    } catch (_) {}
 
     if (buffer.isNotEmpty) {
       return buffer.toString().trim();

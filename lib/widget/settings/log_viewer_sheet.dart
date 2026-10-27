@@ -36,10 +36,13 @@ class _LogViewerSheetState extends State<LogViewerSheet> {
   String _searchQuery = '';
   int _fileSizeBytes = 0;
   bool _autoScroll = true;
+  String? _mirrorPath;
 
   @override
   void initState() {
     super.initState();
+    _entries = LogService.getEntries();
+    _mirrorPath = LogService.publicMirrorDirOverride?.path;
     _loadLogs();
 
     _logSubscription = LogService.onNewEntry.listen((_) {
@@ -74,10 +77,12 @@ class _LogViewerSheetState extends State<LogViewerSheet> {
   Future<void> _loadLogs() async {
     final entries = LogService.getEntries();
     final size = await LogService.getLogFileSize();
+    final mirrorDir = await LogService.getPublicReDriveDirectory();
     if (mounted) {
       setState(() {
         _entries = entries;
         _fileSizeBytes = size;
+        _mirrorPath = mirrorDir?.path;
       });
       if (_autoScroll && _scrollController.hasClients) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -181,6 +186,9 @@ class _LogViewerSheetState extends State<LogViewerSheet> {
       await LogService.clearLogs();
       await _loadLogs();
       if (mounted) {
+        setState(() {
+          _entries = LogService.getEntries();
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Logs cleared successfully'),
@@ -280,6 +288,18 @@ class _LogViewerSheetState extends State<LogViewerSheet> {
                               ),
                             ],
                           ),
+                          if (_mirrorPath != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'Mirror: $_mirrorPath',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white.withValues(alpha: 0.35),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
