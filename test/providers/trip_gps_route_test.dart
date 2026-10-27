@@ -1,15 +1,15 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/models/dtc_code.dart';
-import 'package:redrive/models/trip_anomaly.dart';
-import 'package:redrive/models/trip_route_point.dart';
-import 'package:redrive/obd/models/obd_data.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/services/settings/app_preferences.dart';
-import 'package:redrive/services/trip/trip_history_service.dart';
-import 'package:redrive/services/trip/trip_timeseries_service.dart';
+import 'package:obdrive/models/dtc_code.dart';
+import 'package:obdrive/models/trip_anomaly.dart';
+import 'package:obdrive/models/trip_route_point.dart';
+import 'package:obdrive/obd/models/obd_data.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/services/settings/app_preferences.dart';
+import 'package:obdrive/services/trip/trip_history_service.dart';
+import 'package:obdrive/services/trip/trip_timeseries_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

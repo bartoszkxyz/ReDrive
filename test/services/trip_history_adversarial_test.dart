@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/obd/models/obd_data.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/services/trip/trip_history_service.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/obd/models/obd_data.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/services/trip/trip_history_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -14,7 +14,7 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
-    tempDir = Directory.systemTemp.createTempSync('redrive_adversarial_test_');
+    tempDir = Directory.systemTemp.createTempSync('obdrive_adversarial_test_');
   });
 
   tearDown(() {

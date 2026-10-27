@@ -2,22 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/core/theme/theme_engine.dart';
-import 'package:redrive/models/dtc_code.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/models/trip_route_point.dart';
-import 'package:redrive/models/vehicle_profile.dart';
-import 'package:redrive/obd/models/obd_data.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/providers/sync_provider.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/screens/headunit_launcher_screen.dart';
-import 'package:redrive/services/gps/gps_location_service.dart';
-import 'package:redrive/services/headunit/native_app_launcher_service.dart';
-import 'package:redrive/services/sync/bluetooth_sync_service.dart';
-import 'package:redrive/services/trip/fuel_calculator.dart';
-import 'package:redrive/services/trip/trip_anomaly_detector.dart';
-import 'package:redrive/services/trip/trip_timeseries_service.dart';
+import 'package:obdrive/core/theme/theme_engine.dart';
+import 'package:obdrive/models/dtc_code.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/models/trip_route_point.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
+import 'package:obdrive/obd/models/obd_data.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/providers/sync_provider.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/screens/headunit_launcher_screen.dart';
+import 'package:obdrive/services/gps/gps_location_service.dart';
+import 'package:obdrive/services/headunit/native_app_launcher_service.dart';
+import 'package:obdrive/services/sync/bluetooth_sync_service.dart';
+import 'package:obdrive/services/trip/fuel_calculator.dart';
+import 'package:obdrive/services/trip/trip_anomaly_detector.dart';
+import 'package:obdrive/services/trip/trip_timeseries_service.dart';
 
 /// In-memory test double implementing [TripProvider] with zero disk I/O.
 class FakeTripProvider extends ChangeNotifier implements TripProvider {
@@ -175,7 +175,7 @@ class FakeTripProvider extends ChangeNotifier implements TripProvider {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const channel = MethodChannel('com.example.redrive/storage');
+  const channel = MethodChannel('com.example.obdrive/storage');
   final List<MethodCall> methodCalls = [];
 
   final mockApps = [

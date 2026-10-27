@@ -1,5 +1,5 @@
-import 'package:redrive/providers/bluetooth_provider.dart';
-import 'package:redrive/obd/connection/obd_connection.dart';
+import 'package:obdrive/providers/bluetooth_provider.dart';
+import 'package:obdrive/obd/connection/obd_connection.dart';
 
 class BluetoothObdConnection implements ObdConnection {
   final BluetoothProvider provider;

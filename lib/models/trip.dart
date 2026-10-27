@@ -1,5 +1,5 @@
-import 'package:redrive/models/trip_anomaly.dart';
-import 'package:redrive/models/trip_route_point.dart';
+import 'package:obdrive/models/trip_anomaly.dart';
+import 'package:obdrive/models/trip_route_point.dart';
 
 /// Represents a recorded driving trip with telemetry, fuel consumption history,
 /// diagnostic anomaly episodes, and timeseries recording metadata.

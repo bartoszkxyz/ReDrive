@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/providers/sync_provider.dart';
-import 'package:redrive/services/sync/bluetooth_sync_service.dart';
-import 'package:redrive/services/sync/network_sync_manager.dart';
+import 'package:obdrive/providers/sync_provider.dart';
+import 'package:obdrive/services/sync/bluetooth_sync_service.dart';
+import 'package:obdrive/services/sync/network_sync_manager.dart';
 
 /// Modal bottom sheet providing deep Phone ↔ Headunit link inspection,
 /// real-time TCP ping latency, 4-step automated diagnostic self-test,

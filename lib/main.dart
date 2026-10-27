@@ -5,7 +5,7 @@ import 'l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/services/bluetooth/connection/bluetooth_obd_connection.dart';
+import 'package:obdrive/services/bluetooth/connection/bluetooth_obd_connection.dart';
 
 import 'core/app_flavor.dart';
 import 'providers/garage_provider.dart';
@@ -19,11 +19,11 @@ import 'core/app_themes.dart';
 import 'screens/phone_companion_screen.dart';
 import 'screens/root_screen.dart';
 
-import 'package:redrive/services/background_service.dart';
-import 'package:redrive/services/obd_background_proxy.dart';
-import 'package:redrive/services/logging/log_service.dart';
+import 'package:obdrive/services/background_service.dart';
+import 'package:obdrive/services/obd_background_proxy.dart';
+import 'package:obdrive/services/logging/log_service.dart';
 
-Future<void> runRedriveApp(AppFlavor flavor) async {
+Future<void> runOBDriveApp(AppFlavor flavor) async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Install robust top-level crash logging to guarantee errors are captured on disk
@@ -113,7 +113,7 @@ Future<void> runRedriveApp(AppFlavor flavor) async {
         ChangeNotifierProvider.value(value: garageProvider),
         ChangeNotifierProvider.value(value: syncProvider),
       ],
-      child: const RedriveApp(),
+      child: const OBDriveApp(),
     ),
   );
 }
@@ -123,11 +123,11 @@ void main() async {
   final flavor = envFlavor.isNotEmpty
       ? AppFlavor.fromString(envFlavor)
       : AppFlavor.fromString(appFlavor);
-  await runRedriveApp(flavor);
+  await runOBDriveApp(flavor);
 }
 
-class RedriveApp extends StatelessWidget {
-  const RedriveApp({super.key});
+class OBDriveApp extends StatelessWidget {
+  const OBDriveApp({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/services/settings/app_preferences.dart';
-import 'package:redrive/services/trip/trip_history_service.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/services/settings/app_preferences.dart';
+import 'package:obdrive/services/trip/trip_history_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -17,7 +17,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await AppPreferences.setMinTripDistanceKm(0.1);
     await AppPreferences.setAutoTripEnabled(true);
-    tempDir = Directory.systemTemp.createTempSync('redrive_r3_stress_');
+    tempDir = Directory.systemTemp.createTempSync('obdrive_r3_stress_');
   });
 
   tearDown(() {

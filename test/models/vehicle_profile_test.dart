@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/models/vehicle_profile.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
 
 void main() {
   group('FuelType enum', () {

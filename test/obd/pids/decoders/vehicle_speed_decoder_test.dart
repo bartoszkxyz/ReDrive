@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/obd/elm/elm_response.dart';
-import 'package:redrive/obd/pid/decoders/vehicle_speed_decoder.dart';
+import 'package:obdrive/obd/elm/elm_response.dart';
+import 'package:obdrive/obd/pid/decoders/vehicle_speed_decoder.dart';
 
 void main() {
   group('decodeVehicleSpeed', () {

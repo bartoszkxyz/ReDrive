@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
-import 'package:redrive/models/sync_models.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/models/vehicle_profile.dart';
+import 'package:obdrive/models/sync_models.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
 
-/// Enumerates the framing message types supported by the ReDrive
+/// Enumerates the framing message types supported by the OBDrive
 /// Bluetooth RFCOMM synchronization protocol.
 enum SyncFrameType {
   /// Initial handshake containing the device's manifest of trips and state.

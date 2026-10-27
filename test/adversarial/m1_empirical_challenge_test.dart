@@ -1,15 +1,15 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:redrive/obd/connection/tcp_obd_connection.dart';
-import 'package:redrive/obd/models/obd_data.dart';
-import 'package:redrive/obd/pid/pid_key.dart';
-import 'package:redrive/obd/pid/pid_registry.dart';
-import 'package:redrive/obd/polling/polling_controller.dart';
-import 'package:redrive/obd/source/obd_source_state.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/services/trip/fuel_calculator.dart';
+import 'package:obdrive/obd/connection/tcp_obd_connection.dart';
+import 'package:obdrive/obd/models/obd_data.dart';
+import 'package:obdrive/obd/pid/pid_key.dart';
+import 'package:obdrive/obd/pid/pid_registry.dart';
+import 'package:obdrive/obd/polling/polling_controller.dart';
+import 'package:obdrive/obd/source/obd_source_state.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/services/trip/fuel_calculator.dart';
 
 import '../e2e/e2e_harness.dart';
 

@@ -1,6 +1,6 @@
 import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/services/trip/fuel_calculator.dart';
+import 'package:obdrive/services/trip/fuel_calculator.dart';
 
 void main() {
   const calculator = FuelCalculator(

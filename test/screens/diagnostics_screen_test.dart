@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/screens/diagnostics_screen.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/screens/diagnostics_screen.dart';
 
 void main() {
   group('DiagnosticsScreen Widget Tests', () {

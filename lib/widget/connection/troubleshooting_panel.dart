@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/widget/settings/log_viewer_sheet.dart';
-import 'package:redrive/widget/settings/obd_adapter_test_sheet.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/widget/settings/log_viewer_sheet.dart';
+import 'package:obdrive/widget/settings/obd_adapter_test_sheet.dart';
 
 /// Diagnostics & Troubleshooting Panel for in-car and mobile connection issues.
 class TroubleshootingPanel extends StatelessWidget {

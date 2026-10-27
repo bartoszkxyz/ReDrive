@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/services/trip/trip_history_service.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/services/trip/trip_history_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -10,7 +10,7 @@ void main() {
   late Directory tempDir;
 
   setUp(() {
-    tempDir = Directory.systemTemp.createTempSync('redrive_trip_test_');
+    tempDir = Directory.systemTemp.createTempSync('obdrive_trip_test_');
   });
 
   tearDown(() {
@@ -121,8 +121,8 @@ void main() {
     });
 
     test('3. Temporary directory isolation prevents cross-instance interference', () async {
-      final tempDirA = Directory.systemTemp.createTempSync('redrive_sandbox_a_');
-      final tempDirB = Directory.systemTemp.createTempSync('redrive_sandbox_b_');
+      final tempDirA = Directory.systemTemp.createTempSync('obdrive_sandbox_a_');
+      final tempDirB = Directory.systemTemp.createTempSync('obdrive_sandbox_b_');
 
       try {
         final serviceA = TripHistoryService(customDirectory: tempDirA);

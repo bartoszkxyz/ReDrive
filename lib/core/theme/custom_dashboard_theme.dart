@@ -272,7 +272,7 @@ class CustomDashboardTheme {
   const CustomDashboardTheme({
     required this.id,
     required this.name,
-    this.author = 'ReDrive',
+    this.author = 'OBDrive',
     this.version = '1.0',
     this.colors = const CustomThemeColors(),
     this.gaugeStyle = const CustomGaugeStyle(),
@@ -282,7 +282,7 @@ class CustomDashboardTheme {
   factory CustomDashboardTheme.defaultTheme() => const CustomDashboardTheme(
     id: 'obdrive_neon_lime',
     name: 'OBDrive Neon Lime',
-    author: 'ReDrive',
+    author: 'OBDrive',
     version: '1.0',
     colors: CustomThemeColors(),
     gaugeStyle: CustomGaugeStyle(),
@@ -292,7 +292,7 @@ class CustomDashboardTheme {
   factory CustomDashboardTheme.sportRed() => const CustomDashboardTheme(
     id: 'sport_track_red',
     name: 'Suzuki Sport Redline',
-    author: 'ReDrive',
+    author: 'OBDrive',
     version: '1.0',
     colors: CustomThemeColors(
       primaryAccent: Color(0xFFFF3333),
@@ -311,7 +311,7 @@ class CustomDashboardTheme {
   factory CustomDashboardTheme.stealthOled() => const CustomDashboardTheme(
     id: 'stealth_oled',
     name: 'Stealth OLED Minimal',
-    author: 'ReDrive',
+    author: 'OBDrive',
     version: '1.0',
     colors: CustomThemeColors(
       background: Color(0xFF000000),
@@ -331,7 +331,7 @@ class CustomDashboardTheme {
   factory CustomDashboardTheme.amberGlow() => const CustomDashboardTheme(
     id: 'amber_glow',
     name: 'Amber Glow',
-    author: 'ReDrive',
+    author: 'OBDrive',
     version: '1.0',
     colors: CustomThemeColors(
       background: Color(0xFF090602),
@@ -359,7 +359,7 @@ class CustomDashboardTheme {
   factory CustomDashboardTheme.cyanCyber() => const CustomDashboardTheme(
     id: 'cyan_cyber',
     name: 'Cyan Cyber',
-    author: 'ReDrive',
+    author: 'OBDrive',
     version: '1.0',
     colors: CustomThemeColors(
       background: Color(0xFF040A10),
@@ -387,7 +387,7 @@ class CustomDashboardTheme {
   factory CustomDashboardTheme.emeraldDrive() => const CustomDashboardTheme(
     id: 'emerald_drive',
     name: 'Emerald Drive',
-    author: 'ReDrive',
+    author: 'OBDrive',
     version: '1.0',
     colors: CustomThemeColors(
       background: Color(0xFF030D07),
@@ -415,7 +415,7 @@ class CustomDashboardTheme {
   factory CustomDashboardTheme.monochromeDark() => const CustomDashboardTheme(
     id: 'monochrome_dark',
     name: 'Monochrome Dark',
-    author: 'ReDrive',
+    author: 'OBDrive',
     version: '1.0',
     colors: CustomThemeColors(
       background: Color(0xFF000000),

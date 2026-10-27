@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:redrive/models/vehicle_profile.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/services/garage/auto_data_spec_parser.dart';
-import 'package:redrive/services/garage/garage_service.dart';
-import 'package:redrive/services/logging/log_service.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/services/garage/auto_data_spec_parser.dart';
+import 'package:obdrive/services/garage/garage_service.dart';
+import 'package:obdrive/services/logging/log_service.dart';
 
 /// Provider managing multi-vehicle profiles, active profile selection,
 /// `auto-data.net` URL specification parsing, maintenance tracking,

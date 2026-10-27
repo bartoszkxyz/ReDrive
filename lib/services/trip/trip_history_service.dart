@@ -4,7 +4,7 @@ import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
-import 'package:redrive/models/trip.dart';
+import 'package:obdrive/models/trip.dart';
 
 /// Manages persistence of recorded trips to local storage with atomic writes,
 /// backup mirroring, crash corruption recovery, and active trip checkpointing.
@@ -43,7 +43,7 @@ class TripHistoryService {
     } catch (_) {
       final home = Platform.environment['HOME'] ?? '.';
       final dataDir =
-          Platform.environment['XDG_DATA_HOME'] ?? '$home/.local/share/redrive';
+          Platform.environment['XDG_DATA_HOME'] ?? '$home/.local/share/obdrive';
       final dir = Directory(dataDir);
       if (!await dir.exists()) {
         await dir.create(recursive: true);

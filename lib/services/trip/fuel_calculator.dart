@@ -1,4 +1,4 @@
-import 'package:redrive/models/vehicle_profile.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
 
 /// Computes instantaneous fuel flow and fuel economy from OBD telemetry
 /// based on industry-standard SAE J1979 / ISO 15031-5 specifications.

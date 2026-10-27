@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/core/theme/theme_engine.dart';
-import 'package:redrive/services/headunit/native_app_launcher_service.dart';
-import 'package:redrive/widget/cockpit/pip_application_bay.dart';
+import 'package:obdrive/core/theme/theme_engine.dart';
+import 'package:obdrive/services/headunit/native_app_launcher_service.dart';
+import 'package:obdrive/widget/cockpit/pip_application_bay.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -15,7 +15,7 @@ void main() {
 
   setUp(() {
     methodCalls = <MethodCall>[];
-    channel = const MethodChannel('com.example.redrive/storage');
+    channel = const MethodChannel('com.example.obdrive/storage');
 
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (MethodCall call) async {

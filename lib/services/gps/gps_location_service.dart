@@ -2,14 +2,14 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
-import 'package:redrive/models/trip_route_point.dart';
+import 'package:obdrive/models/trip_route_point.dart';
 
 /// Service providing 1 Hz GPS location fixes for active trip route recording
 /// and parked-car location snapshots, with deterministic simulated trajectory
 /// generation for Demo Mode and offline testing.
 class GpsLocationService {
   static const EventChannel _gpsEventChannel =
-      EventChannel('com.example.redrive/gps_stream');
+      EventChannel('com.example.obdrive/gps_stream');
 
   final StreamController<GpsFix> _fixController =
       StreamController<GpsFix>.broadcast();

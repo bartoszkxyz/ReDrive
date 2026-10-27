@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/obd/elm/elm_client.dart';
-import 'package:redrive/obd/pid/pid_key.dart';
-import 'package:redrive/obd/pid/pid_registry.dart';
-import 'package:redrive/obd/polling/polling_controller.dart';
+import 'package:obdrive/obd/elm/elm_client.dart';
+import 'package:obdrive/obd/pid/pid_key.dart';
+import 'package:obdrive/obd/pid/pid_registry.dart';
+import 'package:obdrive/obd/polling/polling_controller.dart';
 import '../fakes/fake_obd_connection.dart';
 
 void main() {

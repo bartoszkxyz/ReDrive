@@ -24,7 +24,7 @@ class HeadunitBackgroundSheet extends StatefulWidget {
 
 class _HeadunitBackgroundSheetState extends State<HeadunitBackgroundSheet> {
   static const MethodChannel _storageChannel =
-      MethodChannel('com.example.redrive/storage');
+      MethodChannel('com.example.obdrive/storage');
 
   bool _autoLaunch = true;
   String? _lastBootAction;
@@ -229,8 +229,8 @@ class _HeadunitBackgroundSheetState extends State<HeadunitBackgroundSheet> {
                       const SizedBox(height: 6),
                       Text(
                         _autoLaunch
-                            ? 'On ignition, ReDrive automatically brings its dashboard onto the screen and connects to your OBD-II adapter.'
-                            : 'Silent mode active: On ignition, ReDrive wakes up and connects in the background without interrupting your launcher or radio. Toggle ON if you prefer the dashboard to appear on screen immediately.',
+                            ? 'On ignition, OBDrive automatically brings its dashboard onto the screen and connects to your OBD-II adapter.'
+                            : 'Silent mode active: On ignition, OBDrive wakes up and connects in the background without interrupting your launcher or radio. Toggle ON if you prefer the dashboard to appear on screen immediately.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
                           height: 1.35,
@@ -323,7 +323,7 @@ class _HeadunitBackgroundSheetState extends State<HeadunitBackgroundSheet> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Exports a complete JSON snapshot (screen DPI/dimensions, real Android SDK & SoC, all getprop system properties, installed apps, internal com.ts.MainUI / MCU activities for Radio, BT, DSP/EQ, running services, and SWC input devices) to /storage/emulated/0/Download/ReDrive.',
+                        'Exports a complete JSON snapshot (screen DPI/dimensions, real Android SDK & SoC, all getprop system properties, installed apps, internal com.ts.MainUI / MCU activities for Radio, BT, DSP/EQ, running services, and SWC input devices) to /storage/emulated/0/Download/OBDrive.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
                           height: 1.35,
@@ -408,7 +408,7 @@ class _HeadunitBackgroundSheetState extends State<HeadunitBackgroundSheet> {
                   iconColor: Colors.amberAccent,
                   title: 'First-time Launch After APK Updates',
                   body:
-                      'Android security places all newly installed or updated APKs in a "Stopped State". You must open ReDrive manually once after updating so Android registers the ignition broadcast receivers.',
+                      'Android security places all newly installed or updated APKs in a "Stopped State". You must open OBDrive manually once after updating so Android registers the ignition broadcast receivers.',
                 ),
                 const SizedBox(height: 12),
 
@@ -417,9 +417,9 @@ class _HeadunitBackgroundSheetState extends State<HeadunitBackgroundSheet> {
                   theme: theme,
                   icon: Icons.shield_rounded,
                   iconColor: Colors.greenAccent,
-                  title: 'How ReDrive operates (Car Scanner paradigm)',
+                  title: 'How OBDrive operates (Car Scanner paradigm)',
                   body:
-                      'ReDrive runs an Android Foreground Service with an ongoing notification and PARTIAL_WAKE_LOCK. In Android\'s Low Memory Killer (LMK) architecture, foreground services have top priority and will never be killed to free RAM for navigation or music apps.',
+                      'OBDrive runs an Android Foreground Service with an ongoing notification and PARTIAL_WAKE_LOCK. In Android\'s Low Memory Killer (LMK) architecture, foreground services have top priority and will never be killed to free RAM for navigation or music apps.',
                 ),
                 const SizedBox(height: 12),
 
@@ -430,7 +430,7 @@ class _HeadunitBackgroundSheetState extends State<HeadunitBackgroundSheet> {
                   iconColor: Colors.cyanAccent,
                   title: 'Ignition & Sleep Lifecycle',
                   body:
-                      '• Ignition ON (ACC_ON / Boot): ReDrive awakens automatically, launches onto the screen, and retries OBD connection up to 10 times.\n• Ignition OFF (ACC_OFF / Sleep): ReDrive cleanly flushes trip metrics to SQLite disk and closes the Bluetooth RFCOMM socket to ensure 0% battery drain while parked.',
+                      '• Ignition ON (ACC_ON / Boot): OBDrive awakens automatically, launches onto the screen, and retries OBD connection up to 10 times.\n• Ignition OFF (ACC_OFF / Sleep): OBDrive cleanly flushes trip metrics to SQLite disk and closes the Bluetooth RFCOMM socket to ensure 0% battery drain while parked.',
                 ),
                 const SizedBox(height: 12),
 
@@ -441,7 +441,7 @@ class _HeadunitBackgroundSheetState extends State<HeadunitBackgroundSheet> {
                   iconColor: Colors.purpleAccent,
                   title: 'Bluetooth Insecure RFCOMM Fallback',
                   body:
-                      'Topway TS18 and Chinese headunits route Bluetooth via an external MCU chip that often freezes on standard Android secure PIN handshakes. ReDrive automatically falls back to an insecure RFCOMM socket, connecting immediately to your paired OBD-II adapter.',
+                      'Topway TS18 and Chinese headunits route Bluetooth via an external MCU chip that often freezes on standard Android secure PIN handshakes. OBDrive automatically falls back to an insecure RFCOMM socket, connecting immediately to your paired OBD-II adapter.',
                 ),
                 const SizedBox(height: 24),
               ],

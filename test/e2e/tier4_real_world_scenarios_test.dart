@@ -1,11 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/services/dtc/dtc_service.dart';
-import 'package:redrive/services/trip/fuel_calculator.dart';
-import 'package:redrive/services/trip/trip_history_service.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/services/dtc/dtc_service.dart';
+import 'package:obdrive/services/trip/fuel_calculator.dart';
+import 'package:obdrive/services/trip/trip_history_service.dart';
 
 import 'e2e_harness.dart';
 

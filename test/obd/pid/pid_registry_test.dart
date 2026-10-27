@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/obd/pid/pid_definition.dart';
-import 'package:redrive/obd/pid/pid_key.dart';
-import 'package:redrive/obd/pid/pid_registry.dart';
+import 'package:obdrive/obd/pid/pid_definition.dart';
+import 'package:obdrive/obd/pid/pid_key.dart';
+import 'package:obdrive/obd/pid/pid_registry.dart';
 
 void main() {
   test('finds engine RPM definition', () {

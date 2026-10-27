@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/services/logging/log_service.dart';
-import 'package:redrive/widget/settings/log_viewer_sheet.dart';
+import 'package:obdrive/services/logging/log_service.dart';
+import 'package:obdrive/widget/settings/log_viewer_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -13,7 +13,7 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    tempMirrorDir = await Directory.systemTemp.createTemp('redrive_widget_test_');
+    tempMirrorDir = await Directory.systemTemp.createTemp('obdrive_widget_test_');
     LogService.publicMirrorDirOverride = tempMirrorDir;
     await LogService.init();
     await LogService.clearLogs();

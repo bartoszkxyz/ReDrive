@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/obd/pid/pid_key.dart';
-import 'package:redrive/obd/pid/pid_registry.dart';
-import 'package:redrive/services/sensor/sensor_statistics_service.dart';
+import 'package:obdrive/obd/pid/pid_key.dart';
+import 'package:obdrive/obd/pid/pid_registry.dart';
+import 'package:obdrive/services/sensor/sensor_statistics_service.dart';
 
 void main() {
   group('SensorStatisticsService', () {

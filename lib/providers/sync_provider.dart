@@ -1,18 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:redrive/core/theme/custom_dashboard_theme.dart';
-import 'package:redrive/core/theme/theme_engine.dart';
-import 'package:redrive/models/dtc_code.dart';
-import 'package:redrive/models/sync_models.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/models/vehicle_profile.dart';
-import 'package:redrive/providers/garage_provider.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/core/app_flavor.dart';
-import 'package:redrive/services/sync/bluetooth_sync_service.dart';
-import 'package:redrive/services/sync/network_sync_manager.dart';
+import 'package:obdrive/core/theme/custom_dashboard_theme.dart';
+import 'package:obdrive/core/theme/theme_engine.dart';
+import 'package:obdrive/models/dtc_code.dart';
+import 'package:obdrive/models/sync_models.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
+import 'package:obdrive/providers/garage_provider.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/core/app_flavor.dart';
+import 'package:obdrive/services/sync/bluetooth_sync_service.dart';
+import 'package:obdrive/services/sync/network_sync_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Presentation and state management provider coordinating Bluetooth synchronization,
@@ -46,7 +46,7 @@ class SyncProvider extends ChangeNotifier {
     NetworkSyncManager? networkSyncManager,
   })  : _syncService = syncService ??
             BluetoothSyncService(
-              deviceId: 'redrive_device_${DateTime.now().millisecondsSinceEpoch}',
+              deviceId: 'obdrive_device_${DateTime.now().millisecondsSinceEpoch}',
               deviceRole: 'headunit',
             ),
         _themeEngine = themeEngine {

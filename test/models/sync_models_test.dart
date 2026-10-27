@@ -1,10 +1,10 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/l10n/app_localizations.dart';
-import 'package:redrive/models/dtc_code.dart';
-import 'package:redrive/models/sync_models.dart';
-import 'package:redrive/models/trip_anomaly.dart';
-import 'package:redrive/models/vehicle_profile.dart';
+import 'package:obdrive/l10n/app_localizations.dart';
+import 'package:obdrive/models/dtc_code.dart';
+import 'package:obdrive/models/sync_models.dart';
+import 'package:obdrive/models/trip_anomaly.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
 
 void main() {
   final fixedDate = DateTime.utc(2026, 10, 19, 14, 0, 0);

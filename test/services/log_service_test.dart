@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/services/logging/log_service.dart';
+import 'package:obdrive/services/logging/log_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -11,7 +11,7 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    tempMirrorDir = await Directory.systemTemp.createTemp('redrive_mirror_test_');
+    tempMirrorDir = await Directory.systemTemp.createTemp('obdrive_mirror_test_');
     LogService.publicMirrorDirOverride = tempMirrorDir;
     LogService.maxFileSizeBytesOverride = null;
     await LogService.init();
@@ -97,31 +97,31 @@ void main() {
       expect(LogService.getEntries().length, countBefore);
     });
 
-    test('automatic mirroring writes redrive_debug.log to public mirror directory', () async {
+    test('automatic mirroring writes obdrive_debug.log to public mirror directory', () async {
       await LogService.setEnabled(true);
       LogService.i('Mirror verification message', tag: 'MirrorTest');
       await LogService.flush();
 
-      final mirrorFile = File('${tempMirrorDir.path}/redrive_debug.log');
+      final mirrorFile = File('${tempMirrorDir.path}/obdrive_debug.log');
       expect(await mirrorFile.exists(), isTrue);
 
       final content = await mirrorFile.readAsString();
       expect(content, contains('[INFO] [MirrorTest] Mirror verification message'));
     });
 
-    test('critical errors are mirrored to redrive_crash.log in public directory', () async {
+    test('critical errors are mirrored to obdrive_crash.log in public directory', () async {
       LogService.e('Catastrophic failure simulation', tag: 'CrashTest');
       await LogService.flush();
       await Future.delayed(const Duration(milliseconds: 50));
 
-      final mirrorCrash = File('${tempMirrorDir.path}/redrive_crash.log');
+      final mirrorCrash = File('${tempMirrorDir.path}/obdrive_crash.log');
       expect(await mirrorCrash.exists(), isTrue);
 
       final content = await mirrorCrash.readAsString();
       expect(content, contains('[ERROR] [CrashTest] Catastrophic failure simulation'));
     });
 
-    test('log rotation archives to redrive_debug.1.log and preserves historical entries', () async {
+    test('log rotation archives to obdrive_debug.1.log and preserves historical entries', () async {
       await LogService.setEnabled(true);
 
       // Set a low rotation threshold for deterministic testing
@@ -134,8 +134,8 @@ void main() {
 
       final logFile = await LogService.getLogFile();
       final rotatedFile = await LogService.getRotatedLogFile();
-      final mirrorLog = File('${tempMirrorDir.path}/redrive_debug.log');
-      final mirrorRotated = File('${tempMirrorDir.path}/redrive_debug.1.log');
+      final mirrorLog = File('${tempMirrorDir.path}/obdrive_debug.log');
+      final mirrorRotated = File('${tempMirrorDir.path}/obdrive_debug.1.log');
 
       expect(await logFile.length(), greaterThanOrEqualTo(200));
       expect(await rotatedFile.exists(), isFalse);
@@ -145,8 +145,8 @@ void main() {
       await LogService.flush();
 
       // Verify rotation happened
-      expect(await rotatedFile.exists(), isTrue, reason: 'Archived file redrive_debug.1.log should exist');
-      expect(await mirrorRotated.exists(), isTrue, reason: 'Mirror redrive_debug.1.log should exist');
+      expect(await rotatedFile.exists(), isTrue, reason: 'Archived file obdrive_debug.1.log should exist');
+      expect(await mirrorRotated.exists(), isTrue, reason: 'Mirror obdrive_debug.1.log should exist');
 
       // Verify archived file has Gen0 content
       final archivedContent = await rotatedFile.readAsString();
@@ -169,7 +169,7 @@ void main() {
 
       // Verify exportLogs seamlessly combines archived history and active entries
       final exported = await LogService.exportLogs();
-      expect(exported, contains('=== ARCHIVED LOGS (redrive_debug.1.log) ==='));
+      expect(exported, contains('=== ARCHIVED LOGS (obdrive_debug.1.log) ==='));
       expect(exported, contains('First generation line 1 - very important history'));
       expect(exported, contains('Second generation line 1 - fresh post-rotation log'));
     });
@@ -185,8 +185,8 @@ void main() {
 
       final logFile = await LogService.getLogFile();
       final rotatedFile = await LogService.getRotatedLogFile();
-      final mirrorLog = File('${tempMirrorDir.path}/redrive_debug.log');
-      final mirrorRotated = File('${tempMirrorDir.path}/redrive_debug.1.log');
+      final mirrorLog = File('${tempMirrorDir.path}/obdrive_debug.log');
+      final mirrorRotated = File('${tempMirrorDir.path}/obdrive_debug.1.log');
 
       expect(await logFile.exists(), isTrue);
 

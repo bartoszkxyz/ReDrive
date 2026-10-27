@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/services/trip/fuel_calculator.dart';
+import 'package:obdrive/services/trip/fuel_calculator.dart';
 
 void main() {
   // Calibrated for Suzuki Swift 3 M15A (1.5L naturally aspirated engine)

@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:redrive/services/logging/log_service.dart';
-import 'package:redrive/services/sync/bluetooth_sync_service.dart';
+import 'package:obdrive/services/logging/log_service.dart';
+import 'package:obdrive/services/sync/bluetooth_sync_service.dart';
 
 /// Concrete [SyncTransport] implementation wrapping a standard bidirectional TCP [Socket].
 ///
@@ -741,7 +741,7 @@ class NetworkSyncManager extends ChangeNotifier {
         title: 'Headunit Socket Ping',
         details: 'Cannot reach Headunit server on port $port (probed: $probedHosts). Socket connection timed out.',
       ));
-      diagnosticTip = 'Headunit ReDrive server may be asleep (ignition off) or on a different IP. Verify "Server Listening" on Headunit screen.';
+      diagnosticTip = 'Headunit OBDrive server may be asleep (ignition off) or on a different IP. Verify "Server Listening" on Headunit screen.';
       return LinkSelfTestReport(
         steps: results,
         timestamp: DateTime.now(),
@@ -760,7 +760,7 @@ class NetworkSyncManager extends ChangeNotifier {
         step: LinkSelfTestStep.protocolHandshake,
         status: LinkStepStatus.passed,
         title: 'Protocol Handshake & Status',
-        details: 'ReDrive v2 frame handshake verified. Headunit is awake and synchronized.',
+        details: 'OBDrive v2 frame handshake verified. Headunit is awake and synchronized.',
       ));
     } else {
       results.add(LinkStepResult(
@@ -769,7 +769,7 @@ class NetworkSyncManager extends ChangeNotifier {
         title: 'Protocol Handshake & Status',
         details: 'Failed to complete protocol handshake: ${_lastError ?? "Unknown error"}',
       ));
-      diagnosticTip = 'Handshake failed. Check if another client is connected or restart Headunit ReDrive.';
+      diagnosticTip = 'Handshake failed. Check if another client is connected or restart Headunit OBDrive.';
       return LinkSelfTestReport(
         steps: results,
         timestamp: DateTime.now(),

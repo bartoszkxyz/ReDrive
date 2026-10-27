@@ -2,13 +2,13 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/models/dtc_code.dart';
-import 'package:redrive/models/sync_models.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/models/trip_anomaly.dart';
-import 'package:redrive/models/trip_route_point.dart';
-import 'package:redrive/models/vehicle_profile.dart';
-import 'package:redrive/services/sync/sync_protocol.dart';
+import 'package:obdrive/models/dtc_code.dart';
+import 'package:obdrive/models/sync_models.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/models/trip_anomaly.dart';
+import 'package:obdrive/models/trip_route_point.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
+import 'package:obdrive/services/sync/sync_protocol.dart';
 
 void main() {
   group('ParkedCarSnapshot', () {

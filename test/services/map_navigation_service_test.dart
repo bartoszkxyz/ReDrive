@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/services/navigation/map_navigation_service.dart';
+import 'package:obdrive/services/navigation/map_navigation_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void main() {

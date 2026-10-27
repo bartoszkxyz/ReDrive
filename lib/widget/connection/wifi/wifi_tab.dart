@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/obd/connection/tcp_obd_connection.dart';
-import 'package:redrive/providers/obd_provider.dart';
+import 'package:obdrive/obd/connection/tcp_obd_connection.dart';
+import 'package:obdrive/providers/obd_provider.dart';
 
 class WifiTab extends StatefulWidget {
   const WifiTab({super.key});

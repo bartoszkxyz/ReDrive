@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/l10n/app_localizations.dart';
-import 'package:redrive/providers/bluetooth_provider.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/providers/sync_provider.dart';
-import 'package:redrive/services/sync/bluetooth_sync_service.dart';
-import 'package:redrive/widget/connection/connection_screen/custom_tab_bar.dart';
-import 'package:redrive/widget/connection/obd_operations_panel.dart';
-import 'package:redrive/widget/connection/phone_sync_operations_panel.dart';
-import 'package:redrive/widget/connection/troubleshooting_panel.dart';
-import 'package:redrive/widget/connection/wifi/wifi_tab.dart';
+import 'package:obdrive/l10n/app_localizations.dart';
+import 'package:obdrive/providers/bluetooth_provider.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/providers/sync_provider.dart';
+import 'package:obdrive/services/sync/bluetooth_sync_service.dart';
+import 'package:obdrive/widget/connection/connection_screen/custom_tab_bar.dart';
+import 'package:obdrive/widget/connection/obd_operations_panel.dart';
+import 'package:obdrive/widget/connection/phone_sync_operations_panel.dart';
+import 'package:obdrive/widget/connection/troubleshooting_panel.dart';
+import 'package:obdrive/widget/connection/wifi/wifi_tab.dart';
 
 /// Central Operations Center for all device connections, sync management, and diagnostics:
 /// - Tab 1: OBD-II (ELM327): Manual connect/disconnect, live telemetry status, protocol config, adapter tests.

@@ -1,8 +1,8 @@
 import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:redrive/obd/models/obd_data.dart';
-import 'package:redrive/providers/trip_provider.dart';
+import 'package:obdrive/obd/models/obd_data.dart';
+import 'package:obdrive/providers/trip_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

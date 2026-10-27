@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:redrive/services/sync/bluetooth_sync_service.dart';
+import 'package:obdrive/services/sync/bluetooth_sync_service.dart';
 
 /// Compact indicator pill showing Bluetooth / Wi-Fi synchronization state between
 /// the Headunit and Phone companion.

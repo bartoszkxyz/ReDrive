@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/models/vehicle_profile.dart';
-import 'package:redrive/services/garage/garage_service.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
+import 'package:obdrive/services/garage/garage_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -11,7 +11,7 @@ void main() {
   late Directory tempDir;
 
   setUp(() {
-    tempDir = Directory.systemTemp.createTempSync('redrive_garage_test_');
+    tempDir = Directory.systemTemp.createTempSync('obdrive_garage_test_');
   });
 
   tearDown(() {

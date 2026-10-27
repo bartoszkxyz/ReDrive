@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_blue_classic/flutter_blue_classic.dart';
-import 'package:redrive/obd/connection/obd_connection.dart';
+import 'package:obdrive/obd/connection/obd_connection.dart';
 
 class BackgroundBluetoothConnection implements ObdConnection {
   final BluetoothConnection _connection;

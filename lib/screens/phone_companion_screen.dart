@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/providers/garage_provider.dart';
-import 'package:redrive/providers/sync_provider.dart';
-import 'package:redrive/screens/car_screen.dart';
-import 'package:redrive/screens/companion/companion_settings_sheet.dart';
-import 'package:redrive/screens/companion/companion_status_tab.dart';
-import 'package:redrive/screens/diagnostics_screen.dart';
-import 'package:redrive/screens/trips_screen.dart';
-import 'package:redrive/services/sync/bluetooth_sync_service.dart';
-import 'package:redrive/widget/companion/sync_status_pill.dart';
-import 'package:redrive/widget/companion/vehicle_link_modal_sheet.dart';
+import 'package:obdrive/providers/garage_provider.dart';
+import 'package:obdrive/providers/sync_provider.dart';
+import 'package:obdrive/screens/car_screen.dart';
+import 'package:obdrive/screens/companion/companion_settings_sheet.dart';
+import 'package:obdrive/screens/companion/companion_status_tab.dart';
+import 'package:obdrive/screens/diagnostics_screen.dart';
+import 'package:obdrive/screens/trips_screen.dart';
+import 'package:obdrive/services/sync/bluetooth_sync_service.dart';
+import 'package:obdrive/widget/companion/sync_status_pill.dart';
+import 'package:obdrive/widget/companion/vehicle_link_modal_sheet.dart';
 
 /// Primary container screen for the OBDrive Phone Companion application.
 /// Provides a 4-tab workflow: Status, Trips, Garage, and Diagnostics,

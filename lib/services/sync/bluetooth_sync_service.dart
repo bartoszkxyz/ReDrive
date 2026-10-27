@@ -4,13 +4,13 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:redrive/models/dtc_code.dart';
-import 'package:redrive/models/sync_models.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/models/trip_anomaly.dart';
-import 'package:redrive/models/vehicle_profile.dart';
-import 'package:redrive/services/logging/log_service.dart';
-import 'package:redrive/services/sync/sync_protocol.dart';
+import 'package:obdrive/models/dtc_code.dart';
+import 'package:obdrive/models/sync_models.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/models/trip_anomaly.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
+import 'package:obdrive/services/logging/log_service.dart';
+import 'package:obdrive/services/sync/sync_protocol.dart';
 
 /// Represents the current state of the Bluetooth RFCOMM Headunit ↔ Phone sync engine.
 enum SyncConnectionState {
@@ -132,7 +132,7 @@ class SyncDataDelegate {
   });
 }
 
-/// Manages Bluetooth RFCOMM / stream-based synchronization between the ReDrive
+/// Manages Bluetooth RFCOMM / stream-based synchronization between the OBDrive
 /// Headunit (`deviceRole: 'headunit'`) and Phone Companion (`deviceRole: 'phone'`),
 /// as well as local persistence of the latest [ParkedCarSnapshot] and [MechanicDiagnosticReport].
 class BluetoothSyncService {
@@ -192,7 +192,7 @@ class BluetoothSyncService {
       final xdgData = Platform.environment['XDG_DATA_HOME'];
       final dataPath = xdgData != null && xdgData.isNotEmpty
           ? xdgData
-          : '$home/.local/share/redrive';
+          : '$home/.local/share/obdrive';
       dir = Directory(dataPath);
     }
     if (!await dir.exists()) {

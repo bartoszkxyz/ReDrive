@@ -1,4 +1,4 @@
-package com.example.redrive
+package com.example.obdrive
 
 import android.app.ActivityManager
 import android.content.ContentValues
@@ -36,8 +36,8 @@ import java.util.Locale
 class MainActivity : FlutterActivity() {
     companion object {
         private const val TAG = "MainActivity"
-        private const val STORAGE_CHANNEL = "com.example.redrive/storage"
-        private const val GPS_CHANNEL = "com.example.redrive/gps_stream"
+        private const val STORAGE_CHANNEL = "com.example.obdrive/storage"
+        private const val GPS_CHANNEL = "com.example.obdrive/gps_stream"
     }
 
     private var isDvrStarted: Boolean = false
@@ -751,8 +751,8 @@ class MainActivity : FlutterActivity() {
         }
         root.put("systemProperties", propsObj)
 
-        // Save formatted JSON to /storage/emulated/0/ReDrive or /storage/emulated/0/Download/ReDrive
-        val fileName = "redrive_headunit_dump_${fileFmt.format(now)}.json"
+        // Save formatted JSON to /storage/emulated/0/OBDrive or /storage/emulated/0/Download/OBDrive
+        val fileName = "obdrive_headunit_dump_${fileFmt.format(now)}.json"
         val jsonContent = root.toString(2)
         val savedPath = saveToExternalStorage(fileName, jsonContent, "application/json")
 
@@ -770,12 +770,12 @@ class MainActivity : FlutterActivity() {
     private fun saveToExternalStorage(fileName: String, content: String, mimeType: String): String {
         val bytes = content.toByteArray(Charsets.UTF_8)
 
-        // 1. Try direct write to /storage/emulated/0/ReDrive or /storage/emulated/0/Download/ReDrive
+        // 1. Try direct write to /storage/emulated/0/OBDrive or /storage/emulated/0/Download/OBDrive
         val directCandidates = listOf(
-            File("/storage/emulated/0/ReDrive"),
-            File("/storage/emulated/0/Download/ReDrive"),
-            File(Environment.getExternalStorageDirectory(), "ReDrive"),
-            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "ReDrive")
+            File("/storage/emulated/0/OBDrive"),
+            File("/storage/emulated/0/Download/OBDrive"),
+            File(Environment.getExternalStorageDirectory(), "OBDrive"),
+            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "OBDrive")
         )
         for (dir in directCandidates) {
             try {
@@ -793,13 +793,13 @@ class MainActivity : FlutterActivity() {
         }
 
         // 2. Android 10+ (API 29+): Use MediaStore.Downloads so no special storage permission is required
-        // to write directly into /storage/emulated/0/Download/ReDrive/<fileName>
+        // to write directly into /storage/emulated/0/Download/OBDrive/<fileName>
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val resolver = applicationContext.contentResolver
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                 put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-                put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/ReDrive")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/OBDrive")
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
             val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
@@ -811,14 +811,14 @@ class MainActivity : FlutterActivity() {
                 values.clear()
                 values.put(MediaStore.MediaColumns.IS_PENDING, 0)
                 resolver.update(uri, values, null, null)
-                return "/storage/emulated/0/Download/ReDrive/$fileName"
+                return "/storage/emulated/0/Download/OBDrive/$fileName"
             }
         }
 
-        // 3. Final fallback on /storage/emulated/0/Android/data/<pkg>/files/ReDrive_Exports
+        // 3. Final fallback on /storage/emulated/0/Android/data/<pkg>/files/OBDrive_Exports
         val extDir = getExternalFilesDir(null)
         if (extDir != null) {
-            val exportDir = File(extDir, "ReDrive_Exports")
+            val exportDir = File(extDir, "OBDrive_Exports")
             if (!exportDir.exists()) exportDir.mkdirs()
             val outFile = File(exportDir, fileName)
             outFile.writeBytes(bytes)
@@ -855,10 +855,10 @@ class MainActivity : FlutterActivity() {
     private fun handleSilentStart(intent: Intent?) {
         if (intent?.getBooleanExtra("silent_start", false) == true) {
             if (isResumedState) {
-                Log.i(TAG, "ReDrive is active in foreground; ignoring silent_start moveTaskToBack")
+                Log.i(TAG, "OBDrive is active in foreground; ignoring silent_start moveTaskToBack")
                 return
             }
-            Log.i(TAG, "ReDrive started silently from ignition wake; moving task to back")
+            Log.i(TAG, "OBDrive started silently from ignition wake; moving task to back")
             moveTaskToBack(true)
             try {
                 @Suppress("DEPRECATION")
@@ -878,20 +878,20 @@ class MainActivity : FlutterActivity() {
 
                 // 1. Try writing to internal files directory
                 try {
-                    val crashFileInternal = File(filesDir, "redrive_crash.log")
+                    val crashFileInternal = File(filesDir, "obdrive_crash.log")
                     crashFileInternal.appendText(crashReport)
                 } catch (_: Exception) {}
 
-                // 2. Try writing to public Download/ReDrive directory
+                // 2. Try writing to public Download/OBDrive directory
                 try {
-                    val extDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "ReDrive")
+                    val extDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "OBDrive")
                     if (!extDir.exists()) extDir.mkdirs()
                     if (extDir.exists() && extDir.canWrite()) {
-                        File(extDir, "redrive_crash.log").appendText(crashReport)
+                        File(extDir, "obdrive_crash.log").appendText(crashReport)
                     }
                 } catch (_: Exception) {}
 
-                Log.e(TAG, "FATAL CRASH logged to redrive_crash.log: ${throwable.message}", throwable)
+                Log.e(TAG, "FATAL CRASH logged to obdrive_crash.log: ${throwable.message}", throwable)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to persist crash report", e)
             } finally {

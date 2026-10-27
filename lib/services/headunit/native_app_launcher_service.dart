@@ -75,7 +75,7 @@ class NativeAppLauncherService {
   final MethodChannel channel;
 
   NativeAppLauncherService({MethodChannel? channel})
-      : channel = channel ?? const MethodChannel('com.example.redrive/storage');
+      : channel = channel ?? const MethodChannel('com.example.obdrive/storage');
 
   /// Retrieves current audio volume and stream status.
   Future<Map<String, dynamic>?> getAudioState() async {

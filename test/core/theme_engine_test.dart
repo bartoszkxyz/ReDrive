@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/core/theme/custom_dashboard_theme.dart';
-import 'package:redrive/core/theme/theme_engine.dart';
+import 'package:obdrive/core/theme/custom_dashboard_theme.dart';
+import 'package:obdrive/core/theme/theme_engine.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/models/trip_anomaly.dart';
-import 'package:redrive/models/trip_route_point.dart';
-import 'package:redrive/services/trip/trip_timeseries_service.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/models/trip_anomaly.dart';
+import 'package:obdrive/models/trip_route_point.dart';
+import 'package:obdrive/services/trip/trip_timeseries_service.dart';
 
 /// Telemetry visualization mode for color-coding the route vector polyline.
 enum RouteColorMode {

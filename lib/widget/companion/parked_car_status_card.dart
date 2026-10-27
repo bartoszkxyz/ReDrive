@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:redrive/models/sync_models.dart';
+import 'package:obdrive/models/sync_models.dart';
 
 /// Card widget displaying the latest parked vehicle status, including
 /// parking GPS coordinates, remaining fuel, estimated range, battery voltage,

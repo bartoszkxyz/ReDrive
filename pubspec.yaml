@@ -1,5 +1,5 @@
-name: redrive
-description: "Open-source OBD2 dashboard app for real-time car data and diagnostics."
+name: obdrive
+description: "Open-source OBD2 dashboard & launcher app for real-time car data and diagnostics."
 publish_to: 'none'
 homepage: https://github.com/iUnreallx/ReDrive
 

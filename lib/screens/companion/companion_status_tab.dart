@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/models/sync_models.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/models/vehicle_profile.dart';
-import 'package:redrive/providers/garage_provider.dart';
-import 'package:redrive/providers/sync_provider.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/widget/companion/parked_car_map_card.dart';
+import 'package:obdrive/models/sync_models.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
+import 'package:obdrive/providers/garage_provider.dart';
+import 'package:obdrive/providers/sync_provider.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/widget/companion/parked_car_map_card.dart';
 
 /// Hero status overview tab for the phone companion application.
 /// Displays the parked vehicle's location and vitals, latest drive summary,

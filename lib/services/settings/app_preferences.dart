@@ -107,7 +107,7 @@ class AppPreferences {
     await prefs.setBool(_keyDebugLogging, enabled);
   }
 
-  /// Whether ReDrive automatically brings its UI to the front on ignition (false = silent background start).
+  /// Whether OBDrive automatically brings its UI to the front on ignition (false = silent background start).
   static Future<bool> isAutoLaunchOnBootEnabled() async {
     final prefs = await _instance;
     return prefs.getBool(_keyAutoLaunchOnBoot) ?? false;

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:redrive/screens/settings_screen.dart';
+import 'package:obdrive/screens/settings_screen.dart';
 
 class HeaderBar extends StatelessWidget {
   final Widget? trailing;

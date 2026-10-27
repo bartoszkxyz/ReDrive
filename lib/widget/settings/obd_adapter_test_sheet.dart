@@ -137,7 +137,7 @@ class _ObdAdapterTestSheetState extends State<ObdAdapterTestSheet> {
 
   void _copyLogToClipboard() {
     final buffer = StringBuffer();
-    buffer.writeln('=== ReDrive OBD-II Adapter Handshake Diagnostic ===');
+    buffer.writeln('=== OBDrive OBD-II Adapter Handshake Diagnostic ===');
     for (final r in _results) {
       buffer.writeln('[${r.command}] ${r.description} (${r.latencyMs}ms)');
       buffer.writeln('Response: ${r.response}');

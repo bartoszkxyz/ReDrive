@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/l10n/app_localizations.dart';
-import 'package:redrive/models/vehicle_profile.dart';
-import 'package:redrive/providers/garage_provider.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/services/garage/garage_service.dart';
+import 'package:obdrive/l10n/app_localizations.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
+import 'package:obdrive/providers/garage_provider.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/services/garage/garage_service.dart';
 
 /// Main screen displaying vehicle garage profiles, active vehicle specifications,
 /// maintenance checklists, and vehicle configuration editing.

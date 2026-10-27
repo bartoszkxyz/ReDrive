@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:redrive/models/sync_models.dart';
-import 'package:redrive/services/navigation/map_navigation_service.dart';
+import 'package:obdrive/models/sync_models.dart';
+import 'package:obdrive/services/navigation/map_navigation_service.dart';
 
 /// Card widget displaying the latest parked vehicle status with an embedded
 /// OpenStreetMap tile snippet, GPS coordinates lock status, quick navigation
@@ -216,7 +216,7 @@ class ParkedCarMapCard extends StatelessWidget {
                     TileLayer(
                       urlTemplate:
                           'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.example.redrive',
+                      userAgentPackageName: 'com.example.obdrive',
                     ),
                     MarkerLayer(
                       markers: [

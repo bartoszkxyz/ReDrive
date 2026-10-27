@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/models/trip_anomaly.dart';
-import 'package:redrive/obd/models/obd_data.dart';
-import 'package:redrive/services/trip/trip_timeseries_service.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/models/trip_anomaly.dart';
+import 'package:obdrive/obd/models/obd_data.dart';
+import 'package:obdrive/services/trip/trip_timeseries_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -14,9 +14,9 @@ void main() {
   late Directory exportTempDir;
 
   setUp(() {
-    tempDir = Directory.systemTemp.createTempSync('redrive_timeseries_test_');
+    tempDir = Directory.systemTemp.createTempSync('obdrive_timeseries_test_');
     exportTempDir =
-        Directory.systemTemp.createTempSync('redrive_exports_test_');
+        Directory.systemTemp.createTempSync('obdrive_exports_test_');
   });
 
   tearDown(() {
@@ -588,11 +588,11 @@ ${jsonEncode(sample2.toJson())}
 
         expect(
           csvPath,
-          endsWith('redrive_trip_${tripId}_20261017_143045.csv'),
+          endsWith('obdrive_trip_${tripId}_20261017_143045.csv'),
         );
         expect(
           jsonPath,
-          endsWith('redrive_trip_${tripId}_20261017_143045.json'),
+          endsWith('obdrive_trip_${tripId}_20261017_143045.json'),
         );
 
         // 1. Verify CSV contents

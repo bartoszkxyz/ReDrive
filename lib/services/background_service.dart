@@ -4,7 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:redrive/services/logging/log_service.dart';
+import 'package:obdrive/services/logging/log_service.dart';
 
 Future<void> initializeBackgroundService() async {
   if (!Platform.isAndroid && !Platform.isIOS) {
@@ -14,9 +14,9 @@ Future<void> initializeBackgroundService() async {
 
   // Android notifications
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'redrive_foreground', // id
+    'obdrive_foreground', // id
     'Foreground Service', // title
-    description: 'Keeps ReDrive trip data collecting in the background.', // description
+    description: 'Keeps OBDrive trip data collecting in the background.', // description
     importance: Importance.low,
   );
 
@@ -39,8 +39,8 @@ Future<void> initializeBackgroundService() async {
       autoStart: true,
       autoStartOnBoot: true,
       isForegroundMode: true,
-      notificationChannelId: 'redrive_foreground',
-      initialNotificationTitle: 'ReDrive Telemetry',
+      notificationChannelId: 'obdrive_foreground',
+      initialNotificationTitle: 'OBDrive Telemetry',
       initialNotificationContent: 'Waiting for OBD connection...',
       foregroundServiceNotificationId: 888,
     ),
@@ -82,7 +82,7 @@ void onStart(ServiceInstance service) async {
 
   service.on('updateNotification').listen((event) {
     if (event != null && service is AndroidServiceInstance) {
-      final title = event['title'] as String? ?? 'ReDrive Active';
+      final title = event['title'] as String? ?? 'OBDrive Active';
       final content = event['content'] as String? ?? 'Collecting telemetry...';
       service.setForegroundNotificationInfo(
         title: title,

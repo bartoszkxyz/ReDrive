@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/services/garage/auto_data_spec_parser.dart';
+import 'package:obdrive/services/garage/auto_data_spec_parser.dart';
 
 void main() {
   group('AutoDataSpecParser URL Validation', () {

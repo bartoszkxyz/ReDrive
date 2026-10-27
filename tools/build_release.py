@@ -2,7 +2,7 @@
 """
 tools/build_release.py
 
-Unified, deterministic release builder for ReDrive dual-target packages:
+Unified, deterministic release builder for OBDrive dual-target packages:
 - Headunit Cockpit Launcher (com.example.redrive.headunit)
 - Phone Companion (com.example.redrive.phone)
 
@@ -13,7 +13,7 @@ Features:
 2. Version Management (--bump-patch, --bump-minor, --bump-build, --set-version):
    Reads, validates, and updates pubspec.yaml version (Semantic Versioning + Android versionCode).
 3. Verification Gate:
-   Runs `flutter analyze` and `flutter test` (bypassable via --skip-tests for fast redrives).
+   Runs `flutter analyze` and `flutter test` (bypassable via --skip-tests for fast rebuilds).
 4. Dual Artifact Packaging:
    Builds flavored APKs, verifies manifest badging via Android SDK `aapt`, and generates
    standardized release filenames and legacy compatibility aliases.
@@ -34,12 +34,12 @@ from typing import Dict, List, Optional, Set, Tuple
 FLAVORS = {
     'headunit': {
         'entrypoint': 'lib/main_headunit.dart',
-        'package_id': 'com.example.redrive.headunit',
+        'package_id': 'com.example.obdrive.headunit',
         'display_name': 'Headunit Cockpit Launcher',
     },
     'phone': {
         'entrypoint': 'lib/main_phone.dart',
-        'package_id': 'com.example.redrive.phone',
+        'package_id': 'com.example.obdrive.phone',
         'display_name': 'Phone Companion',
     },
 }
@@ -346,7 +346,7 @@ def format_bytes(size: int) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Deterministic ReDrive dual-target release builder for Headunit and Phone companion."
+        description="Deterministic OBDrive dual-target release builder for Headunit and Phone companion."
     )
     parser.add_argument(
         '--target', '-t',
@@ -401,7 +401,7 @@ def main() -> int:
     pubspec_path = os.path.join(repo_root, 'pubspec.yaml')
 
     print("═══════════════════════════════════════════════════════════════════")
-    print(" 🚗 ReDrive Release Builder & Verification Pipeline")
+    print(" 🚗 OBDrive Release Builder & Verification Pipeline")
     print("═══════════════════════════════════════════════════════════════════")
 
     # 1. Version Handling
@@ -508,15 +508,11 @@ def main() -> int:
         else:
             print("⚠️ Notice: aapt not found; skipping binary badging check.")
 
-        # Standard release names & backwards compatibility aliases
-        primary_name = f"redrive-{target}-v{full_version}-release.apk"
-        legacy_name = f"obdrive-{target}-v{full_version}-release.apk"
-
+        # Standard OBDrive release artifact name
+        primary_name = f"obdrive-{target}-v{full_version}-release.apk"
         primary_path = os.path.join(output_dir, primary_name)
-        legacy_path = os.path.join(output_dir, legacy_name)
 
         shutil.copyfile(default_apk, primary_path)
-        shutil.copyfile(default_apk, legacy_path)
 
         size_bytes = os.path.getsize(primary_path)
         sha256_hash = compute_sha256(primary_path)
@@ -526,7 +522,6 @@ def main() -> int:
             'package_id': pkg_id,
             'file_name': primary_name,
             'file_path': primary_path,
-            'legacy_name': legacy_name,
             'size_bytes': size_bytes,
             'size_formatted': format_bytes(size_bytes),
             'sha256': sha256_hash,

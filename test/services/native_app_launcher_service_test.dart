@@ -1,11 +1,11 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/services/headunit/native_app_launcher_service.dart';
+import 'package:obdrive/services/headunit/native_app_launcher_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const channelName = 'com.example.redrive/storage';
+  const channelName = 'com.example.obdrive/storage';
   final channel = const MethodChannel(channelName);
   late NativeAppLauncherService launcherService;
   late List<MethodCall> methodCalls;

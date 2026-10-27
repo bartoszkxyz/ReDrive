@@ -1,21 +1,21 @@
-import 'package:redrive/l10n/app_localizations.dart';
+import 'package:obdrive/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/obd/pid/pid_key.dart';
-import 'package:redrive/obd/polling/polling_controller.dart';
-import 'package:redrive/obd/source/obd_source_state.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/widget/home_screen/active_trip_tile.dart';
-import 'package:redrive/widget/home_screen/connections_buttons.dart';
-import 'package:redrive/widget/home_screen/engine_load_card.dart';
-import 'package:redrive/widget/home_screen/engine_temp_card.dart';
-import 'package:redrive/widget/home_screen/header_bar.dart';
+import 'package:obdrive/obd/pid/pid_key.dart';
+import 'package:obdrive/obd/polling/polling_controller.dart';
+import 'package:obdrive/obd/source/obd_source_state.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/widget/home_screen/active_trip_tile.dart';
+import 'package:obdrive/widget/home_screen/connections_buttons.dart';
+import 'package:obdrive/widget/home_screen/engine_load_card.dart';
+import 'package:obdrive/widget/home_screen/engine_temp_card.dart';
+import 'package:obdrive/widget/home_screen/header_bar.dart';
 
-import 'package:redrive/core/app_flavor.dart';
-import 'package:redrive/obd/connection/tcp_obd_connection.dart';
-import 'package:redrive/providers/sync_provider.dart';
-import 'package:redrive/widget/companion/parked_car_status_card.dart';
-import 'package:redrive/widget/companion/sync_status_pill.dart';
+import 'package:obdrive/core/app_flavor.dart';
+import 'package:obdrive/obd/connection/tcp_obd_connection.dart';
+import 'package:obdrive/providers/sync_provider.dart';
+import 'package:obdrive/widget/companion/parked_car_status_card.dart';
+import 'package:obdrive/widget/companion/sync_status_pill.dart';
 import '../providers/obd_provider.dart';
 
 class HomeScreen extends StatefulWidget {

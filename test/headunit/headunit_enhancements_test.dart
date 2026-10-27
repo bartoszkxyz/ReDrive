@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:redrive/obd/pid/pid_key.dart';
-import 'package:redrive/obd/polling/polling_controller.dart';
-import 'package:redrive/providers/bluetooth_provider.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/widget/settings/headunit_background_sheet.dart';
-import 'package:redrive/widget/settings/obd_adapter_test_sheet.dart';
+import 'package:obdrive/obd/pid/pid_key.dart';
+import 'package:obdrive/obd/polling/polling_controller.dart';
+import 'package:obdrive/providers/bluetooth_provider.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/widget/settings/headunit_background_sheet.dart';
+import 'package:obdrive/widget/settings/obd_adapter_test_sheet.dart';
 
 import '../obd/fakes/fake_obd_connection.dart';
 
@@ -103,8 +103,8 @@ void main() {
       await tester.scrollUntilVisible(find.text('Why standard Android permission popups fail'), 100);
       expect(find.text('Why standard Android permission popups fail'), findsOneWidget);
 
-      await tester.scrollUntilVisible(find.text('How ReDrive operates (Car Scanner paradigm)'), 100);
-      expect(find.text('How ReDrive operates (Car Scanner paradigm)'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('How OBDrive operates (Car Scanner paradigm)'), 100);
+      expect(find.text('How OBDrive operates (Car Scanner paradigm)'), findsOneWidget);
     });
 
     testWidgets('ObdAdapterTestSheet renders in idle state with test button', (tester) async {

@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.redrive"
+    namespace = "com.example.obdrive"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,10 +21,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.redrive"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        // Unique Application ID for OBDrive
+        applicationId = "com.example.obdrive"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -71,8 +69,6 @@ tasks.matching { it.name.matches(Regex("assemble.*Release")) }.configureEach {
             if (src.exists()) {
                 val obdriveDest = File(flutterApkDir, "obdrive-$flavor-v${flutter.versionName}+${flutter.versionCode}-release.apk")
                 src.copyTo(obdriveDest, overwrite = true)
-                val redriveDest = File(flutterApkDir, "redrive-$flavor-v${flutter.versionName}+${flutter.versionCode}-release.apk")
-                src.copyTo(redriveDest, overwrite = true)
                 logger.lifecycle("✓ Generated versioned release APK: ${obdriveDest.name} (${obdriveDest.length()} bytes)")
             }
         }
@@ -83,8 +79,6 @@ tasks.matching { it.name.matches(Regex("assemble.*Release")) }.configureEach {
         if (src.exists()) {
             val obdriveDest = File(flutterApkDir, "obdrive-v${flutter.versionName}+${flutter.versionCode}-release.apk")
             src.copyTo(obdriveDest, overwrite = true)
-            val redriveDest = File(flutterApkDir, "redrive-v${flutter.versionName}+${flutter.versionCode}-release.apk")
-            src.copyTo(redriveDest, overwrite = true)
             logger.lifecycle("✓ Generated versioned release APK: ${obdriveDest.name} (${obdriveDest.length()} bytes)")
         }
     }

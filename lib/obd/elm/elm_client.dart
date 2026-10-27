@@ -1,11 +1,11 @@
-import 'package:redrive/obd/elm/elm_command.dart';
-import 'package:redrive/obd/elm/elm_command_queue.dart';
+import 'package:obdrive/obd/elm/elm_command.dart';
+import 'package:obdrive/obd/elm/elm_command_queue.dart';
 
 import '../connection/obd_connection.dart';
 import 'elm_response.dart';
 import 'elm_response_parser.dart';
 import 'dart:async';
-import 'package:redrive/services/logging/log_service.dart';
+import 'package:obdrive/services/logging/log_service.dart';
 
 /// Provides command-level communication with an ELM327 adapter.
 ///

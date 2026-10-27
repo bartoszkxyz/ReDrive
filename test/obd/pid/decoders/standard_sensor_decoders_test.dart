@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/obd/elm/elm_response.dart';
-import 'package:redrive/obd/models/fuel_system_status.dart';
-import 'package:redrive/obd/pid/decoders/standard_sensor_decoders.dart';
+import 'package:obdrive/obd/elm/elm_response.dart';
+import 'package:obdrive/obd/models/fuel_system_status.dart';
+import 'package:obdrive/obd/pid/decoders/standard_sensor_decoders.dart';
 
 ElmResponse _resp(String line) => ElmResponse(
       raw: '$line\r>',

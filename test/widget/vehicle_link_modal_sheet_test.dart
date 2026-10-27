@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/models/sync_models.dart';
-import 'package:redrive/providers/sync_provider.dart';
-import 'package:redrive/services/sync/bluetooth_sync_service.dart';
-import 'package:redrive/services/sync/network_sync_manager.dart';
-import 'package:redrive/widget/companion/sync_status_pill.dart';
-import 'package:redrive/widget/companion/vehicle_link_modal_sheet.dart';
+import 'package:obdrive/models/sync_models.dart';
+import 'package:obdrive/providers/sync_provider.dart';
+import 'package:obdrive/services/sync/bluetooth_sync_service.dart';
+import 'package:obdrive/services/sync/network_sync_manager.dart';
+import 'package:obdrive/widget/companion/sync_status_pill.dart';
+import 'package:obdrive/widget/companion/vehicle_link_modal_sheet.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -115,7 +115,7 @@ void main() {
             step: LinkSelfTestStep.protocolHandshake,
             status: LinkStepStatus.passed,
             title: 'Protocol Handshake & Status',
-            details: 'ReDrive v2 frame handshake verified.',
+            details: 'OBDrive v2 frame handshake verified.',
           ),
         ],
         timestamp: DateTime.now(),

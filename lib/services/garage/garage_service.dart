@@ -5,7 +5,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:redrive/models/vehicle_profile.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
 
 /// Immutable state containing the user's vehicles and current active selection.
 class GarageState {
@@ -139,7 +139,7 @@ class GarageService {
     } catch (_) {
       final home = Platform.environment['HOME'] ?? '.';
       final dataDir =
-          Platform.environment['XDG_DATA_HOME'] ?? '$home/.local/share/redrive';
+          Platform.environment['XDG_DATA_HOME'] ?? '$home/.local/share/obdrive';
       final dir = Directory(dataDir);
       if (!await dir.exists()) {
         await dir.create(recursive: true);

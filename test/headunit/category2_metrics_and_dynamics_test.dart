@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/obd/models/obd_data.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/screens/dashboard_screen.dart';
+import 'package:obdrive/obd/models/obd_data.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/screens/dashboard_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

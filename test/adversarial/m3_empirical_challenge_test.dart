@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/models/dtc_code.dart';
-import 'package:redrive/obd/elm/elm_response.dart';
-import 'package:redrive/obd/elm/elm_response_parser.dart';
-import 'package:redrive/services/dtc/dtc_database.dart';
-import 'package:redrive/services/dtc/dtc_decoder.dart';
-import 'package:redrive/services/dtc/dtc_service.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/obd/models/obd_data.dart';
+import 'package:obdrive/models/dtc_code.dart';
+import 'package:obdrive/obd/elm/elm_response.dart';
+import 'package:obdrive/obd/elm/elm_response_parser.dart';
+import 'package:obdrive/services/dtc/dtc_database.dart';
+import 'package:obdrive/services/dtc/dtc_decoder.dart';
+import 'package:obdrive/services/dtc/dtc_service.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/obd/models/obd_data.dart';
 
 class _FakeObdProvider extends ObdProvider {
   ObdMode _mockMode = ObdMode.real;

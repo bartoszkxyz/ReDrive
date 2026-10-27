@@ -1,6 +1,6 @@
-import 'package:redrive/obd/elm/elm_response.dart';
-import 'package:redrive/obd/pid/decoders/supported_pids_decoder.dart';
-import 'package:redrive/services/logging/log_service.dart';
+import 'package:obdrive/obd/elm/elm_response.dart';
+import 'package:obdrive/obd/pid/decoders/supported_pids_decoder.dart';
+import 'package:obdrive/services/logging/log_service.dart';
 
 import '../elm/elm_client.dart';
 

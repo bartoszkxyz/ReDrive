@@ -4,7 +4,7 @@ import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:redrive/services/logging/log_service.dart';
+import 'package:obdrive/services/logging/log_service.dart';
 
 void showLogViewerSheet(BuildContext context) {
   HapticFeedback.mediumImpact();
@@ -77,7 +77,7 @@ class _LogViewerSheetState extends State<LogViewerSheet> {
   Future<void> _loadLogs() async {
     final entries = LogService.getEntries();
     final size = await LogService.getLogFileSize();
-    final mirrorDir = await LogService.getPublicReDriveDirectory();
+    final mirrorDir = await LogService.getPublicOBDriveDirectory();
     if (mounted) {
       setState(() {
         _entries = entries;
@@ -518,7 +518,7 @@ class _LogViewerSheetState extends State<LogViewerSheet> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Log file: redrive_debug.log',
+                      'Log file: obdrive_debug.log',
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.white.withValues(alpha: 0.35),

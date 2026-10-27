@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/core/theme/custom_dashboard_theme.dart';
-import 'package:redrive/providers/sync_provider.dart';
-import 'package:redrive/services/sync/bluetooth_sync_service.dart';
-import 'package:redrive/widget/companion/mechanic_report_sheet.dart';
+import 'package:obdrive/core/theme/custom_dashboard_theme.dart';
+import 'package:obdrive/providers/sync_provider.dart';
+import 'package:obdrive/services/sync/bluetooth_sync_service.dart';
+import 'package:obdrive/widget/companion/mechanic_report_sheet.dart';
 
 /// Modal bottom sheet for Headunit Bluetooth synchronization, theme sideloading,
 /// and comprehensive mechanic diagnostic report generation.

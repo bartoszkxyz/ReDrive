@@ -357,7 +357,7 @@ def main():
         print(f"  Listening on {args.host}:{args.port}")
         print(f"  Simulated K-Line init delay: {args.delay}s")
         print("=" * 60)
-        print("Connect using ReDrive app (Wi-Fi tab -> 127.0.0.1:35000)")
+        print("Connect using OBDrive app (Wi-Fi tab -> 127.0.0.1:35000)")
         print("Press Ctrl+C to stop.\n")
 
         while True:

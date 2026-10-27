@@ -3,7 +3,7 @@ import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:redrive/obd/connection/obd_connection.dart';
+import 'package:obdrive/obd/connection/obd_connection.dart';
 
 /// Implements [ObdConnection] over TCP sockets.
 ///

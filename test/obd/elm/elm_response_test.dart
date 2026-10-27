@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/obd/elm/elm_response.dart';
-import 'package:redrive/obd/elm/elm_response_parser.dart';
+import 'package:obdrive/obd/elm/elm_response.dart';
+import 'package:obdrive/obd/elm/elm_response_parser.dart';
 
 void main() {
   test('stores successful OBD response', () {

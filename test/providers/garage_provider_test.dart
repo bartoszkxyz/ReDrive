@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/models/vehicle_profile.dart';
-import 'package:redrive/obd/models/obd_data.dart';
-import 'package:redrive/providers/garage_provider.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/services/garage/garage_service.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
+import 'package:obdrive/obd/models/obd_data.dart';
+import 'package:obdrive/providers/garage_provider.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/services/garage/garage_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

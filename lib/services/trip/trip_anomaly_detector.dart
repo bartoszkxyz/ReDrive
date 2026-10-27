@@ -1,9 +1,9 @@
 import 'dart:math' as math;
 
-import 'package:redrive/models/dtc_code.dart';
-import 'package:redrive/models/trip_anomaly.dart';
-import 'package:redrive/models/vehicle_profile.dart';
-import 'package:redrive/obd/models/obd_data.dart';
+import 'package:obdrive/models/dtc_code.dart';
+import 'package:obdrive/models/trip_anomaly.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
+import 'package:obdrive/obd/models/obd_data.dart';
 
 /// Evaluates real-time [ObdData] telemetry and [DtcCode] scans against
 /// Suzuki Swift 3 (M15A 1.5L) single-metric and composite high-load power-loss

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/models/trip.dart';
+import 'package:obdrive/models/trip.dart';
 
 void main() {
   group('Trip Model', () {

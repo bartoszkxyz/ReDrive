@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/models/sync_models.dart';
-import 'package:redrive/services/navigation/map_navigation_service.dart';
-import 'package:redrive/widget/companion/parked_car_map_card.dart';
+import 'package:obdrive/models/sync_models.dart';
+import 'package:obdrive/services/navigation/map_navigation_service.dart';
+import 'package:obdrive/widget/companion/parked_car_map_card.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class _MockMapNavigationService extends MapNavigationService {

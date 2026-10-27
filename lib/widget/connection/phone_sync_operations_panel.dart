@@ -2,11 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/core/app_flavor.dart';
-import 'package:redrive/providers/sync_provider.dart';
-import 'package:redrive/services/sync/bluetooth_sync_service.dart';
-import 'package:redrive/services/sync/network_sync_manager.dart';
-import 'package:redrive/widget/companion/mechanic_report_sheet.dart';
+import 'package:obdrive/core/app_flavor.dart';
+import 'package:obdrive/providers/sync_provider.dart';
+import 'package:obdrive/services/sync/bluetooth_sync_service.dart';
+import 'package:obdrive/services/sync/network_sync_manager.dart';
+import 'package:obdrive/widget/companion/mechanic_report_sheet.dart';
 
 /// Complete Operations Center widget for Phone Companion ↔ Headunit Synchronization.
 ///

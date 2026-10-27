@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:redrive/obd/connection/tcp_obd_connection.dart';
-import 'package:redrive/obd/elm/elm_response.dart';
-import 'package:redrive/obd/elm/elm_response_parser.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/services/dtc/dtc_decoder.dart';
-import 'package:redrive/services/dtc/dtc_service.dart';
+import 'package:obdrive/obd/connection/tcp_obd_connection.dart';
+import 'package:obdrive/obd/elm/elm_response.dart';
+import 'package:obdrive/obd/elm/elm_response_parser.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/services/dtc/dtc_decoder.dart';
+import 'package:obdrive/services/dtc/dtc_service.dart';
 
 import '../e2e/e2e_harness.dart';
 

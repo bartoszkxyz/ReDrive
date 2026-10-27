@@ -1,4 +1,4 @@
-import 'package:redrive/models/trip_route_point.dart';
+import 'package:obdrive/models/trip_route_point.dart';
 
 /// Downsamples high-rate GPS+OBD updates into a permanent lightweight polyline
 /// (~1 point every [minIntervalSeconds] or [minDistanceMeters], plus always keeping

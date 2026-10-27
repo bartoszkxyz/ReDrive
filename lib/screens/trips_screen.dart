@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/models/trip_anomaly.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/services/trip/trip_timeseries_service.dart';
-import 'package:redrive/widget/trips/trip_route_inspector.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/models/trip_anomaly.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/services/trip/trip_timeseries_service.dart';
+import 'package:obdrive/widget/trips/trip_route_inspector.dart';
 
 class TripsScreen extends StatelessWidget {
   const TripsScreen({super.key});

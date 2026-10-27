@@ -1,4 +1,4 @@
-/// Application flavor enumeration and global configuration for ReDrive.
+/// Application flavor enumeration and global configuration for OBDrive.
 ///
 /// Distinguishes between:
 /// - [AppFlavor.headunit]: The primary in-car launcher target (landscape-first,

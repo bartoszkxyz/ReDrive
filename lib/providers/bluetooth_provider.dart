@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_classic/flutter_blue_classic.dart';
-import 'package:redrive/services/bluetooth/models/bluetooth_status.dart';
-import 'package:redrive/services/bluetooth/permissions/bluetooth_permission_service.dart';
-import 'package:redrive/services/bluetooth/models/bluetooth_obd_device.dart';
-import 'package:redrive/services/settings/app_preferences.dart';
-import 'package:redrive/services/logging/log_service.dart';
+import 'package:obdrive/services/bluetooth/models/bluetooth_status.dart';
+import 'package:obdrive/services/bluetooth/permissions/bluetooth_permission_service.dart';
+import 'package:obdrive/services/bluetooth/models/bluetooth_obd_device.dart';
+import 'package:obdrive/services/settings/app_preferences.dart';
+import 'package:obdrive/services/logging/log_service.dart';
 
 /// [BluetoothProvider] — центральный узел управления Classic Bluetooth (SPP).
 ///

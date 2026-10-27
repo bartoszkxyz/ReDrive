@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/obd/elm/elm_client.dart';
-import 'package:redrive/obd/elm/elm_command_queue.dart';
-import 'package:redrive/obd/elm/elm_response.dart';
+import 'package:obdrive/obd/elm/elm_client.dart';
+import 'package:obdrive/obd/elm/elm_command_queue.dart';
+import 'package:obdrive/obd/elm/elm_response.dart';
 import '../fakes/fake_obd_connection.dart';
 
 void main() {

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/obd/models/fuel_system_status.dart';
-import 'package:redrive/obd/pid/pid_key.dart';
-import 'package:redrive/obd/polling/polling_controller.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/widget/home_screen/telemetry_card.dart';
+import 'package:obdrive/obd/models/fuel_system_status.dart';
+import 'package:obdrive/obd/pid/pid_key.dart';
+import 'package:obdrive/obd/polling/polling_controller.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/widget/home_screen/telemetry_card.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});

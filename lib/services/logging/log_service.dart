@@ -3,7 +3,7 @@ import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
-import 'package:redrive/services/settings/app_preferences.dart';
+import 'package:obdrive/services/settings/app_preferences.dart';
 
 /// Severity level for troubleshooting logs.
 enum LogLevel {
@@ -64,12 +64,12 @@ class LogEntry {
   String toString() => formatted;
 }
 
-/// Centralized troubleshooting logging service for ReDrive.
+/// Centralized troubleshooting logging service for OBDrive.
 ///
 /// Features:
 /// - Persisted toggle in [AppPreferences] (Debug / Log collection mode).
 /// - Rolling in-memory buffer of recent entries for real-time UI display.
-/// - File-based persistent storage (`redrive_debug.log`) for export and post-mortem analysis.
+/// - File-based persistent storage (`obdrive_debug.log`) for export and post-mortem analysis.
 /// - Automatic rotation/capping to prevent excessive disk consumption on headunits.
 /// - Reactive stream for real-time UI log viewer.
 class LogService {
@@ -106,7 +106,7 @@ class LogService {
     try {
       _isEnabled = await AppPreferences.isDebugLoggingEnabled();
       if (_isEnabled) {
-        final mirror = await getPublicReDriveDirectory();
+        final mirror = await getPublicOBDriveDirectory();
         final mirrorDesc = mirror != null ? 'mirrored to ${mirror.path}' : 'internal sandbox only';
         i('LogService initialized (debug logging active, $mirrorDesc)', tag: 'System');
       }
@@ -194,7 +194,7 @@ class LogService {
     // 5. Queue for background file write
     _queueFileLine(entry.formatted);
 
-    // 6. If it's an error, also append immediately to redrive_crash.log
+    // 6. If it's an error, also append immediately to obdrive_crash.log
     if (level == LogLevel.error) {
       _appendCrashLog(entry.formatted);
     }
@@ -254,7 +254,7 @@ class LogService {
       }
 
       if (needRotate) {
-        // Rotate primary file: archive current to redrive_debug.1.log
+        // Rotate primary file: archive current to obdrive_debug.1.log
         final rotatedFile = await getRotatedLogFile();
         try {
           if (rotatedFile.existsSync()) {
@@ -271,7 +271,7 @@ class LogService {
 
         // Fresh primary file with latest batch
         await file.writeAsString(
-          '--- LOG ROTATED (archived to redrive_debug.1.log) ---\n${batch.join('\n')}\n',
+          '--- LOG ROTATED (archived to obdrive_debug.1.log) ---\n${batch.join('\n')}\n',
           mode: FileMode.write,
           flush: true,
         );
@@ -286,7 +286,7 @@ class LogService {
       // Mirror write asynchronously to public downloads directory
       await _mirrorWrite(
         needRotate
-            ? ['--- LOG ROTATED (archived to redrive_debug.1.log) ---', ...batch]
+            ? ['--- LOG ROTATED (archived to obdrive_debug.1.log) ---', ...batch]
             : batch,
         rotate: needRotate,
       );
@@ -304,14 +304,14 @@ class LogService {
     }
   }
 
-  /// Mirrors written log batches to the public ReDrive downloads directory.
+  /// Mirrors written log batches to the public OBDrive downloads directory.
   static Future<void> _mirrorWrite(List<String> lines, {bool rotate = false}) async {
     try {
-      final mirrorDir = await getPublicReDriveDirectory();
+      final mirrorDir = await getPublicOBDriveDirectory();
       if (mirrorDir == null) return;
 
-      final mirrorFile = File('${mirrorDir.path}/redrive_debug.log');
-      final mirrorRotated = File('${mirrorDir.path}/redrive_debug.1.log');
+      final mirrorFile = File('${mirrorDir.path}/obdrive_debug.log');
+      final mirrorRotated = File('${mirrorDir.path}/obdrive_debug.1.log');
 
       if (rotate) {
         try {
@@ -347,9 +347,9 @@ class LogService {
       } catch (_) {}
 
       try {
-        final mirrorDir = await getPublicReDriveDirectory();
+        final mirrorDir = await getPublicOBDriveDirectory();
         if (mirrorDir != null) {
-          final mirrorCrashFile = File('${mirrorDir.path}/redrive_crash.log');
+          final mirrorCrashFile = File('${mirrorDir.path}/obdrive_crash.log');
           await mirrorCrashFile.writeAsString('$formattedLine\n', mode: FileMode.append, flush: true);
         }
       } catch (_) {}
@@ -357,9 +357,9 @@ class LogService {
   }
 
   /// Resolves the public, user-accessible directory for mirrored logs.
-  /// On Android: `/storage/emulated/0/Download/ReDrive` (or `/storage/emulated/0/ReDrive`).
-  /// On Desktop/Linux: `$HOME/Downloads/ReDrive`.
-  static Future<Directory?> getPublicReDriveDirectory() async {
+  /// On Android: `/storage/emulated/0/Download/OBDrive` (or `/storage/emulated/0/OBDrive`).
+  /// On Desktop/Linux: `$HOME/Downloads/OBDrive`.
+  static Future<Directory?> getPublicOBDriveDirectory() async {
     if (publicMirrorDirOverride != null) {
       return publicMirrorDirOverride;
     }
@@ -369,8 +369,8 @@ class LogService {
 
     if (Platform.isAndroid) {
       const publicCandidates = <String>[
-        '/storage/emulated/0/Download/ReDrive',
-        '/storage/emulated/0/ReDrive',
+        '/storage/emulated/0/Download/OBDrive',
+        '/storage/emulated/0/OBDrive',
       ];
 
       for (final path in publicCandidates) {
@@ -393,7 +393,7 @@ class LogService {
       try {
         final extDir = await getExternalStorageDirectory();
         if (extDir != null) {
-          final fallbackDir = Directory('${extDir.path}/ReDrive');
+          final fallbackDir = Directory('${extDir.path}/OBDrive');
           if (!fallbackDir.existsSync()) {
             fallbackDir.createSync(recursive: true);
           }
@@ -406,7 +406,7 @@ class LogService {
       final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
       if (home != null && home.isNotEmpty) {
         try {
-          final dir = Directory('$home/Downloads/ReDrive');
+          final dir = Directory('$home/Downloads/OBDrive');
           if (!dir.existsSync()) {
             dir.createSync(recursive: true);
           }
@@ -430,7 +430,7 @@ class LogService {
       dir = Directory.systemTemp;
     }
 
-    _cachedCrashLogFile = File('${dir.path}/redrive_crash.log');
+    _cachedCrashLogFile = File('${dir.path}/obdrive_crash.log');
     return _cachedCrashLogFile!;
   }
 
@@ -445,7 +445,7 @@ class LogService {
       dir = Directory.systemTemp;
     }
 
-    _cachedLogFile = File('${dir.path}/redrive_debug.log');
+    _cachedLogFile = File('${dir.path}/obdrive_debug.log');
     return _cachedLogFile!;
   }
 
@@ -460,7 +460,7 @@ class LogService {
       dir = Directory.systemTemp;
     }
 
-    _cachedRotatedLogFile = File('${dir.path}/redrive_debug.1.log');
+    _cachedRotatedLogFile = File('${dir.path}/obdrive_debug.1.log');
     return _cachedRotatedLogFile!;
   }
 
@@ -499,13 +499,13 @@ class LogService {
       }
 
       // Also clean public mirror files
-      final mirrorDir = await getPublicReDriveDirectory();
+      final mirrorDir = await getPublicOBDriveDirectory();
       if (mirrorDir != null) {
-        final mirrorLog = File('${mirrorDir.path}/redrive_debug.log');
+        final mirrorLog = File('${mirrorDir.path}/obdrive_debug.log');
         if (mirrorLog.existsSync()) mirrorLog.deleteSync();
-        final mirrorRotated = File('${mirrorDir.path}/redrive_debug.1.log');
+        final mirrorRotated = File('${mirrorDir.path}/obdrive_debug.1.log');
         if (mirrorRotated.existsSync()) mirrorRotated.deleteSync();
-        final mirrorCrash = File('${mirrorDir.path}/redrive_crash.log');
+        final mirrorCrash = File('${mirrorDir.path}/obdrive_crash.log');
         if (mirrorCrash.existsSync()) mirrorCrash.deleteSync();
       }
     } catch (_) {}
@@ -542,7 +542,7 @@ class LogService {
       if (rotatedFile.existsSync()) {
         final rotatedContent = await rotatedFile.readAsString();
         if (rotatedContent.trim().isNotEmpty) {
-          buffer.writeln('=== ARCHIVED LOGS (redrive_debug.1.log) ===');
+          buffer.writeln('=== ARCHIVED LOGS (obdrive_debug.1.log) ===');
           buffer.writeln(rotatedContent.trim());
           buffer.writeln('===========================================\n');
           readFromDisk = true;

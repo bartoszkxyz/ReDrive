@@ -1,6 +1,8 @@
-# ReDrive (Extended In-Car & Headunit Edition)
+# OBDrive (Extended In-Car & Headunit Edition)
 
-> A customized fork and derivative of [ReDrive by iUnreallx](https://github.com/iUnreallx/ReDrive), extended for in-car Android headunits, trip tracking, diagnostics, and wireless OBD2 connectivity.
+> OBDrive is a high-performance OBD2 cockpit launcher and companion platform for in-car Android headunits and mobile devices, featuring real-time telemetry, trip tracking, diagnostics, and wireless sync.
+> 
+> A customized derivative originating from [ReDrive by iUnreallx](https://github.com/iUnreallx/ReDrive).
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-02569B?style=flat&logo=flutter&logoColor=white)](https://flutter.dev/)

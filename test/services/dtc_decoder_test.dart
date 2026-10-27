@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/obd/elm/elm_response.dart';
-import 'package:redrive/services/dtc/dtc_decoder.dart';
-import 'package:redrive/services/dtc/dtc_database.dart';
+import 'package:obdrive/obd/elm/elm_response.dart';
+import 'package:obdrive/services/dtc/dtc_decoder.dart';
+import 'package:obdrive/services/dtc/dtc_database.dart';
 
 void main() {
   const decoder = DtcDecoder();

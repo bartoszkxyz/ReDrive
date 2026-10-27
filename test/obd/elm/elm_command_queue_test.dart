@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/obd/elm/elm_command.dart';
-import 'package:redrive/obd/elm/elm_command_queue.dart';
+import 'package:obdrive/obd/elm/elm_command.dart';
+import 'package:obdrive/obd/elm/elm_command_queue.dart';
 
 const Duration _timeout = Duration(seconds: 1);
 

@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/models/trip_anomaly.dart';
-import 'package:redrive/models/trip_route_point.dart';
-import 'package:redrive/obd/models/obd_data.dart';
-import 'package:redrive/services/trip/route_downsampler.dart';
-import 'package:redrive/services/trip/trip_timeseries_service.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/models/trip_anomaly.dart';
+import 'package:obdrive/models/trip_route_point.dart';
+import 'package:obdrive/obd/models/obd_data.dart';
+import 'package:obdrive/services/trip/route_downsampler.dart';
+import 'package:obdrive/services/trip/trip_timeseries_service.dart';
 
 void main() {
   group('GpsFix Model', () {

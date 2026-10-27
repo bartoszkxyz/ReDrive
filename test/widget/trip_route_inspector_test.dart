@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/models/dtc_code.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/models/trip_anomaly.dart';
-import 'package:redrive/models/trip_route_point.dart';
-import 'package:redrive/models/vehicle_profile.dart';
-import 'package:redrive/obd/models/obd_data.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/screens/trips_screen.dart';
-import 'package:redrive/services/gps/gps_location_service.dart';
-import 'package:redrive/services/trip/fuel_calculator.dart';
-import 'package:redrive/services/trip/trip_anomaly_detector.dart';
-import 'package:redrive/services/trip/trip_timeseries_service.dart';
-import 'package:redrive/widget/trips/trip_route_inspector.dart';
+import 'package:obdrive/models/dtc_code.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/models/trip_anomaly.dart';
+import 'package:obdrive/models/trip_route_point.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
+import 'package:obdrive/obd/models/obd_data.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/screens/trips_screen.dart';
+import 'package:obdrive/services/gps/gps_location_service.dart';
+import 'package:obdrive/services/trip/fuel_calculator.dart';
+import 'package:obdrive/services/trip/trip_anomaly_detector.dart';
+import 'package:obdrive/services/trip/trip_timeseries_service.dart';
+import 'package:obdrive/widget/trips/trip_route_inspector.dart';
 
 /// Test double implementing [TripProvider] for widget testing without disk I/O.
 class _MockTripProvider extends ChangeNotifier implements TripProvider {

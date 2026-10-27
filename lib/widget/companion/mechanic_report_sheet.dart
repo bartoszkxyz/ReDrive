@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:redrive/models/dtc_code.dart';
-import 'package:redrive/models/sync_models.dart';
-import 'package:redrive/models/trip_anomaly.dart';
+import 'package:obdrive/models/dtc_code.dart';
+import 'package:obdrive/models/sync_models.dart';
+import 'package:obdrive/models/trip_anomaly.dart';
 
 /// Modal bottom sheet displaying a comprehensive mechanic diagnostic report
 /// including confirmed/pending DTCs, recent anomaly episodes, and vehicle telemetry.

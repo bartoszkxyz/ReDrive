@@ -5,8 +5,8 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/obd/models/obd_data.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/obd/models/obd_data.dart';
 
 /// Supported export formats for trip timeseries data.
 enum TimeseriesExportFormat {
@@ -309,7 +309,7 @@ class TripTimeseriesService {
         final xdgData = Platform.environment['XDG_DATA_HOME'];
         final dataPath = xdgData != null && xdgData.isNotEmpty
             ? xdgData
-            : '$home/.local/share/redrive';
+            : '$home/.local/share/obdrive';
         baseDir = Directory(dataPath);
       }
     }
@@ -666,7 +666,7 @@ class TripTimeseriesService {
   }
 
   static const MethodChannel _storageChannel =
-      MethodChannel('com.example.redrive/storage');
+      MethodChannel('com.example.obdrive/storage');
 
   /// Exports recorded timeseries samples for [trip] into CSV, JSON, or both formats.
   /// Throws [StateError] if no samples exist for the trip.
@@ -686,7 +686,7 @@ class TripTimeseriesService {
 
     if (format == TimeseriesExportFormat.csv ||
         format == TimeseriesExportFormat.both) {
-      final csvFileName = 'redrive_trip_${trip.id}_$timestampStr.csv';
+      final csvFileName = 'obdrive_trip_${trip.id}_$timestampStr.csv';
       final csvBuffer = StringBuffer();
       csvBuffer.writeln(
         'timestamp_iso,elapsed_s,rpm,speed_kmh,engine_load_pct,throttle_raw_pct,throttle_rel_pct,maf_gps,map_kpa,stft_pct,ltft_pct,total_trim_pct,timing_adv_deg,coolant_c,iat_c,voltage_v,fuel_rate_lph,fuel_level_pct,fuel_system_status,is_dfco,active_problems,active_suspicions',
@@ -732,7 +732,7 @@ class TripTimeseriesService {
 
     if (format == TimeseriesExportFormat.json ||
         format == TimeseriesExportFormat.both) {
-      final jsonFileName = 'redrive_trip_${trip.id}_$timestampStr.json';
+      final jsonFileName = 'obdrive_trip_${trip.id}_$timestampStr.json';
       final exportMap = <String, dynamic>{
         'trip': trip.toJson(),
         'anomalies': trip.anomalies.map((e) => e.toJson()).toList(),
@@ -768,15 +768,15 @@ class TripTimeseriesService {
       return file.path;
     }
 
-    // 2. Android: save to /storage/emulated/0/ReDrive or /storage/emulated/0/Download/ReDrive
+    // 2. Android: save to /storage/emulated/0/OBDrive or /storage/emulated/0/Download/OBDrive
     if (Platform.isAndroid) {
       try {
         await Permission.storage.request();
       } catch (_) {}
 
       const androidCandidateDirs = <String>[
-        '/storage/emulated/0/ReDrive',
-        '/storage/emulated/0/Download/ReDrive',
+        '/storage/emulated/0/OBDrive',
+        '/storage/emulated/0/Download/OBDrive',
         '/storage/emulated/0/Download',
         '/storage/emulated/0',
       ];
@@ -810,11 +810,11 @@ class TripTimeseriesService {
         }
       } catch (_) {}
 
-      // Fallback to /storage/emulated/0/Android/data/<pkg>/files/ReDrive_Exports
+      // Fallback to /storage/emulated/0/Android/data/<pkg>/files/OBDrive_Exports
       try {
         final extDir = await getExternalStorageDirectory();
         if (extDir != null) {
-          final exportDir = Directory('${extDir.path}/ReDrive_Exports');
+          final exportDir = Directory('${extDir.path}/OBDrive_Exports');
           if (!await exportDir.exists()) {
             await exportDir.create(recursive: true);
           }
@@ -836,7 +836,7 @@ class TripTimeseriesService {
     final home = Platform.environment['HOME'] ??
         Platform.environment['USERPROFILE'] ??
         '.';
-    final desktopDownload = Directory('$home/Downloads/ReDrive');
+    final desktopDownload = Directory('$home/Downloads/OBDrive');
     try {
       if (!await desktopDownload.exists()) {
         await desktopDownload.create(recursive: true);
@@ -850,10 +850,10 @@ class TripTimeseriesService {
         final xdgData = Platform.environment['XDG_DATA_HOME'];
         final dataPath = xdgData != null && xdgData.isNotEmpty
             ? xdgData
-            : '$home/.local/share/redrive';
+            : '$home/.local/share/obdrive';
         docDir = Directory(dataPath);
       }
-      final fallbackDir = Directory('${docDir.path}/ReDrive_Exports');
+      final fallbackDir = Directory('${docDir.path}/OBDrive_Exports');
       if (!await fallbackDir.exists()) {
         await fallbackDir.create(recursive: true);
       }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/providers/trip_provider.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/providers/trip_provider.dart';
 
 /// Compact, comprehensive Active Trip Tile for the Home screen.
 /// Spans full screen width (two tile slots on split-screen), prioritizing

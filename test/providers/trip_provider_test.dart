@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:redrive/obd/models/obd_data.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/services/settings/app_preferences.dart';
-import 'package:redrive/services/trip/trip_history_service.dart';
+import 'package:obdrive/obd/models/obd_data.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/services/settings/app_preferences.dart';
+import 'package:obdrive/services/trip/trip_history_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -19,7 +19,7 @@ void main() {
     AppPreferences.resetCacheForTesting();
     await AppPreferences.setAutoTripEnabled(true);
     tempDir = Directory.systemTemp.createTempSync(
-      'redrive_trip_provider_test_',
+      'obdrive_trip_provider_test_',
     );
   });
 

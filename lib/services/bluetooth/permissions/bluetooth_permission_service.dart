@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:redrive/services/bluetooth/models/bluetooth_status.dart';
+import 'package:obdrive/services/bluetooth/models/bluetooth_status.dart';
 
 Future<BluetoothPermissionStatus> requestBluetoothPermissions() async {
   if (!Platform.isAndroid) return BluetoothPermissionStatus.granted;

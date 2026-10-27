@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/obd/elm/elm_response.dart';
-import 'package:redrive/obd/pid/decoders/throttle_position_decoder.dart';
+import 'package:obdrive/obd/elm/elm_response.dart';
+import 'package:obdrive/obd/pid/decoders/throttle_position_decoder.dart';
 
 void main() {
   group('decodeThrottlePosition', () {

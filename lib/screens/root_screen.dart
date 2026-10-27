@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/l10n/app_localizations.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/screens/car_screen.dart';
-import 'package:redrive/screens/connection_screen.dart';
-import 'package:redrive/widget/bottom_bar/custom_bottom_bar.dart';
-import 'package:redrive/widget/common/reconnection_banner.dart';
-import 'package:redrive/screens/dashboard_screen.dart';
-import 'package:redrive/core/app_flavor.dart';
-import 'package:redrive/screens/headunit_launcher_screen.dart';
-import 'package:redrive/screens/settings_screen.dart';
+import 'package:obdrive/l10n/app_localizations.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/screens/car_screen.dart';
+import 'package:obdrive/screens/connection_screen.dart';
+import 'package:obdrive/widget/bottom_bar/custom_bottom_bar.dart';
+import 'package:obdrive/widget/common/reconnection_banner.dart';
+import 'package:obdrive/screens/dashboard_screen.dart';
+import 'package:obdrive/core/app_flavor.dart';
+import 'package:obdrive/screens/headunit_launcher_screen.dart';
+import 'package:obdrive/screens/settings_screen.dart';
 import 'home_screen.dart';
 import 'dart:async';
 
-import 'package:redrive/screens/trips_screen.dart';
-import 'package:redrive/screens/diagnostics_screen.dart';
+import 'package:obdrive/screens/trips_screen.dart';
+import 'package:obdrive/screens/diagnostics_screen.dart';
 
 class RootScreen extends StatefulWidget {
   const RootScreen({super.key});

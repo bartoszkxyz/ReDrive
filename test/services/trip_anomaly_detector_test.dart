@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/models/dtc_code.dart';
-import 'package:redrive/models/trip_anomaly.dart';
-import 'package:redrive/obd/models/obd_data.dart';
-import 'package:redrive/services/trip/trip_anomaly_detector.dart';
+import 'package:obdrive/models/dtc_code.dart';
+import 'package:obdrive/models/trip_anomaly.dart';
+import 'package:obdrive/obd/models/obd_data.dart';
+import 'package:obdrive/services/trip/trip_anomaly_detector.dart';
 
 void main() {
   group('TripAnomalyDetector', () {

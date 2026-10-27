@@ -2,13 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/l10n/app_localizations.dart';
-import 'package:redrive/obd/source/obd_source_state.dart';
-import 'package:redrive/providers/bluetooth_provider.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/services/settings/app_preferences.dart';
-import 'package:redrive/widget/connection/bluetooth/bluetooth_tab.dart';
-import 'package:redrive/widget/settings/obd_adapter_test_sheet.dart';
+import 'package:obdrive/l10n/app_localizations.dart';
+import 'package:obdrive/obd/source/obd_source_state.dart';
+import 'package:obdrive/providers/bluetooth_provider.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/services/settings/app_preferences.dart';
+import 'package:obdrive/widget/connection/bluetooth/bluetooth_tab.dart';
+import 'package:obdrive/widget/settings/obd_adapter_test_sheet.dart';
 
 /// Comprehensive OBD-II (ELM327) Operations Center widget.
 ///

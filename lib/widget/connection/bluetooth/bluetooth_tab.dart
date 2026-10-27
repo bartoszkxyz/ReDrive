@@ -1,12 +1,12 @@
 import 'dart:async';
-import 'package:redrive/l10n/app_localizations.dart';
+import 'package:obdrive/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/services/bluetooth/models/bluetooth_status.dart';
-import 'package:redrive/services/bluetooth/models/bluetooth_obd_device.dart';
-import 'package:redrive/providers/bluetooth_provider.dart';
-import 'package:redrive/providers/obd_provider.dart';
+import 'package:obdrive/services/bluetooth/models/bluetooth_status.dart';
+import 'package:obdrive/services/bluetooth/models/bluetooth_obd_device.dart';
+import 'package:obdrive/providers/bluetooth_provider.dart';
+import 'package:obdrive/providers/obd_provider.dart';
 
 class BluetoothTab extends StatefulWidget {
   const BluetoothTab({super.key});

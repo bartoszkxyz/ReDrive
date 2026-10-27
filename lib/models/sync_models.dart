@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
-import 'package:redrive/models/dtc_code.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/models/trip_anomaly.dart';
-import 'package:redrive/models/vehicle_profile.dart';
+import 'package:obdrive/models/dtc_code.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/models/trip_anomaly.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
 
 /// Snapshot of vehicle status recorded when the ignition is switched off
 /// or when a trip finishes, used for parking location, fuel level, and battery health.

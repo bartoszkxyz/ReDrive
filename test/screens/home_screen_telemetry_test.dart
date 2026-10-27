@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:redrive/models/trip.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/providers/trip_provider.dart';
-import 'package:redrive/screens/home_screen.dart';
-import 'package:redrive/l10n/app_localizations.dart';
-import 'package:redrive/widget/home_screen/active_trip_tile.dart';
-import 'package:redrive/widget/home_screen/engine_temp_card.dart';
-import 'package:redrive/widget/home_screen/fuel_load_card.dart';
+import 'package:obdrive/models/trip.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/providers/trip_provider.dart';
+import 'package:obdrive/screens/home_screen.dart';
+import 'package:obdrive/l10n/app_localizations.dart';
+import 'package:obdrive/widget/home_screen/active_trip_tile.dart';
+import 'package:obdrive/widget/home_screen/engine_temp_card.dart';
+import 'package:obdrive/widget/home_screen/fuel_load_card.dart';
 
 void main() {
   group('EngineTempCard', () {

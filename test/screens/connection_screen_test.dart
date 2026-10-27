@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:redrive/core/theme/theme_engine.dart';
-import 'package:redrive/l10n/app_localizations.dart';
-import 'package:redrive/providers/bluetooth_provider.dart';
-import 'package:redrive/providers/obd_provider.dart';
-import 'package:redrive/providers/sync_provider.dart';
-import 'package:redrive/screens/connection_screen.dart';
-import 'package:redrive/services/sync/bluetooth_sync_service.dart';
-import 'package:redrive/widget/settings/obd_adapter_test_sheet.dart';
+import 'package:obdrive/core/theme/theme_engine.dart';
+import 'package:obdrive/l10n/app_localizations.dart';
+import 'package:obdrive/providers/bluetooth_provider.dart';
+import 'package:obdrive/providers/obd_provider.dart';
+import 'package:obdrive/providers/sync_provider.dart';
+import 'package:obdrive/screens/connection_screen.dart';
+import 'package:obdrive/services/sync/bluetooth_sync_service.dart';
+import 'package:obdrive/widget/settings/obd_adapter_test_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

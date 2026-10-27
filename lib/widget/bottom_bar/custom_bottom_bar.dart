@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:redrive/l10n/app_localizations.dart';
-import 'package:redrive/widget/bottom_bar/bottom_bar_config.dart';
-import 'package:redrive/widget/bottom_bar/bottom_bar_item.dart';
+import 'package:obdrive/l10n/app_localizations.dart';
+import 'package:obdrive/widget/bottom_bar/bottom_bar_config.dart';
+import 'package:obdrive/widget/bottom_bar/bottom_bar_item.dart';
 
 class CustomBottomBar extends StatelessWidget {
   const CustomBottomBar({

@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:redrive/models/vehicle_profile.dart';
-import 'package:redrive/obd/pid/pid_key.dart';
-import 'package:redrive/obd/polling/polling_controller.dart';
+import 'package:obdrive/models/vehicle_profile.dart';
+import 'package:obdrive/obd/pid/pid_key.dart';
+import 'package:obdrive/obd/polling/polling_controller.dart';
 
 import '../obd/demo/demo_data_generator.dart';
 import '../obd/models/obd_data.dart';
@@ -150,7 +150,7 @@ class ObdProvider extends ChangeNotifier {
       notifyListeners();
       try {
         updateServiceNotification(
-          title: 'ReDrive Connected',
+          title: 'OBDrive Connected',
           content: 'Coolant normalized ($temp°C). Monitoring active.',
         );
       } catch (_) {}

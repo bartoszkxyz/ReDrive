@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:redrive/obd/elm/elm_client.dart';
-import 'package:redrive/obd/session/obd_session.dart';
+import 'package:obdrive/obd/elm/elm_client.dart';
+import 'package:obdrive/obd/session/obd_session.dart';
 
 import '../fakes/fake_obd_connection.dart';
 

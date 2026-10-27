@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:redrive/obd/elm/elm_response.dart';
+import 'package:obdrive/obd/elm/elm_response.dart';
 
 class ElmCommand {
   final String command;
